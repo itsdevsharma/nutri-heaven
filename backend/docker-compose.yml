@@ -1,0 +1,133 @@
+# Local development infrastructure: MongoDB, Redis and S3-compatible object
+# storage. Every value has a development default, so this works with no .env
+# file present. Copy .env.example to .env to override anything.
+#
+#   pnpm infra:up      start everything and wait until healthy
+#   pnpm infra:down    stop everything
+#   pnpm infra:reset   stop everything and delete all data volumes
+#
+# NOTE: object storage is pulled from quay.io. MinIO retired its community
+# images on Docker Hub, so `minio/minio` no longer resolves — `docker pull
+# minio/minio` fails with "pull access denied".
+
+name: nutri-heaven
+
+services:
+  mongodb:
+    # Pinned long-term, not floating, and deliberate. `mongo:8` refuses to boot
+    # on kernels >= 6.19 (SERVER-121912 — vendored TCMalloc violates the rseq
+    # ABI, and 7.0.0 >= 6.19 counts): the log fills with "Linux kernel versions
+    # 6.19 and newer has a known incompatibility with this version of MongoDB"
+    # and the container restart-loops forever. `mongo:7.0` is unaffected and
+    # boots on this host's kernel 7.0.x.
+    image: mongo:7.0
+    container_name: nutri-mongodb
+    restart: unless-stopped
+    # Runs as a single-node replica set rather than a standalone server.
+    # Multi-document transactions (order creation + stock decrement) only exist
+    # on a replica set, so development matches production instead of discovering
+    # the difference in phase 3.
+    #
+    # No authentication in local development, on purpose. A replica set with
+    # `--auth` requires a keyFile, which means generating a secret file with
+    # exact ownership/permissions on every developer machine. The port binds to
+    # 127.0.0.1 only, so the unauthenticated server never leaves the laptop;
+    # production uses an authenticated managed MongoDB and the API takes the
+    # full URI (with credentials) from MONGODB_URI.
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    ports:
+      - '127.0.0.1:${MONGO_PORT:-27017}:27017'
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      # Initiates the replica set on first run, then reports healthy only once
+      # this node is the writable primary. Both steps are idempotent, so this is
+      # safe to repeat on every tick — and it keeps `infra:up --wait` honest:
+      # when it returns, the database is genuinely ready for transactions.
+      test:
+        - CMD-SHELL
+        - >
+          mongosh --quiet
+          --eval "try { rs.status() } catch (e) { rs.initiate() };
+          if (!db.hello().isWritablePrimary) { quit(1) }"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: nutri-redis
+    restart: unless-stopped
+    # appendonly survives restarts; `noeviction` is required by BullMQ, whose
+    # job keys must never be evicted under memory pressure.
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  object-storage:
+    image: quay.io/minio/minio:latest
+    container_name: nutri-object-storage
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nutri}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nutri_dev_password}
+    ports:
+      - '${MINIO_API_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - object_storage_data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # One-shot job that creates the media bucket, then exits. Without it every
+  # developer has to click through the console before the API can store a file.
+  #
+  # It lives behind the `init` profile on purpose: `docker compose up --wait`
+  # treats any container that exits as a failure, so an always-on one-shot job
+  # would break `pnpm infra:up`. Run it explicitly with `pnpm infra:buckets`.
+  object-storage-init:
+    image: quay.io/minio/mc:latest
+    container_name: nutri-object-storage-init
+    profiles: [init]
+    depends_on:
+      object-storage:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nutri}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nutri_dev_password}
+      S3_BUCKET: ${S3_BUCKET:-nutri-media}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://object-storage:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$S3_BUCKET"
+        # Product imagery is rendered in browsers, so the bucket is public-read.
+        mc anonymous set download "local/$$S3_BUCKET"
+        echo "bucket ready: $$S3_BUCKET"
+    restart: 'no'
+
+volumes:
+  mongodb_data:
+  redis_data:
+  object_storage_data:

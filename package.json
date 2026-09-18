@@ -1,8 +1,26 @@
 {
   "name": "nutri-heaven",
+  "version": "0.1.0",
   "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
-  "dependencies": { "@vitejs/plugin-react": "latest", "vite": "latest", "react": "latest", "react-dom": "latest" }
+  "packageManager": "pnpm@12.4.2",
+  "description": "Nutri Heaven — thin root scripts dispatching into the self-contained frontend/ and backend/ packages (each has its own lockfile; run pnpm install:all first)",
+  "scripts": {
+    "install:all": "pnpm -C frontend install && pnpm -C backend install",
+    "dev": "pnpm -C frontend dev & pnpm -C backend dev & wait",
+    "build": "pnpm -C backend build && pnpm -C frontend build",
+    "clean": "pnpm -C backend clean && pnpm -C frontend clean",
+    "frontend:dev": "pnpm -C frontend dev",
+    "frontend:build": "pnpm -C frontend build",
+    "frontend:preview": "pnpm -C frontend preview",
+    "backend:dev": "pnpm -C backend dev",
+    "backend:build": "pnpm -C backend build",
+    "backend:start": "pnpm -C backend start",
+    "backend:seed": "pnpm -C backend build && pnpm -C backend seed",
+    "backend:test": "pnpm -C backend test",
+    "infra:up": "pnpm -C backend infra:up",
+    "infra:buckets": "pnpm -C backend infra:buckets",
+    "infra:down": "pnpm -C backend infra:down",
+    "infra:logs": "pnpm -C backend infra:logs",
+    "infra:reset": "pnpm -C backend infra:reset"
+  }
 }
