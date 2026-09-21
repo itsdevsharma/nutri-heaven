@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { orderTotalForPaise, shippingFeeForPaise } from '../common/pricing';
 import { Model } from 'mongoose';
@@ -44,6 +44,49 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(`No product found for slug "${slug}"`);
     }
+    return product;
+  }
+
+  /**
+   * Admin catalogue save. Authentication is deliberately left to the future
+   * admin module; this keeps the editable catalogue contract in one place.
+   */
+  async adminUpdate(slug: string, changes: Partial<Product>): Promise<Product> {
+    const product = await this.products
+      .findOneAndUpdate({ slug }, { $set: changes }, { new: true, runValidators: true })
+      .lean()
+      .exec();
+    if (!product) throw new NotFoundException(`No product found for slug "${slug}"`);
+    return product;
+  }
+
+  async adminCreate(input: Partial<Product>): Promise<Product> {
+    const slug = input.slug?.trim().toLowerCase();
+    if (!slug || !input.title || !input.description || !input.image || !input.category || input.pricePaise === undefined) {
+      throw new ConflictException('slug, title, description, image, category and pricePaise are required');
+    }
+    try { return await this.products.create({ ...input, slug, isActive: input.isActive ?? true, status: input.status ?? 'draft' }); }
+    catch (error) { if (typeof error === 'object' && error && 'code' in error && error.code === 11000) throw new ConflictException('Product slug or SKU already exists'); throw error; }
+  }
+
+  async adminDuplicate(slug: string): Promise<Product> {
+    const original = await this.products.findOne({ slug }).lean().exec();
+    if (!original) throw new NotFoundException(`No product found for slug "${slug}"`);
+    const copySlug = `${original.slug}-copy-${Date.now().toString(36)}`;
+    return this.products.create({
+      slug: copySlug, title: `${original.title} (copy)`, description: original.description,
+      shortDescription: original.shortDescription, fullDescription: original.fullDescription,
+      pricePaise: original.pricePaise, mrpPaise: original.mrpPaise, image: original.image,
+      images: original.images, category: original.category, subCategory: original.subCategory,
+      brand: original.brand, tags: original.tags, discountBasisPoints: original.discountBasisPoints,
+      seoTitle: original.seoTitle, seoDescription: original.seoDescription, status: 'draft', isActive: false,
+      variants: original.variants.map(variant => ({ ...variant, sku: undefined })),
+    });
+  }
+
+  async adminDeactivate(slug: string): Promise<Product> {
+    const product = await this.products.findOneAndUpdate({ slug }, { $set: { isActive: false, status: 'inactive' } }, { new: true }).lean().exec();
+    if (!product) throw new NotFoundException(`No product found for slug "${slug}"`);
     return product;
   }
 

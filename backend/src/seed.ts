@@ -2,7 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { getModelToken } from '@nestjs/mongoose';
 import { Logger } from '@nestjs/common';
 import { Model } from 'mongoose';
+import { hash } from 'bcryptjs';
 import { AppModule } from './app.module';
+import { Admin, AdminDocument, AdminRole } from './admin/admin.schema';
 import { Product, ProductDocument } from './products/product.schema';
 
 /**
@@ -11,7 +13,7 @@ import { Product, ProductDocument } from './products/product.schema';
  * storefront swaps its hardcoded list for API data. Prices are paise —
  * ₹275 is 27500 — and categories mirror the storefront's four tiles.
  */
-const SEED_PRODUCTS: Omit<Product, '_id'>[] = [
+const SEED_PRODUCTS: Array<Pick<Product, 'slug' | 'title' | 'description' | 'pricePaise' | 'image' | 'category' | 'isActive'>> = [
   { slug: 'almonds', title: 'California Almonds', description: 'Crisp, buttery and naturally wholesome', pricePaise: 27500, image: 'almonds_ze0A.jpg', category: 'Premium Nuts', isActive: true },
   { slug: 'cashews', title: 'Roasted Cashews', description: 'Jumbo, golden and full of flavour', pricePaise: 29900, image: 'cashews_ze0A.jpg', category: 'Premium Nuts', isActive: true },
   { slug: 'pistachios', title: 'Iranian Pistachios', description: 'Lightly salted, naturally opened', pricePaise: 34900, image: 'pistachios_ze0A.jpg', category: 'Premium Nuts', isActive: true },
@@ -34,10 +36,32 @@ async function run(): Promise<void> {
     const products = app.get<Model<ProductDocument>>(
       getModelToken(Product.name),
     );
+    const admins = app.get<Model<AdminDocument>>(getModelToken(Admin.name));
     for (const seed of SEED_PRODUCTS) {
+      const variants = [
+        { size: '250g', pricePaise: seed.pricePaise, isActive: true },
+        { size: '500g', pricePaise: Math.round(seed.pricePaise * 1.9), isActive: true },
+        { size: '1kg', pricePaise: Math.round(seed.pricePaise * 3.65), isActive: true },
+      ];
       await products
-        .updateOne({ slug: seed.slug }, { $set: seed }, { upsert: true })
+        .updateOne(
+          { slug: seed.slug },
+          { $set: { ...seed, variants, tags: ['Natural'] } },
+          { upsert: true },
+        )
         .exec();
+    }
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (adminEmail && adminPassword) {
+      await admins.updateOne(
+        { email: adminEmail },
+        { $setOnInsert: { name: 'Initial administrator', email: adminEmail, passwordHash: await hash(adminPassword, 12), role: AdminRole.SUPER_ADMIN, isActive: true } },
+        { upsert: true },
+      ).exec();
+      Logger.log(`Seeded admin ${adminEmail}`, 'Seed');
+    } else {
+      Logger.warn('No ADMIN_EMAIL/ADMIN_PASSWORD set; no admin account was seeded', 'Seed');
     }
     Logger.log(`Seeded ${SEED_PRODUCTS.length} products`, 'Seed');
   } finally {

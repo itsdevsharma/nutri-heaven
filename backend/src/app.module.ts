@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HealthController } from './health.controller';
 import { ProductsModule } from './products/products.module';
+import { AdminModule } from './admin/admin.module';
+import { AuthModule } from './auth/auth.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -23,6 +26,9 @@ import { ProductsModule } from './products/products.module';
       }),
     }),
     ProductsModule,
+    AdminModule,
+    AuthModule,
+    CategoriesModule,
   ],
   controllers: [HealthController],
 })
