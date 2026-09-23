@@ -11,10 +11,11 @@ export function cartId() {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_URL}${path}`, {
+  let response;
+  try { response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', 'x-cart-id': cartId(), ...options.headers },
-  });
+  }); } catch { throw new Error('The store service is temporarily unavailable. Please try again shortly.'); }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.message ?? 'Cart request failed');
@@ -43,7 +44,8 @@ export const storefrontApi = {
 const CUSTOMER_TOKEN_KEY = 'nutri_customer_access_token';
 async function customerRequest(path, options = {}) {
   const token = localStorage.getItem(CUSTOMER_TOKEN_KEY);
-  const response = await fetch(`${API_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } });
+  let response;
+  try { response = await fetch(`${API_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } }); } catch { throw new Error('The account service is temporarily unavailable. Please try again shortly.'); }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(Array.isArray(body.message) ? body.message.join(', ') : body.message ?? 'Customer request failed');
   return body;

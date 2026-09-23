@@ -37,7 +37,10 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const origins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+  // An empty host environment variable must not silently produce an empty
+  // allow-list (which causes successful OPTIONS responses with no CORS header).
+  // Production deployments should still set CORS_ORIGINS explicitly.
+  const origins = (process.env.CORS_ORIGINS?.trim() || 'http://localhost:5173,https://nutri-heaven-topaz.vercel.app')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
