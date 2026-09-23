@@ -3,5 +3,15 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Category, CategorySchema } from './category.schema';
 import { CategoriesController } from './categories.controller';
 import { CategoriesService } from './categories.service';
-@Module({ imports: [MongooseModule.forFeature([{ name: Category.name, schema: CategorySchema }])], controllers: [CategoriesController], providers: [CategoriesService], exports: [CategoriesService] })
+import { AuthModule } from '../auth/auth.module';
+
+@Module({
+  imports: [
+    AuthModule,
+    MongooseModule.forFeature([{ name: Category.name, schema: CategorySchema }]),
+  ],
+  controllers: [CategoriesController],
+  providers: [CategoriesService],
+  exports: [CategoriesService],
+})
 export class CategoriesModule {}

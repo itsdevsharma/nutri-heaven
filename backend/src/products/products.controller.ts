@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ListProductsQuery } from './dto/list-products.query';
+import { ListAdminProductsQuery } from './dto/list-admin-products.query';
 import { QuoteRequest } from './dto/quote.request';
 import { ProductsService } from './products.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
@@ -35,6 +36,44 @@ export class ProductsController {
   @HttpCode(HttpStatus.OK)
   quote(@Body() dto: QuoteRequest) {
     return this.products.quote(dto);
+  }
+
+  /**
+   * Admin catalogue reads.
+   *
+   * Declared before `@Get(':slug')` for the same reason `POST /products/quote`
+   * is: Express matches in declaration order, so `admin` would otherwise be
+   * read as a slug and the console would 404 on its own list route.
+   *
+   * Reads are open to every staff role (support answers catalogue questions,
+   * inventory needs stock, marketing needs scopes); writes stay restricted to
+   * `SUPER_ADMIN`/`CATALOGUE_MANAGER` below. `RolesGuard` grants `SUPER_ADMIN`
+   * implicitly.
+   */
+  @Get('admin')
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles(
+    AdminRole.SUPER_ADMIN,
+    AdminRole.CATALOGUE_MANAGER,
+    AdminRole.INVENTORY_MANAGER,
+    AdminRole.MARKETING_MANAGER,
+    AdminRole.SUPPORT,
+  )
+  adminList(@Query() query: ListAdminProductsQuery) {
+    return this.products.adminList(query);
+  }
+
+  @Get('admin/:slug')
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles(
+    AdminRole.SUPER_ADMIN,
+    AdminRole.CATALOGUE_MANAGER,
+    AdminRole.INVENTORY_MANAGER,
+    AdminRole.MARKETING_MANAGER,
+    AdminRole.SUPPORT,
+  )
+  adminBySlug(@Param('slug') slug: string) {
+    return this.products.adminFindBySlug(slug);
   }
 
   @Get(':slug')

@@ -6,6 +6,12 @@ import { ProductsModule } from './products/products.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
+import { CartModule } from './cart/cart.module';
+import { StoreSettingsModule } from './settings/store-settings.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { OrderModule } from './orders/order.module';
+import { PaymentsModule } from './payments/payments.module';
+import { CustomerModule } from './customers/customer.module';
 
 @Module({
   imports: [
@@ -29,6 +35,15 @@ import { CategoriesModule } from './categories/categories.module';
     AdminModule,
     AuthModule,
     CategoriesModule,
+    CartModule,
+    StoreSettingsModule,
+    // Step 3 of the plan: the immutable inventory ledger and its adjustment
+    // endpoints. Order placement (step 7) will import InventoryModule to
+    // reserve and release stock through the same service.
+    InventoryModule,
+    OrderModule,
+    PaymentsModule,
+    CustomerModule,
   ],
   controllers: [HealthController],
 })

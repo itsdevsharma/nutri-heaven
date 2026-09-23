@@ -1,12 +1,13 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { orderTotalForPaise, shippingFeeForPaise } from '../common/pricing';
-import { Model } from 'mongoose';
+import { FilterQuery, Model } from 'mongoose';
 import { QuoteRequest } from './dto/quote.request';
 import { Product, ProductDocument } from './product.schema';
 
 export interface QuoteLineResult {
   slug: string;
+  packSize: string;
   title: string;
   quantity: number;
   unitPricePaise: number;
@@ -18,6 +19,14 @@ export interface QuoteResult {
   subtotalPaise: number;
   shippingPaise: number;
   totalPaise: number;
+}
+
+/** One page of the admin catalogue, together with the total for the pager. */
+export interface AdminProductListResult {
+  items: Product[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 @Injectable()
@@ -48,8 +57,74 @@ export class ProductsService {
   }
 
   /**
-   * Admin catalogue save. Authentication is deliberately left to the future
-   * admin module; this keeps the editable catalogue contract in one place.
+   * Admin catalogue read: unlike `findAll` this is the unfiltered view —
+   * drafts, inactive and archived products included — so the admin console can
+   * manage the whole lifecycle instead of only what the storefront sells.
+   *
+   * The search needle is escaped before it reaches `RegExp`, so a user typing
+   * `.*` searches for a literal `.*` rather than turning the query into a scan.
+   * `sku` is sparse; a missing SKU simply does not match.
+   */
+  async adminList(
+    filters: {
+      status?: Product['status'];
+      q?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<AdminProductListResult> {
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    const query: FilterQuery<ProductDocument> = {};
+    if (filters.status) query.status = filters.status;
+
+    const needle = filters.q?.trim();
+    if (needle) {
+      const pattern = new RegExp(
+        needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i',
+      );
+      query.$or = [
+        { title: pattern },
+        { slug: pattern },
+        { sku: pattern },
+        { category: pattern },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.products
+        .find(query)
+        .sort({ updatedAt: -1, slug: 1 })
+        .skip(offset)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.products.countDocuments(query).exec(),
+    ]);
+    return { items, total, limit, offset };
+  }
+
+  /**
+   * Admin single read: resolves drafts and inactive products too, which is why
+   * `findBySlug` (public, `isActive: true` only) cannot be reused here.
+   */
+  async adminFindBySlug(slug: string): Promise<Product> {
+    const product = await this.products
+      .findOne({ slug: slug.trim().toLowerCase() })
+      .lean()
+      .exec();
+    if (!product) {
+      throw new NotFoundException(`No product found for slug "${slug}"`);
+    }
+    return product;
+  }
+
+  /**
+   * Admin catalogue save. Authentication and role checks live on the controller
+   * (`AdminAuthGuard` + `RolesGuard`); this keeps the editable catalogue
+   * contract in one place.
    */
   async adminUpdate(slug: string, changes: Partial<Product>): Promise<Product> {
     const product = await this.products
@@ -108,12 +183,20 @@ export class ProductsService {
       if (!product) {
         throw new NotFoundException(`No product found for slug "${line.slug}"`);
       }
+      const packSize = line.packSize ?? '250g';
+      const variant = product.variants.find((item) => item.size === packSize && item.isActive);
+      // Legacy catalogue rows created before variants existed remain quoteable
+      // at their base price while all new cart/order lines require a variant.
+      if (!variant && product.variants.length) {
+        throw new NotFoundException(`No active pack "${packSize}" for "${line.slug}"`);
+      }
       return {
         slug: product.slug,
+        packSize: variant?.size ?? packSize,
         title: product.title,
         quantity: line.quantity,
-        unitPricePaise: product.pricePaise,
-        lineTotalPaise: product.pricePaise * line.quantity,
+        unitPricePaise: variant?.pricePaise ?? product.pricePaise,
+        lineTotalPaise: (variant?.pricePaise ?? product.pricePaise) * line.quantity,
       };
     });
 

@@ -17,6 +17,10 @@ class QuoteLine {
   @IsString()
   slug!: string;
 
+  @IsOptional()
+  @IsString()
+  packSize?: string;
+
   @IsInt()
   @Min(1)
   @Max(99)

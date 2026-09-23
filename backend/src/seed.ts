@@ -39,14 +39,14 @@ async function run(): Promise<void> {
     const admins = app.get<Model<AdminDocument>>(getModelToken(Admin.name));
     for (const seed of SEED_PRODUCTS) {
       const variants = [
-        { size: '250g', pricePaise: seed.pricePaise, isActive: true },
-        { size: '500g', pricePaise: Math.round(seed.pricePaise * 1.9), isActive: true },
-        { size: '1kg', pricePaise: Math.round(seed.pricePaise * 3.65), isActive: true },
+        { size: '250g', pricePaise: seed.pricePaise, stockQuantity: 100, lowStockLimit: 10, isActive: true },
+        { size: '500g', pricePaise: Math.round(seed.pricePaise * 1.9), stockQuantity: 75, lowStockLimit: 10, isActive: true },
+        { size: '1kg', pricePaise: Math.round(seed.pricePaise * 3.65), stockQuantity: 50, lowStockLimit: 5, isActive: true },
       ];
       await products
         .updateOne(
           { slug: seed.slug },
-          { $set: { ...seed, variants, tags: ['Natural'] } },
+          { $set: { ...seed, variants, tags: ['Natural'], status: 'active' } },
           { upsert: true },
         )
         .exec();

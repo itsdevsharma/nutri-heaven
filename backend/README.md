@@ -2,7 +2,7 @@
 
 Premium dry fruits, nuts and seeds — storefront for the Indian market.
 
-> **Status: phase 2 of 6 — NestJS + MongoDB API.** Two self-contained pnpm
+> **Status: commerce phase in progress — API-backed cart, orders, inventory and admin.** Two self-contained pnpm
 > packages at the repository root (`frontend/`, `backend/`) with local
 > infrastructure (MongoDB, Redis, S3-compatible object storage) wired up. The
 > application is the original customer storefront, plus a catalogue + pricing
@@ -172,7 +172,7 @@ Customer Website (Next.js)        Admin Panel (Next.js/React)
 | 0 | Repository hygiene — `.gitignore`, untrack `node_modules/` and `dist/`, README | done |
 | 1 | Monorepo skeleton; move the SPA to `frontend` unchanged; MongoDB + Redis + object storage via Compose | done |
 | 2 | NestJS + Mongoose (MongoDB) API: catalogue endpoints, server-side pricing, [NestJS explainer](backend/NESTJS.md) | done |
-| 3 | Storefront on the API; real order creation with idempotency; Razorpay + COD | next |
+| 3 | Storefront on the API; persisted cart, variant pricing, real COD order creation, inventory ledger, admin order operations and Razorpay sandbox APIs | in progress |
 | 4 | BullMQ worker with email / SMS / WhatsApp providers, retries and a notification log | planned |
 | 5 | Admin panel: products, inventory, orders, fulfilment, coupons, notification log | planned |
 | 6 | Hardening: observability, backups, CI/CD, DLT and WhatsApp template registration | planned |
