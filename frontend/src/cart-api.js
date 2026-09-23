@@ -39,6 +39,7 @@ export const storefrontApi = {
   quote: (lines) => request('/products/quote', { method: 'POST', body: JSON.stringify({ lines }) }),
     placeOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload) }),
   getOrder: (id) => request(`/orders/${encodeURIComponent(id)}`),
+  publicSettings: () => request('/storefront/settings'),
 };
 
 const CUSTOMER_TOKEN_KEY = 'nutri_customer_access_token';

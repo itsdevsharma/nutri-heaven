@@ -4,6 +4,13 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AdminRole } from '../admin/admin.schema';
 import { StoreSettingsService } from './store-settings.service';
+
+@Controller('storefront/settings')
+export class StorefrontSettingsController {
+  constructor(private readonly service: StoreSettingsService) {}
+  @Get() get() { return this.service.get().then(record => { const value = record?.value ?? {}; return { content: value.content ?? {}, supportEmail: value.supportEmail ?? 'hello@nutriheaven.in', supportPhone: value.supportPhone ?? '', address: value.address ?? '', homepage: value.homepage ?? {}, footer: value.footer ?? {} }; }); }
+}
+
 @Controller('admin/settings')
 @UseGuards(AdminAuthGuard, RolesGuard)
 @Roles(AdminRole.SUPER_ADMIN)

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { StoreSettings, StoreSettingsSchema } from './store-settings.schema';
-import { StoreSettingsController } from './store-settings.controller';
+import { StoreSettingsController, StorefrontSettingsController } from './store-settings.controller';
 import { StoreSettingsService } from './store-settings.service';
 
 /**
@@ -17,9 +17,8 @@ import { StoreSettingsService } from './store-settings.service';
     AuthModule,
     MongooseModule.forFeature([{ name: StoreSettings.name, schema: StoreSettingsSchema }]),
   ],
-  controllers: [StoreSettingsController],
+  controllers: [StoreSettingsController, StorefrontSettingsController],
   providers: [StoreSettingsService],
   exports: [StoreSettingsService],
 })
 export class StoreSettingsModule {}
-

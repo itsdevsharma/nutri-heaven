@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import ProductEditorPage from './pages/ProductEditorPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import ProductsPage from './pages/ProductsPage.jsx';
+import StoreContentPage from './pages/StoreContentPage.jsx';
 
 /**
  * The console's route table — the single source of truth for three things that
@@ -72,6 +73,16 @@ export const ROUTES = [
     icon: '⌸',
     capability: 'catalogue:read',
     element: CategoriesPage,
+  },
+  {
+    id: 'store-content',
+    path: '/admin/store-content',
+    title: 'Store content',
+    label: 'Store content',
+    group: 'System',
+    icon: '¶',
+    capability: 'settings:write',
+    element: StoreContentPage,
   },
   {
     id: 'inventory',

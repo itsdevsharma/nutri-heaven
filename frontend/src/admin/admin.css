@@ -136,6 +136,9 @@
 .admin-stat-ok { border-left: 3px solid var(--ok); }
 .admin-stat-warn { border-left: 3px solid var(--warn); }
 .admin-stat-danger { border-left: 3px solid var(--danger); }
+.store-content-field { display:grid; gap:7px; margin:0 0 18px; font-size:12px; font-weight:700; }
+.store-content-field textarea,.store-content-field input { width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); font:13px/1.55 Manrope,Arial,sans-serif; }
+.store-content-field textarea { resize:vertical; }
 .admin-dashboard-columns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 
 /* -------------------------------------------------------------- buttons ----- */
@@ -410,7 +413,6 @@
   .admin-toasts { left: 14px; right: 14px; bottom: 14px; }
   .admin-editor-savebar { position: static; }
 }
-
 
 
 
