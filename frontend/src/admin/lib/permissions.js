@@ -48,6 +48,7 @@ export const CAPABILITIES = {
   'orders:read': [ROLES.SUPPORT],
   'marketing:read': [ROLES.MARKETING_MANAGER],
   'audit:read': [],
+  'settings:write': [],
 };
 
 export function can(role, capability) {

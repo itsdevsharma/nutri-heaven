@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Product, ProductSchema } from '../products/product.schema';
 import { AuthModule } from '../auth/auth.module';
+import { AdminModule } from '../admin/admin.module';
 import { InventoryMovement, InventoryMovementSchema } from './inventory-movement.schema';
 import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
@@ -15,6 +16,7 @@ import { InventoryService } from './inventory.service';
 @Module({
   imports: [
     AuthModule,
+    AdminModule,
     MongooseModule.forFeature([
       { name: InventoryMovement.name, schema: InventoryMovementSchema },
       // The overview derives stock from `products.variants[]`, so the product

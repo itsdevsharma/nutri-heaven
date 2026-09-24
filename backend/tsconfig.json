@@ -23,6 +23,7 @@
     "outDir": "dist",
     "baseUrl": "./",
     "allowJs": false
+    ,"isolatedModules": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test/**/*"]

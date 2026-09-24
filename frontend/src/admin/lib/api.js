@@ -126,6 +126,7 @@ export const adminApi = {
   /** `POST /admin/auth/login` → `{ accessToken, admin }`. */
   login: (email, password) =>
     request('/admin/auth/login', { method: 'POST', body: { email, password }, auth: false }),
+  logout: () => request('/admin/auth/logout', { method: 'POST' }),
 
   products: {
     /** Every lifecycle state, unlike the storefront's `GET /products`. */
@@ -178,6 +179,17 @@ export const adminApi = {
   settings: {
     get: () => request('/admin/settings'),
     update: (value) => request('/admin/settings', { method: 'PATCH', body: { value } }),
+  },
+  cms: {
+    list: (kind) => request(`/admin/cms/${kind}`),
+    create: (kind, payload) => request(`/admin/cms/${kind}`, { method: 'POST', body: payload }),
+    update: (kind, id, payload) => request(`/admin/cms/${kind}/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
+    remove: (kind, id) => request(`/admin/cms/${kind}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    uploadImage: async (file) => {
+      const token = sessionStore.token(); const form = new FormData(); form.append('image', file);
+      const response = await fetch(`${API_URL}/admin/media/images`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form });
+      const payload = await response.json().catch(() => null); if (!response.ok) throw new ApiError(apiMessage(payload,response.status),response.status,payload); return payload;
+    },
   },
 };
 

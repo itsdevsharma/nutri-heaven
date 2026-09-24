@@ -41,7 +41,8 @@ export function SessionProvider({ children }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try { await adminApi.logout(); } catch { /* local logout still clears an expired/offline session */ }
     sessionStore.clear();
     setSession(null);
     setNotice('You have been signed out.');

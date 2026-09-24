@@ -7,6 +7,7 @@ import ProductEditorPage from './pages/ProductEditorPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import ProductsPage from './pages/ProductsPage.jsx';
 import StoreContentPage from './pages/StoreContentPage.jsx';
+import CmsCollectionsPage from './pages/CmsCollectionsPage.jsx';
 
 /**
  * The console's route table — the single source of truth for three things that
@@ -28,6 +29,9 @@ export const ROUTES = [
     public: true,
     element: LoginPage,
   },
+  { id:'cms-banners', path:'/admin/banners', title:'Banners', label:'Banners', group:'Marketing', icon:'▧', capability:'settings:write', element:CmsCollectionsPage },
+  { id:'cms-faqs', path:'/admin/faqs', title:'FAQs', label:'FAQs', group:'Marketing', icon:'?', capability:'settings:write', element:CmsCollectionsPage },
+  { id:'cms-socials', path:'/admin/socials', title:'Social links', label:'Social links', group:'Marketing', icon:'@', capability:'settings:write', element:CmsCollectionsPage },
   {
     id: 'dashboard',
     path: '/admin',

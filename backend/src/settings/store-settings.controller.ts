@@ -4,11 +4,12 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AdminRole } from '../admin/admin.schema';
 import { StoreSettingsService } from './store-settings.service';
+import { UpdateStoreSettingsDto } from './store-settings.dto';
 
 @Controller('storefront/settings')
 export class StorefrontSettingsController {
   constructor(private readonly service: StoreSettingsService) {}
-  @Get() get() { return this.service.get().then(record => { const value = record?.value ?? {}; return { content: value.content ?? {}, supportEmail: value.supportEmail ?? 'hello@nutriheaven.in', supportPhone: value.supportPhone ?? '', address: value.address ?? '', homepage: value.homepage ?? {}, footer: value.footer ?? {} }; }); }
+  @Get() get() { return this.service.get().then(record => { const value = record?.value ?? {}; return { content: value.content ?? {}, legalName: value.legalName ?? 'NUTRI HEAVEN', supportEmail: value.supportEmail ?? 'nutriheavenhsr@gmail.com', supportPhone: value.supportPhone ?? '90172-25722', whatsappNumber: value.whatsappNumber ?? '90172-25722', address: value.address ?? '258, Siwach complex Bishnoi colony near HAU gate no. 4 (sec-15) Hisar', businessHours: value.businessHours ?? '' }; }); }
 }
 
 @Controller('admin/settings')
@@ -17,5 +18,5 @@ export class StorefrontSettingsController {
 export class StoreSettingsController {
   constructor(private readonly service: StoreSettingsService) {}
   @Get() get() { return this.service.get(); }
-  @Patch() update(@Body() body: { value: Record<string, unknown> }) { return this.service.update(body.value); }
+  @Patch() update(@Body() body: UpdateStoreSettingsDto) { return this.service.update(body.value as Record<string, unknown>); }
 }

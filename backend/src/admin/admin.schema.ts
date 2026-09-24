@@ -27,6 +27,10 @@ export class Admin {
   isActive!: boolean;
 
   @Prop() refreshTokenHash?: string;
+
+  /** Incremented on logout or account disable to invalidate existing JWTs. */
+  @Prop({ default: 0 })
+  authVersion!: number;
 }
 
 export type AdminDocument = HydratedDocument<Admin>;

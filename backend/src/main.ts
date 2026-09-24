@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import type { NextFunction, Request, Response } from 'express';
+import { static as serveStatic, type NextFunction, type Request, type Response } from 'express';
+import { existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
@@ -15,6 +17,9 @@ async function bootstrap(): Promise<void> {
     }
   }
   const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
+  const uploads = join(process.cwd(), 'uploads');
+  if (!existsSync(uploads)) mkdirSync(uploads, { recursive: true });
+  app.use('/uploads', serveStatic(uploads));
 
   // Baseline browser protections without adding a second middleware stack.
   // A deployed reverse proxy remains responsible for HTTPS/HSTS.

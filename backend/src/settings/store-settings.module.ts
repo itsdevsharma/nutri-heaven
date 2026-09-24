@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
+import { AdminModule } from '../admin/admin.module';
 import { StoreSettings, StoreSettingsSchema } from './store-settings.schema';
 import { StoreSettingsController, StorefrontSettingsController } from './store-settings.controller';
 import { StoreSettingsService } from './store-settings.service';
@@ -15,6 +16,7 @@ import { StoreSettingsService } from './store-settings.service';
 @Module({
   imports: [
     AuthModule,
+    AdminModule,
     MongooseModule.forFeature([{ name: StoreSettings.name, schema: StoreSettingsSchema }]),
   ],
   controllers: [StoreSettingsController, StorefrontSettingsController],

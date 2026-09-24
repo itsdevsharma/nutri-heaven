@@ -408,12 +408,12 @@
 }
 @media (max-width: 640px) {
   .admin-topbar-meta { display: none; }
+  .admin-table-wrap { margin-inline: -4px; padding-bottom: 8px; overscroll-behavior-inline: contain; -webkit-overflow-scrolling: touch; }
   .admin-table { min-width: 560px; }
   .admin-stat-grid { grid-template-columns: repeat(auto-fit, minmax(142px, 1fr)); }
   .admin-toasts { left: 14px; right: 14px; bottom: 14px; }
   .admin-editor-savebar { position: static; }
 }
-
 
 
 

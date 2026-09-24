@@ -5,8 +5,18 @@ import { HydratedDocument } from 'mongoose';
 @Schema({ collection: 'store_settings', timestamps: true })
 export class StoreSettings {
   @Prop({ required: true, unique: true, default: 'primary' }) key!: string;
-  @Prop({ type: Object, default: { legalName: 'NUTRI HEAVEN', supportEmail: 'hello@nutriheaven.in', supportPhone: '', address: '', gstin: '', invoicePrefix: 'NH', invoiceFooter: '', freeShippingThresholdPaise: 99900, standardShippingFeePaise: 7900, serviceablePins: [], homepage: {}, footer: {} } })
-  value!: Record<string, unknown>;
+  @Prop({ type: {
+    legalName: { type: String, default: 'NUTRI HEAVEN', trim: true },
+    supportEmail: { type: String, default: 'nutriheavenhsr@gmail.com', trim: true, lowercase: true },
+    supportPhone: { type: String, default: '90172-25722', trim: true },
+    whatsappNumber: { type: String, default: '90172-25722', trim: true },
+    address: { type: String, default: '', trim: true },
+    businessHours: { type: String, default: '', trim: true },
+    content: { type: {
+      shippingPolicy: { type: String, default: '' }, returnPolicy: { type: String, default: '' }, privacyPolicy: { type: String, default: '' }, terms: { type: String, default: '' }, about: { type: String, default: '' }, contact: { type: String, default: '' }, faq: { type: String, default: '' },
+    }, default: {} },
+  }, default: {} })
+  value!: { legalName?: string; supportEmail?: string; supportPhone?: string; whatsappNumber?: string; address?: string; businessHours?: string; content?: Record<string, string> };
 }
 export type StoreSettingsDocument = HydratedDocument<StoreSettings>;
 export const StoreSettingsSchema = SchemaFactory.createForClass(StoreSettings);

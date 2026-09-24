@@ -12,6 +12,8 @@ import { InventoryModule } from './inventory/inventory.module';
 import { OrderModule } from './orders/order.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CustomerModule } from './customers/customer.module';
+import { CmsModule } from './cms/cms.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { CustomerModule } from './customers/customer.module';
     OrderModule,
     PaymentsModule,
     CustomerModule,
+    CmsModule,
+    MediaModule,
   ],
   controllers: [HealthController],
 })
