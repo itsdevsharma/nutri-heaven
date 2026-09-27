@@ -51,7 +51,9 @@ async function bootstrap(): Promise<void> {
     .filter(Boolean);
   app.enableCors({ origin: origins });
 
-  const port = Number(process.env.API_PORT ?? 3000);
+  // Render and most managed hosts provide PORT; API_PORT remains useful for
+  // local development and existing deployments.
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3000);
   await app.listen(port);
   Logger.log(`API listening on http://localhost:${port}`, 'Bootstrap');
 }

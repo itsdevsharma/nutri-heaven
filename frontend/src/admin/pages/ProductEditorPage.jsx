@@ -5,7 +5,7 @@ import { Card, PageHeader } from '../components/PageHeader.jsx';
 import { Pill, StatusPill } from '../components/StatusPill.jsx';
 import { useConfirm } from '../components/ConfirmProvider.jsx';
 import { useToast } from '../components/ToastProvider.jsx';
-import { adminApi } from '../lib/api.js';
+import { adminApi, API_URL } from '../lib/api.js';
 import { PRODUCT_STATUSES, assetUrl, productStatusMeta } from '../lib/catalogue.js';
 import {
   basisPointsToPercent,
@@ -22,7 +22,7 @@ import { Link, useRouter } from '../router.jsx';
 import { useSession } from '../session/session-context.js';
 
 function blankVariant() {
-  return { size: '', price: '', mrp: '', stock: '0', lowStockLimit: '0', weightGrams: '', isActive: true };
+  return { size: '', price: '', mrp: '', sku: '', barcode: '', taxPercent: '', stock: '0', lowStockLimit: '0', weightGrams: '', isActive: true };
 }
 
 function blankProduct() {
@@ -84,6 +84,9 @@ function fromProduct(product) {
       size: variant.size ?? '',
       price: paiseToRupees(variant.pricePaise),
       mrp: paiseToRupees(variant.mrpPaise),
+      sku: variant.sku ?? '',
+      barcode: variant.barcode ?? '',
+      taxPercent: basisPointsToPercent(variant.taxBasisPoints),
       stock: String(variant.stockQuantity ?? 0),
       lowStockLimit: String(variant.lowStockLimit ?? 0),
       weightGrams:
@@ -113,9 +116,7 @@ const toNumber = (value) => Math.max(0, Number(String(value ?? '').replace(/[^0-
  * Stock is deliberately not taken from the form on an update: the stored balance
  * is echoed back unchanged, because a balance may only move through an inventory
  * movement (`ADMIN_COMMERCE_PLAN.md`). On create the entered number is the
- * opening balance — the one moment a balance legitimately starts. Fields the
- * editor does not expose (variant SKU/barcode/tax) are round-tripped from the
- * stored variant so a save cannot blank them out.
+ * opening balance — the one moment a balance legitimately starts.
  */
 function buildPayload(form, { isNew, sourceVariants }) {
   return {
@@ -143,10 +144,12 @@ function buildPayload(form, { isNew, sourceVariants }) {
     isBestseller: form.isBestseller,
     isNewArrival: form.isNewArrival,
     variants: form.variants.map((variant, index) => ({
-      ...(sourceVariants?.[index] ?? {}),
       size: variant.size.trim(),
       pricePaise: rupeesToPaise(variant.price),
       mrpPaise: variant.mrp === '' ? undefined : rupeesToPaise(variant.mrp),
+      sku: variant.sku.trim() || undefined,
+      barcode: variant.barcode.trim() || undefined,
+      taxBasisPoints: variant.taxPercent === '' ? 0 : percentToBasisPoints(variant.taxPercent),
       lowStockLimit: toNumber(variant.lowStockLimit),
       weightGrams: variant.weightGrams === '' ? undefined : toNumber(variant.weightGrams),
       isActive: variant.isActive,
@@ -162,12 +165,15 @@ function validate(form) {
   if (!form.slug.trim()) errors.slug = 'A slug is required — it is the public product id used by the storefront.';
   else if (!/^[a-z0-9-]+$/.test(form.slug.trim())) errors.slug = 'Use lowercase letters, numbers and hyphens only.';
   if (!form.description.trim()) errors.description = 'A short description is required.';
-  if (!form.category.trim()) errors.category = 'A category is required.';
   if (!form.image.trim()) errors.image = 'A primary image filename is required, e.g. almonds_ze0A.jpg.';
   if (form.price === '' || rupeesToPaise(form.price) <= 0) errors.price = 'A selling price above zero is required.';
   if (form.mrp !== '' && rupeesToPaise(form.mrp) < rupeesToPaise(form.price)) errors.mrp = 'MRP cannot be below the selling price.';
   if (!form.variants.length) errors.variants = 'At least one pack size is required.';
   else if (form.variants.some((variant) => !variant.size.trim())) errors.variants = 'Every pack needs a size label.';
+  else if (new Set(form.variants.map((variant) => variant.size.trim().toLowerCase())).size !== form.variants.length) errors.variants = 'Pack sizes must be unique.';
+  else if (form.variants.some((variant) => variant.price === '' || rupeesToPaise(variant.price) <= 0)) errors.variants = 'Every pack needs a selling price above zero.';
+  else if (form.variants.some((variant) => variant.mrp !== '' && rupeesToPaise(variant.mrp) < rupeesToPaise(variant.price))) errors.variants = 'A pack MRP cannot be below its selling price.';
+  else { const skus = form.variants.map((variant) => variant.sku.trim().toUpperCase()).filter(Boolean); if (new Set(skus).size !== skus.length) errors.variants = 'Variant SKUs must be unique.'; }
   return errors;
 }
 
@@ -191,6 +197,7 @@ export default function ProductEditorPage({ params }) {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const sourceVariants = useRef([]);
   const slugTouched = useRef(!isNew);
@@ -263,6 +270,23 @@ export default function ProductEditorPage({ params }) {
   const changeSlug = (value) => {
     slugTouched.current = true;
     setField('slug', slugify(value));
+  };
+
+  const uploadImage = async (event, destination = 'primary') => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await adminApi.cms.uploadImage(file);
+      const url = result.url.startsWith('http') ? result.url : `${API_URL}${result.url}`;
+      setForm((current) => destination === 'primary'
+        ? { ...current, image: url }
+        : { ...current, images: current.images ? `${current.images}\n${url}` : url });
+      setDirty(true);
+      toast.success(destination === 'primary' ? 'Primary image uploaded.' : 'Gallery image uploaded.');
+    } catch (failure) { toast.error(failure.message); }
+    finally { setUploading(false); }
   };
 
   const save = async (event) => {
@@ -470,7 +494,7 @@ export default function ProductEditorPage({ params }) {
 
                     <FormSection
             title="Content"
-            description="Storefront copy and imagery. Image fields hold filenames served from /assets."
+            description="Upload product photos or use an existing asset filename. The first image is shown on product cards."
           >
             <FormGrid columns={1}>
               <FormField label="Card description" required error={errors.description}>
@@ -498,15 +522,16 @@ export default function ProductEditorPage({ params }) {
                   disabled={!canWrite}
                 />
               </FormField>
-              <FormField label="Primary image" required error={errors.image} hint="For example almonds_ze0A.jpg">
+              <FormField label="Primary image" required error={errors.image} hint="Upload JPEG, PNG or WebP (up to 5 MB), or enter an existing asset filename.">
                 <input
                   className="admin-input admin-mono"
                   value={form.image}
                   onChange={(event) => setField('image', event.target.value)}
                   disabled={!canWrite}
                 />
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadImage(event, 'primary')} disabled={!canWrite || uploading} />
               </FormField>
-              <FormField label="Gallery images" hint="One filename per line.">
+              <FormField label="Gallery images" hint="One image URL or filename per line. Uploads are appended in display order.">
                 <textarea
                   className="admin-input admin-mono admin-textarea"
                   rows={3}
@@ -514,6 +539,7 @@ export default function ProductEditorPage({ params }) {
                   onChange={(event) => setField('images', event.target.value)}
                   disabled={!canWrite}
                 />
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadImage(event, 'gallery')} disabled={!canWrite || uploading} />
               </FormField>
               <FormGrid>
                 <FormField label="SEO title">
@@ -635,6 +661,9 @@ export default function ProductEditorPage({ params }) {
                 <span>Size</span>
                 <span>Price (₹)</span>
                 <span>MRP (₹)</span>
+                <span>SKU</span>
+                <span>Barcode</span>
+                <span>Tax (%)</span>
                 <span>{isNew ? 'Opening stock' : 'Stock'}</span>
                 <span>Low-stock at</span>
                 <span>Weight (g)</span>
@@ -665,6 +694,9 @@ export default function ProductEditorPage({ params }) {
                     onChange={(event) => setVariant(index, 'mrp', event.target.value)}
                     disabled={!canWrite}
                   />
+                  <input className="admin-input admin-mono" value={variant.sku} placeholder="Optional" onChange={(event) => setVariant(index, 'sku', event.target.value)} disabled={!canWrite} />
+                  <input className="admin-input admin-mono" value={variant.barcode} placeholder="Optional" onChange={(event) => setVariant(index, 'barcode', event.target.value)} disabled={!canWrite} />
+                  <input className="admin-input admin-mono" inputMode="decimal" value={variant.taxPercent} placeholder="0" onChange={(event) => setVariant(index, 'taxPercent', event.target.value)} disabled={!canWrite} />
                   {isNew ? (
                     <input
                       className="admin-input admin-mono"

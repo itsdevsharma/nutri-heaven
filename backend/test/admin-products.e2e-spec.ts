@@ -70,6 +70,7 @@ describe('Admin catalogue reads (e2e)', () => {
         category: 'Premium Nuts',
         status: 'active',
         isActive: true,
+        variants: [{ size: '250g', pricePaise: 27500, stockQuantity: 12, lowStockLimit: 3, isActive: true }],
       },
       {
         slug: 'walnuts-draft',
@@ -80,6 +81,10 @@ describe('Admin catalogue reads (e2e)', () => {
         category: 'Premium Nuts',
         status: 'draft',
         isActive: false,
+      },
+      {
+        slug: 'active-flag-draft', title: 'Draft with active flag', description: 'Must remain private', pricePaise: 10000,
+        image: 'walnuts_ze0A.jpg', category: 'Premium Nuts', status: 'draft', isActive: true,
       },
     ]);
 
@@ -130,7 +135,7 @@ describe('Admin catalogue reads (e2e)', () => {
       .get('/products/admin')
       .set(auth('catalogue_manager'))
       .expect(200);
-    expect(res.body.total).toBe(2);
+    expect(res.body.total).toBe(3);
     expect(res.body.limit).toBe(50);
     expect(res.body.offset).toBe(0);
     expect(res.body.items.map((item: Product) => item.slug)).toEqual(
@@ -143,8 +148,8 @@ describe('Admin catalogue reads (e2e)', () => {
       .get('/products/admin?status=draft')
       .set(auth('catalogue_manager'))
       .expect(200);
-    expect(drafts.body.items).toHaveLength(1);
-    expect(drafts.body.items[0].slug).toBe('walnuts-draft');
+    expect(drafts.body.items).toHaveLength(2);
+    expect(drafts.body.items.map((product: Product) => product.slug)).toEqual(expect.arrayContaining(['walnuts-draft', 'active-flag-draft']));
 
     const search = await request(app.getHttpServer())
       .get('/products/admin?q=cashew')
@@ -202,5 +207,16 @@ describe('Admin catalogue reads (e2e)', () => {
       .set(auth('support'))
       .send({ slug: 'blocked', title: 'Blocked' })
       .expect(403);
+  });
+
+  it('does not let catalogue updates bypass the inventory ledger', async () => {
+    await request(app.getHttpServer())
+      .patch('/products/admin/almonds')
+      .set(auth('catalogue_manager'))
+      .send({ variants: [{ size: '250g', pricePaise: 27500, stockQuantity: 999, lowStockLimit: 3, isActive: true }] })
+      .expect(400);
+
+    const product = await request(app.getHttpServer()).get('/products/admin/almonds').set(auth('catalogue_manager')).expect(200);
+    expect(product.body.variants[0].stockQuantity).toBe(12);
   });
 });

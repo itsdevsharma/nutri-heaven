@@ -41,6 +41,9 @@ importers:
       class-validator:
         specifier: ^0.15.1
         version: 0.15.1
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1(supports-color@8.1.1)
       mongoose:
         specifier: ^8.24.4
         version: 8.24.4(supports-color@8.1.1)

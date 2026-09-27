@@ -58,7 +58,7 @@ describe('Products (e2e)', () => {
         pricePaise: 27500,
         image: 'almonds_ze0A.jpg',
         category: 'Premium Nuts',
-        isActive: true,
+        isActive: true, status: 'active',
       },
       {
         slug: 'cashews',
@@ -67,7 +67,7 @@ describe('Products (e2e)', () => {
         pricePaise: 29900,
         image: 'cashews_ze0A.jpg',
         category: 'Premium Nuts',
-        isActive: true,
+        isActive: true, status: 'active',
       },
     ]);
   });

@@ -1,9 +1,10 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { orderTotalForPaise, shippingFeeForPaise } from '../common/pricing';
 import { FilterQuery, Model } from 'mongoose';
 import { QuoteRequest } from './dto/quote.request';
 import { Product, ProductDocument } from './product.schema';
+import { Category, CategoryDocument } from '../categories/category.schema';
 
 export interface QuoteLineResult {
   slug: string;
@@ -33,11 +34,21 @@ export interface AdminProductListResult {
 export class ProductsService {
   constructor(
     @InjectModel(Product.name) private readonly products: Model<ProductDocument>,
+    @InjectModel(Category.name) private readonly categories: Model<CategoryDocument>,
   ) {}
+
+  private async validateCommerce(input: Partial<Product>, exceptSlug?: string) {
+    if (input.pricePaise !== undefined && (!Number.isInteger(input.pricePaise) || input.pricePaise <= 0)) throw new BadRequestException('Selling price must be a positive integer amount in paise');
+    if (input.mrpPaise !== undefined && input.pricePaise !== undefined && input.mrpPaise < input.pricePaise) throw new BadRequestException('MRP cannot be below selling price');
+    const variants = (input.variants ?? []) as Array<Record<string, unknown>>;
+    const sizes = new Set<string>(); const skus = new Set<string>();
+    for (const variant of variants) { const size=String(variant.size ?? '').trim(); if(!size || sizes.has(size)) throw new BadRequestException('Every variant must have a unique pack size'); sizes.add(size); const price=Number(variant.pricePaise); const mrp=variant.mrpPaise===undefined?undefined:Number(variant.mrpPaise); if(!Number.isInteger(price)||price<=0) throw new BadRequestException(`Variant ${size} needs a positive selling price`); if(mrp!==undefined && (!Number.isInteger(mrp)||mrp<price)) throw new BadRequestException(`Variant ${size} MRP cannot be below selling price`); const sku=String(variant.sku ?? '').trim().toUpperCase(); if(sku) { if(skus.has(sku)) throw new BadRequestException('Variant SKUs must be unique'); skus.add(sku); const duplicate=await this.products.exists({ slug: {$ne: exceptSlug}, 'variants.sku': sku }); if(duplicate) throw new ConflictException(`Variant SKU ${sku} already exists`); } }
+    if (input.category) { const parent=await this.categories.findOne({name:input.category,isActive:true}).lean().exec(); if(!parent) throw new BadRequestException('Select an active category'); if(input.subCategory) { const child=await this.categories.findOne({name:input.subCategory,parentId:parent._id,isActive:true}).lean().exec(); if(!child) throw new BadRequestException('Select an active sub-category belonging to the selected category'); } }
+  }
 
   findAll(limit = 50, offset = 0): Promise<Product[]> {
     return this.products
-      .find({ isActive: true })
+      .find({ isActive: true, status: 'active' })
       .sort({ slug: 1 })
       .skip(offset)
       .limit(limit)
@@ -47,7 +58,7 @@ export class ProductsService {
 
   async findBySlug(slug: string): Promise<Product> {
     const product = await this.products
-      .findOne({ slug, isActive: true })
+      .findOne({ slug, isActive: true, status: 'active' })
       .lean()
       .exec();
     if (!product) {
@@ -127,6 +138,25 @@ export class ProductsService {
    * contract in one place.
    */
   async adminUpdate(slug: string, changes: Partial<Product>): Promise<Product> {
+    if (changes.variants) {
+      const current = await this.products.findOne({ slug }).lean().exec();
+      if (!current) throw new NotFoundException(`No product found for slug "${slug}"`);
+      const existing = new Map(((current.variants ?? []) as Array<{ size: string; stockQuantity?: number }>).map((variant) => [variant.size, variant.stockQuantity]));
+      const submittedSizes = new Set((changes.variants as Array<Record<string, unknown>>).map((variant) => String(variant.size ?? '')));
+      for (const size of existing.keys()) {
+        if (!submittedSizes.has(size)) throw new BadRequestException('Existing pack sizes cannot be removed through product editing; deactivate the pack after its stock is adjusted to zero');
+      }
+      for (const variant of changes.variants as Array<Record<string, unknown>>) {
+        const stored = existing.get(String(variant.size ?? ''));
+        if (stored !== undefined && Number(variant.stockQuantity) !== Number(stored)) {
+          throw new BadRequestException('Variant stock can only be changed through the inventory adjustment API');
+        }
+        if (stored === undefined && Number(variant.stockQuantity) !== 0) {
+          throw new BadRequestException('New pack sizes must start at zero stock and be filled through the inventory adjustment API');
+        }
+      }
+    }
+    await this.validateCommerce(changes, slug);
     const product = await this.products
       .findOneAndUpdate({ slug }, { $set: changes }, { new: true, runValidators: true })
       .lean()
@@ -140,6 +170,7 @@ export class ProductsService {
     if (!slug || !input.title || !input.description || !input.image || !input.category || input.pricePaise === undefined) {
       throw new ConflictException('slug, title, description, image, category and pricePaise are required');
     }
+    await this.validateCommerce(input);
     try { return await this.products.create({ ...input, slug, isActive: input.isActive ?? true, status: input.status ?? 'draft' }); }
     catch (error) { if (typeof error === 'object' && error && 'code' in error && error.code === 11000) throw new ConflictException('Product slug or SKU already exists'); throw error; }
   }
@@ -173,7 +204,7 @@ export class ProductsService {
   async quote(dto: QuoteRequest): Promise<QuoteResult> {
     const slugs = [...new Set(dto.lines.map((line) => line.slug))];
     const found = await this.products
-      .find({ slug: { $in: slugs }, isActive: true })
+      .find({ slug: { $in: slugs }, isActive: true, status: 'active' })
       .lean()
       .exec();
     const bySlug = new Map(found.map((product) => [product.slug, product]));

@@ -12,7 +12,7 @@ export class CartService {
   private key(productId: string, packSize: string) { return `${productId}:${packSize}`; }
   private async cart(cartId: string) { return this.carts.findOneAndUpdate({ cartId }, { $setOnInsert: { cartId } }, { upsert: true, new: true }).exec(); }
   private async variant(productId: string, packSize: string) {
-    const product = await this.products.findOne({ slug: productId, isActive: true }).lean().exec();
+    const product = await this.products.findOne({ slug: productId, isActive: true, status: 'active' }).lean().exec();
     const variant = product?.variants?.find(item => item.size === packSize && item.isActive);
     if (!product || !variant) throw new NotFoundException('This product pack is no longer available');
     const stock = (variant as any).stockQuantity ?? 0;
