@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CancelOrderDto, OrderCreateDto, UpdateOrderStatusDto } from './order.dto';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from '../admin/admin.schema';
+import { AdminRequest } from '../auth/admin-auth.guard';
 
 @Controller('orders')
 export class OrderController {
@@ -34,15 +35,15 @@ export class OrderController {
   @Patch('admin/:id/status')
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
-  adminUpdateStatus(@Param('id') id: string, @Body() body: UpdateOrderStatusDto) {
-    return this.service.updateStatus(id, body.status, body);
+  adminUpdateStatus(@Param('id') id: string, @Body() body: UpdateOrderStatusDto, @Request() request: AdminRequest) {
+    return this.service.updateStatus(id, body.status, { ...body, actor: request.admin?.email ?? 'unknown-admin' });
   }
 
   @Post('admin/:id/cancel')
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles(AdminRole.SUPER_ADMIN)
-  cancel(@Param('id') id: string, @Body() body: CancelOrderDto) {
-    return this.service.cancel(id, body.reason);
+  cancel(@Param('id') id: string, @Body() body: CancelOrderDto, @Request() request: AdminRequest) {
+    return this.service.cancel(id, body.reason, request.admin?.email ?? 'unknown-admin');
   }
 
   @Get(':id')

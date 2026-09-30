@@ -33,7 +33,9 @@ export class Order {
   @Prop({ required: true, type: Object })
   deliveryAddress!: {
     street: string;
+    landmark?: string;
     city: string;
+    state: string;
     pin: string;
   };
 
@@ -53,6 +55,9 @@ export class Order {
 
   @Prop({ required: true, min: 0 })
   shippingPaise!: number;
+
+  @Prop({ trim: true, uppercase: true, default: '' }) couponCode!: string;
+  @Prop({ min: 0, default: 0 }) couponDiscountPaise!: number;
 
   @Prop({ required: true, min: 0 })
   totalPaise!: number;
@@ -86,6 +91,12 @@ export class Order {
 
   @Prop({ trim: true, default: '' })
   cancellationReason?: string;
+
+  @Prop({ default: false })
+  paymentReconciliationRequired!: boolean;
+
+  @Prop({ trim: true, default: '' })
+  paymentReconciliationNote?: string;
 
   @Prop({ trim: true, default: '' })
   idempotencyKey!: string;

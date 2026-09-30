@@ -6,7 +6,7 @@ import { Modal } from '../components/Modal.jsx';
 import { Pill } from '../components/StatusPill.jsx';
 import { useConfirm } from '../components/ConfirmProvider.jsx';
 import { useToast } from '../components/ToastProvider.jsx';
-import { adminApi } from '../lib/api.js';
+import { adminApi, API_URL } from '../lib/api.js';
 import { assetUrl, buildCategoryTree, categoryOptions } from '../lib/catalogue.js';
 import { slugify } from '../lib/format.js';
 import { can } from '../lib/permissions.js';
@@ -57,6 +57,7 @@ export default function CategoriesPage() {
   const [form, setForm] = useState(blankCategory);
   const [saving, setSaving] = useState(false);
   const [busySlug, setBusySlug] = useState('');
+  const [draggedSlug, setDraggedSlug] = useState('');
 
   const categories = data ?? [];
   const tree = useMemo(() => buildCategoryTree(categories), [categories]);
@@ -141,6 +142,36 @@ export default function CategoriesPage() {
     }
   };
 
+  const activate = async (category) => {
+    setBusySlug(category.slug);
+    try { await adminApi.categories.activate(category.slug); toast.success(`“${category.name}” is active again.`); await reload(); }
+    catch (failure) { toast.error(failure.message); }
+    finally { setBusySlug(''); }
+  };
+
+  const uploadCategoryImage = async (file) => {
+    if (!file) return;
+    setSaving(true);
+    try {
+      const result = await adminApi.cms.uploadImage(file);
+      setField('image', result.url.startsWith('http') ? result.url : `${API_URL}${result.url}`);
+      toast.success('Category image uploaded. Save the category to publish it.');
+    } catch (failure) { toast.error(failure.message); }
+    finally { setSaving(false); }
+  };
+
+  const reorderSiblings = async (siblings, dragged, target) => {
+    if (!dragged || dragged === target) return;
+    const slugs = siblings.map((item) => item.slug);
+    const from = slugs.indexOf(dragged), to = slugs.indexOf(target);
+    if (from < 0 || to < 0) return;
+    slugs.splice(to, 0, slugs.splice(from, 1)[0]);
+    setBusySlug(dragged);
+    try { await adminApi.categories.reorder(slugs); toast.success('Category order saved.'); await reload(); }
+    catch (failure) { toast.error(failure.message); }
+    finally { setBusySlug(''); setDraggedSlug(''); }
+  };
+
   const parentOptions = categoryOptions(categories, { excludeId: editor?.category?._id ?? null });
 
   /** Recursive rows: indentation is a CSS variable, not nested tables. */
@@ -149,7 +180,8 @@ export default function CategoriesPage() {
       const children = node.children ?? [];
       return (
         <div className="admin-tree-node" key={node._id ?? node.slug}>
-          <div className="admin-tree-row" style={{ '--depth': depth }}>
+          <div className="admin-tree-row" style={{ '--depth': depth }} draggable={canWrite} onDragStart={(event) => { event.stopPropagation(); setDraggedSlug(node.slug); event.dataTransfer.effectAllowed = 'move'; }} onDragOver={(event) => { if (draggedSlug) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); reorderSiblings(nodes, draggedSlug, node.slug); }} onDragEnd={() => setDraggedSlug('')}>
+            {canWrite && <span className="admin-tree-drag" aria-label="Drag to reorder" title="Drag to reorder">⠿</span>}
             {node.image ? (
               <img src={assetUrl(node.image)} alt="" />
             ) : (
@@ -170,6 +202,7 @@ export default function CategoriesPage() {
                 <button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => openEdit(node)}>
                   Edit
                 </button>
+                {node.isActive === false ? <button type="button" className="admin-btn admin-btn-small admin-btn-ghost" disabled={busySlug === node.slug} onClick={() => activate(node)}>Reactivate</button> : null}
                 <button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => openCreate(node)}>
                   + Sub-category
                 </button>
@@ -306,12 +339,14 @@ export default function CategoriesPage() {
                 onChange={(event) => setField('position', event.target.value)}
               />
             </FormField>
-            <FormField label="Image" hint="Filename served from /assets, e.g. cat-nuts_ze0A.jpg">
+            <FormField label="Image" hint="Upload JPEG, PNG or WebP, or enter an existing asset path.">
               <input
                 className="admin-input admin-mono"
                 value={form.image}
                 onChange={(event) => setField('image', event.target.value)}
               />
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadCategoryImage(event.target.files?.[0])} disabled={saving} aria-label="Upload category image" />
+              {form.image && <img className="admin-category-image-preview" src={assetUrl(form.image)} alt="Category image preview" />}
             </FormField>
             <FormField label="Description">
               <input

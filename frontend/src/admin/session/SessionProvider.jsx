@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { adminApi, setUnauthorizedHandler, sessionStore } from '../lib/api.js';
 import { SessionContext } from './session-context.js';
 
@@ -19,7 +19,7 @@ export function SessionProvider({ children }) {
   const [notice, setNotice] = useState('');
   const [signingIn, setSigningIn] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setUnauthorizedHandler(() => {
       sessionStore.clear();
       setSession(null);

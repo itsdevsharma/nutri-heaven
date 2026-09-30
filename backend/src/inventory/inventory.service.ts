@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { ClientSession, Connection, Model } from 'mongoose';
+import { InjectConnection } from '@nestjs/mongoose';
 import { Product, ProductDocument } from '../products/product.schema';
 import {
   InventoryMovement,
@@ -58,6 +59,7 @@ const stateFor = (stock: number, limit: number): InventoryRow['state'] =>
 @Injectable()
 export class InventoryService {
   constructor(
+    @InjectConnection() private readonly connection: Connection,
     @InjectModel(Product.name) private readonly products: Model<ProductDocument>,
     @InjectModel(InventoryMovement.name)
     private readonly movements: Model<InventoryMovementDocument>,
@@ -170,12 +172,14 @@ export class InventoryService {
     productSlug: string;
     packSize: string;
     delta: number;
+    targetBalance?: number;
     type: InventoryMovementType;
     reason: string;
     actor: string;
     referenceId?: string;
     idempotencyKey?: string;
     setLowStockLimit?: number;
+    session?: ClientSession;
   }) {
     const slug = input.productSlug.trim().toLowerCase();
     if (!input.reason.trim()) {
@@ -190,45 +194,36 @@ export class InventoryService {
       if (existing) return existing;
     }
 
-    const product = await this.products.findOne({ slug }).exec();
-    if (!product) throw new NotFoundException(`No product found for slug "${slug}"`);
-    const variants = (product.variants ?? []) as Array<Record<string, unknown>>;
-    const index = variants.findIndex((item) => item.size === input.packSize);
-    if (index < 0) throw new NotFoundException(`Pack "${input.packSize}" not found on "${slug}"`);
-
-    const current = Number(variants[index]?.stockQuantity) || 0;
-    const balance = current + input.delta;
-    if (balance < 0) {
-      throw new BadRequestException(`Only ${current} available for ${slug} (${input.packSize})`);
-    }
-    if (variants[index]) {
-      if (input.setLowStockLimit !== undefined) variants[index].lowStockLimit = input.setLowStockLimit;
-      variants[index].stockQuantity = balance;
-    }
-    product.markModified('variants');
-    await product.save();
-
+    let result: Record<string, unknown> | undefined;
+    const run = async (session: ClientSession) => {
+      if (input.idempotencyKey) {
+        const existing = await this.movements.findOne({ idempotencyKey: input.idempotencyKey }).session(session).lean().exec();
+        if (existing) { result = existing as unknown as Record<string, unknown>; return; }
+      }
+      const product = await this.products.findOne({ slug }).session(session).lean().exec();
+      const variant = (product?.variants ?? []).find((item) => item.size === input.packSize) as { stockQuantity?: number } | undefined;
+      if (!product || !variant) throw new NotFoundException(`Pack "${input.packSize}" not found on "${slug}"`);
+      const current = Number(variant.stockQuantity) || 0;
+      const delta = input.targetBalance === undefined ? input.delta : input.targetBalance - current;
+      const balance = current + delta;
+      if (balance < 0) throw new BadRequestException(`Only ${current} available for ${slug} (${input.packSize})`);
+      const stockPredicate = { variants: { $elemMatch: { size: input.packSize, stockQuantity: current } } };
+      const set: Record<string, unknown> = { 'variants.$[v].stockQuantity': balance };
+      if (input.setLowStockLimit !== undefined) set['variants.$[v].lowStockLimit'] = input.setLowStockLimit;
+      const updated = await this.products.updateOne({ slug, ...stockPredicate }, { $set: set }, { arrayFilters: [{ 'v.size': input.packSize }], session }).exec();
+      if (!updated.modifiedCount) throw new BadRequestException(`Stock changed concurrently; retry adjustment for ${slug} (${input.packSize})`);
+      const createdRows = await this.movements.create([{ productSlug: slug, packSize: input.packSize, quantity: delta, balance, type: input.type, reason: input.reason.trim(), actor: input.actor, referenceId: input.referenceId ?? '', idempotencyKey: input.idempotencyKey }], { session });
+      const created = createdRows[0];
+      if (!created) throw new Error('Inventory ledger insert failed');
+      result = created.toObject() as unknown as Record<string, unknown>;
+    };
+    const session = input.session ?? await this.connection.startSession();
     try {
-      const created = await this.movements.create({
-        productSlug: slug,
-        packSize: input.packSize,
-        quantity: input.delta,
-        balance,
-        type: input.type,
-        reason: input.reason.trim(),
-        actor: input.actor,
-        referenceId: input.referenceId ?? '',
-        idempotencyKey: input.idempotencyKey,
-      });
-      return created.toObject();
-    } catch (error) {
-      // Ledger write failed after the balance moved: compensate so the two
-      // stores can never disagree, then surface the failure.
-      if (variants[index]) variants[index].stockQuantity = current;
-      product.markModified('variants');
-      await product.save();
-      throw error;
-    }
+      if (input.session) await run(session);
+      else await session.withTransaction(() => run(session));
+      if (!result) throw new Error('Inventory transaction produced no result');
+      return result;
+    } finally { if (!input.session) await session.endSession(); }
   }
 
   /** Console adjustment: the UI sends the counted shelf balance, not a delta. */
@@ -242,18 +237,11 @@ export class InventoryService {
     actor: string;
   }) {
     const slug = dto.productSlug.trim().toLowerCase();
-    const product = await this.products.findOne({ slug }).lean().exec();
-    if (!product) throw new NotFoundException(`No product found for slug "${slug}"`);
-    const variant = (product.variants ?? []).find((item) => item.size === dto.packSize) as
-      | { stockQuantity?: number }
-      | undefined;
-    if (!variant) throw new NotFoundException(`Pack "${dto.packSize}" not found on "${slug}"`);
-    const current = Number(variant.stockQuantity) || 0;
-
     return this.apply({
       productSlug: slug,
       packSize: dto.packSize,
-      delta: dto.balance - current,
+      delta: 0,
+      targetBalance: dto.balance,
       type: 'adjustment',
       reason: dto.reason,
       actor: dto.actor,
@@ -271,7 +259,16 @@ export class InventoryService {
     referenceId: string,
     lines: Array<{ productSlug: string; packSize: string; quantity: number }>,
     actor = 'system',
+    session?: ClientSession,
   ) {
+    if (!session) {
+      const transaction = await this.connection.startSession();
+      try {
+        let result: unknown;
+        await transaction.withTransaction(async () => { result = await this.reserveForOrder(referenceId, lines, actor, transaction); });
+        return result;
+      } finally { await transaction.endSession(); }
+    }
     const grouped = new Map<string, { productSlug: string; packSize: string; quantity: number }>();
     for (const line of lines) {
       if (!Number.isInteger(line.quantity) || line.quantity <= 0) {
@@ -289,7 +286,7 @@ export class InventoryService {
     // the former has already decremented stock.
     for (const line of uniqueLines) {
       const slug = line.productSlug;
-      const product = await this.products.findOne({ slug }).lean().exec();
+      const product = await this.products.findOne({ slug }).session(session).lean().exec();
       const variant = (product?.variants ?? []).find((item) => item.size === line.packSize) as
         | { stockQuantity?: number }
         | undefined;
@@ -315,6 +312,7 @@ export class InventoryService {
           actor,
           referenceId,
           idempotencyKey: `order:${referenceId}:${slug}:${line.packSize}`,
+          session,
         }),
       );
     }
@@ -327,7 +325,16 @@ export class InventoryService {
     lines: Array<{ productSlug: string; packSize: string; quantity: number }>,
     kind: 'cancelled' | 'return' = 'cancelled',
     actor = 'system',
+    session?: ClientSession,
   ) {
+    if (!session) {
+      const transaction = await this.connection.startSession();
+      try {
+        let result: unknown;
+        await transaction.withTransaction(async () => { result = await this.releaseForOrder(referenceId, lines, kind, actor, transaction); });
+        return result;
+      } finally { await transaction.endSession(); }
+    }
     const applied = [];
     for (const line of lines) {
       const slug = line.productSlug.trim().toLowerCase();
@@ -344,6 +351,7 @@ export class InventoryService {
           actor,
           referenceId,
           idempotencyKey: `${kind}:${referenceId}:${slug}:${line.packSize}`,
+          session,
         }),
       );
     }
@@ -356,10 +364,19 @@ export class InventoryService {
     referenceId: string,
     lines: Array<{ productSlug: string; packSize: string; quantity: number }>,
     actor = 'system',
+    session?: ClientSession,
   ) {
+    if (!session) {
+      const transaction = await this.connection.startSession();
+      try {
+        let result: unknown;
+        await transaction.withTransaction(async () => { result = await this.commitForOrder(referenceId, lines, actor, transaction); });
+        return result;
+      } finally { await transaction.endSession(); }
+    }
     const applied = [];
     for (const line of lines) {
-      const product = await this.products.findOne({ slug: line.productSlug.trim().toLowerCase() }).lean().exec();
+      const product = await this.products.findOne({ slug: line.productSlug.trim().toLowerCase() }).session(session).lean().exec();
       const variant = (product?.variants ?? []).find((item) => item.size === line.packSize) as { stockQuantity?: number } | undefined;
       if (!product || !variant) throw new NotFoundException(`Pack "${line.packSize}" not found on "${line.productSlug}"`);
       applied.push(await this.apply({
@@ -371,6 +388,7 @@ export class InventoryService {
         actor,
         referenceId,
         idempotencyKey: `commit:${referenceId}:${line.productSlug}:${line.packSize}`,
+        session,
       }));
     }
     return applied;

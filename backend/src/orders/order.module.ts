@@ -7,6 +7,7 @@ import { OrderService } from './order.service';
 import { Order, OrderSchema } from './order.schema';
 import { ProductsModule } from '../products/products.module';
 import { InventoryModule } from '../inventory/inventory.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { InventoryModule } from '../inventory/inventory.module';
     AdminModule,
     ProductsModule,
     InventoryModule,
+    CouponsModule,
     MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }]),
   ],
   controllers: [OrderController],

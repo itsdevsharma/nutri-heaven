@@ -1,4 +1,4 @@
-import { IsString, IsEmail, MinLength, IsNotEmpty, ValidateNested, IsOptional, IsArray, IsIn, IsNumber, Min, IsEnum } from 'class-validator';
+import { IsString, IsEmail, MinLength, IsNotEmpty, ValidateNested, IsOptional, IsArray, IsIn, IsNumber, Min, IsEnum, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from './order.schema';
 
@@ -25,7 +25,15 @@ export class OrderAddressDto {
 
   @IsString()
   @IsNotEmpty()
-  @MinLength(6)
+  state!: string;
+
+  @IsOptional()
+  @IsString()
+  landmark?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d{6}$/)
   pin!: string;
 }
 
@@ -42,7 +50,7 @@ export class OrderCreateDto {
   customerEmail!: string;
 
   @IsString()
-  @IsNotEmpty()
+  @Matches(/^\d{10}$/)
   customerPhone!: string;
 
   @ValidateNested()
@@ -68,6 +76,10 @@ export class OrderCreateDto {
   @IsOptional()
   @IsString()
   razorpayPaymentId?: string;
+
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }
 
 export class UpdateOrderStatusDto {

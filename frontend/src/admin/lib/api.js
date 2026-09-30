@@ -43,7 +43,14 @@ export const sessionStore = {
       const raw = window.sessionStorage.getItem(SESSION_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      return parsed?.accessToken && parsed?.admin ? parsed : null;
+      if (!parsed?.accessToken || !parsed?.admin) return null;
+      // Do not render a protected screen with a JWT we already know has
+      // expired. Besides avoiding a needless request, this closes the small
+      // effect-order race where a child fetch could finish before the session
+      // provider installs its 401 handler.
+      const payload = JSON.parse(atob(parsed.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (payload?.exp && payload.exp * 1000 <= Date.now()) { window.sessionStorage.removeItem(SESSION_KEY); return null; }
+      return parsed;
     } catch {
       return null;
     }
@@ -139,6 +146,12 @@ export const adminApi = {
       request(`/products/admin/${encodeURIComponent(slug)}/duplicate`, { method: 'POST' }),
     deactivate: (slug) =>
       request(`/products/admin/${encodeURIComponent(slug)}/deactivate`, { method: 'PATCH' }),
+    archive: (slug) => request(`/products/admin/${encodeURIComponent(slug)}/archive`, { method: 'PATCH' }),
+    recover: (slug, targetStatus = 'draft') => request(`/products/admin/${encodeURIComponent(slug)}/recover`, { method: 'PATCH', body: { targetStatus } }),
+    bulk: (payload) => request('/products/admin/bulk', { method: 'PATCH', body: payload }),
+    exportCsv: async (params = {}) => { const response = await fetch(`${API_URL}/products/admin/export${toQuery(params)}`, { headers: { Authorization: `Bearer ${sessionStore.token()}` } }); if (!response.ok) throw new ApiError('CSV export failed.', response.status); return response.blob(); },
+    importCsv: async (file, dryRun = true) => { const form = new FormData(); form.append('file', file); const response = await fetch(`${API_URL}/products/admin/import?dryRun=${dryRun}`, { method: 'POST', headers: { Authorization: `Bearer ${sessionStore.token()}` }, body: form }); const payload = await response.json().catch(() => null); if (!response.ok) throw new ApiError(apiMessage(payload, response.status), response.status, payload); return payload; },
+    confirmImport: (token) => request('/products/admin/import/confirm', { method: 'POST', body: { token } }),
   },
 
   categories: {
@@ -149,6 +162,8 @@ export const adminApi = {
       request(`/categories/admin/${encodeURIComponent(slug)}`, { method: 'PATCH', body: payload }),
     deactivate: (slug) =>
       request(`/categories/admin/${encodeURIComponent(slug)}/deactivate`, { method: 'PATCH' }),
+    activate: (slug) => request(`/categories/admin/${encodeURIComponent(slug)}/activate`, { method: 'PATCH' }),
+    reorder: (slugs) => request('/categories/admin/reorder', { method: 'PATCH', body: { slugs } }),
   },
 
   inventory: {
@@ -175,6 +190,9 @@ export const adminApi = {
     updateStatus: (id, status) => request(`/orders/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } }),
     cancel: (id, reason) => request(`/orders/admin/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: { reason } }),
   },
+  payments: {
+    refund: (id) => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/refund`, { method: 'POST' }),
+  },
 
   settings: {
     get: () => request('/admin/settings'),
@@ -191,6 +209,9 @@ export const adminApi = {
       const payload = await response.json().catch(() => null); if (!response.ok) throw new ApiError(apiMessage(payload,response.status),response.status,payload); return payload;
     },
   },
+  offers: { list: () => request('/admin/offers'), create: (payload) => request('/admin/offers', { method: 'POST', body: payload }), update: (id, payload) => request(`/admin/offers/${id}`, { method: 'PATCH', body: payload }), deactivate: (id) => request(`/admin/offers/${id}/deactivate`, { method: 'PATCH' }) },
+  coupons: { list: () => request('/admin/coupons'), create: (payload) => request('/admin/coupons', { method: 'POST', body: payload }), update: (id, payload) => request(`/admin/coupons/${id}`, { method: 'PATCH', body: payload }), deactivate: (id) => request(`/admin/coupons/${id}/deactivate`, { method: 'PATCH' }), redemptions: (code) => request(`/admin/coupons/${encodeURIComponent(code)}/redemptions`) },
+  audit: { list: (params = {}) => request(`/admin/audit${toQuery(params)}`) },
 };
 
 export { API_URL };

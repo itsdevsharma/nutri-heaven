@@ -5,10 +5,11 @@ import { shippingFeeForPaise } from '../common/pricing';
 import { Product, ProductDocument } from '../products/product.schema';
 import { Cart, CartDocument } from './cart.schema';
 import { AddCartItemDto, UpdateCartItemDto } from './cart.dto';
+import { OffersService } from '../offers/offers.service';
 
 @Injectable()
 export class CartService {
-  constructor(@InjectModel(Cart.name) private carts: Model<CartDocument>, @InjectModel(Product.name) private products: Model<ProductDocument>) {}
+  constructor(@InjectModel(Cart.name) private carts: Model<CartDocument>, @InjectModel(Product.name) private products: Model<ProductDocument>, private offers: OffersService) {}
   private key(productId: string, packSize: string) { return `${productId}:${packSize}`; }
   private async cart(cartId: string) { return this.carts.findOneAndUpdate({ cartId }, { $setOnInsert: { cartId } }, { upsert: true, new: true }).exec(); }
   private async variant(productId: string, packSize: string) {
@@ -42,5 +43,14 @@ export class CartService {
   async clear(cartId: string) { const cart = await this.cart(cartId); cart.items = []; cart.note = ''; await cart.save(); return this.summary(cart); }
   async saveForLater(cartId: string, index: number, savedForLater = true) { const cart = await this.cart(cartId); if (!cart.items[index]) throw new NotFoundException('Cart line not found'); cart.items[index].savedForLater = savedForLater; await cart.save(); return this.summary(cart); }
   async note(cartId: string, note: string) { const cart = await this.cart(cartId); cart.note = note.trim(); await cart.save(); return this.summary(cart); }
-  private summary(cart: CartDocument) { const active = cart.items.filter(item => !item.savedForLater); const subtotalPaise = active.reduce((sum, item) => sum + item.unitPricePaise * item.quantity, 0); const shippingPaise = shippingFeeForPaise(subtotalPaise); const gstPaise = Math.round(subtotalPaise * .05 / 1.05); return { cartId: cart.cartId, items: active, savedItems: cart.items.filter(item => item.savedForLater), note: cart.note, subtotalPaise, couponDiscountPaise: 0, gstPaise, cgstPaise: Math.floor(gstPaise / 2), sgstPaise: Math.ceil(gstPaise / 2), shippingPaise, totalPaise: subtotalPaise + shippingPaise }; }
+  private async summary(cart: CartDocument) {
+    const active = cart.items.filter(item => !item.savedForLater);
+    const items = await Promise.all(active.map(async item => {
+      const product = await this.products.findOne({ slug: item.productId, isActive: true, status: 'active' }).select('slug category').lean().exec();
+      const unitPricePaise = product ? await this.offers.priceFor(product, item.unitPricePaise) : item.unitPricePaise;
+      return { productId: item.productId, packSize: item.packSize, quantity: item.quantity, unitPricePaise, productName: item.productName, image: item.image, stock: item.stock, savedForLater: item.savedForLater };
+    }));
+    const subtotalPaise = items.reduce((sum, item) => sum + item.unitPricePaise * item.quantity, 0); const shippingPaise = shippingFeeForPaise(subtotalPaise); const gstPaise = Math.round(subtotalPaise * .05 / 1.05);
+    return { cartId: cart.cartId, items, savedItems: cart.items.filter(item => item.savedForLater), note: cart.note, subtotalPaise, couponDiscountPaise: 0, gstPaise, cgstPaise: Math.floor(gstPaise / 2), sgstPaise: Math.ceil(gstPaise / 2), shippingPaise, totalPaise: subtotalPaise + shippingPaise };
+  }
 }

@@ -1,4 +1,3 @@
-import ComingSoonPage from './pages/ComingSoonPage.jsx';
 import CategoriesPage from './pages/CategoriesPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import InventoryPage from './pages/InventoryPage.jsx';
@@ -8,6 +7,9 @@ import OrdersPage from './pages/OrdersPage.jsx';
 import ProductsPage from './pages/ProductsPage.jsx';
 import StoreContentPage from './pages/StoreContentPage.jsx';
 import CmsCollectionsPage from './pages/CmsCollectionsPage.jsx';
+import OffersPage from './pages/OffersPage.jsx';
+import AuditPage from './pages/AuditPage.jsx';
+import CouponsPage from './pages/CouponsPage.jsx';
 
 /**
  * The console's route table — the single source of truth for three things that
@@ -116,7 +118,7 @@ export const ROUTES = [
     group: 'Marketing',
     icon: '◆',
     capability: 'marketing:read',
-    element: ComingSoonPage,
+    element: OffersPage,
     planned: {
       summary: 'Product, category and festival offers with priority, validity windows and stackability rules.',
       phase: 'Step 4 of backend/ADMIN_COMMERCE_PLAN.md (pricing and promotions).',
@@ -136,7 +138,7 @@ export const ROUTES = [
     group: 'Marketing',
     icon: '◈',
     capability: 'marketing:read',
-    element: ComingSoonPage,
+    element: CouponsPage,
     planned: {
       summary: 'Rule-based coupons with usage caps, expiry and optional product or category scopes.',
       phase: 'Step 5 of backend/ADMIN_COMMERCE_PLAN.md (coupons).',
@@ -161,7 +163,7 @@ export const ROUTES = [
     group: 'System',
     icon: '≡',
     capability: 'audit:read',
-    element: ComingSoonPage,
+    element: AuditPage,
     planned: {
       summary: 'Who changed what, before and after, with the request that caused it.',
       phase: 'Audit events land in step 1 of backend/ADMIN_COMMERCE_PLAN.md and are consumed from step 6 on.',

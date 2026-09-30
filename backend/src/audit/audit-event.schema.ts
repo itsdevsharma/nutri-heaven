@@ -1,0 +1,3 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'; import { HydratedDocument } from 'mongoose';
+@Schema({ collection: 'audit_events', timestamps: true }) export class AuditEvent { @Prop() actorId?: string; @Prop() actorEmail?: string; @Prop({ required: true }) action!: string; @Prop({ required: true }) entityType!: string; @Prop({ required: true }) entityId!: string; @Prop({ type: Object }) before?: Record<string, unknown>; @Prop({ type: Object }) after?: Record<string, unknown>; @Prop() correlationId?: string; }
+export type AuditEventDocument = HydratedDocument<AuditEvent>; export const AuditEventSchema = SchemaFactory.createForClass(AuditEvent);

@@ -19,7 +19,10 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   const uploads = join(process.cwd(), 'uploads');
   if (!existsSync(uploads)) mkdirSync(uploads, { recursive: true });
-  app.use('/uploads', serveStatic(uploads));
+  // Canvas-based image editing needs the upload origin to be CORS-readable.
+  // Static middleware runs before Nest's regular route handling, so it must
+  // emit the header itself rather than relying on `app.enableCors()` below.
+  app.use('/uploads', serveStatic(uploads, { setHeaders: (response) => response.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGINS?.split(',')[0]?.trim() || 'http://localhost:5173') }));
 
   // Baseline browser protections without adding a second middleware stack.
   // A deployed reverse proxy remains responsible for HTTPS/HSTS.

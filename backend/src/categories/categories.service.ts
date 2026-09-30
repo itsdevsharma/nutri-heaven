@@ -12,4 +12,12 @@ export class CategoriesService {
   async create(input: Partial<Category>) { await this.validateParent(input.parentId); try { return await this.categories.create(input); } catch { throw new ConflictException('Category slug already exists'); } }
   async update(slug: string, input: Partial<Category>) { const current=await this.categories.findOne({slug}).lean().exec(); if(!current) throw new NotFoundException('Category not found'); await this.validateParent(input.parentId,current._id.toString()); const result = await this.categories.findOneAndUpdate({ slug }, { $set: input }, { new: true, runValidators: true }).lean().exec(); return result!; }
   async deactivate(slug: string) { const result = await this.categories.findOneAndUpdate({ slug }, { $set: { isActive: false } }, { new: true }).lean().exec(); if (!result) throw new NotFoundException('Category not found'); return result; }
+  async activate(slug: string) { const result = await this.categories.findOneAndUpdate({ slug }, { $set: { isActive: true } }, { new: true }).lean().exec(); if (!result) throw new NotFoundException('Category not found'); return result; }
+  async reorder(slugs: string[]) {
+    if (!Array.isArray(slugs) || !slugs.length || new Set(slugs).size !== slugs.length) throw new ConflictException('Provide a unique ordered list of category slugs');
+    const rows = await this.categories.find({ slug: { $in: slugs } }).select('slug parentId').lean().exec();
+    if (rows.length !== slugs.length || new Set(rows.map((row) => String(row.parentId ?? 'root'))).size !== 1) throw new ConflictException('Categories must be siblings');
+    await Promise.all(slugs.map((slug, position) => this.categories.updateOne({ slug }, { $set: { position } }).exec()));
+    return this.adminList();
+  }
 }

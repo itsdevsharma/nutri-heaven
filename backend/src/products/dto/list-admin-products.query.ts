@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBooleanString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 /** Product lifecycle states, mirrored from `Product['status']`. */
 export const ADMIN_PRODUCT_STATUSES = ['draft', 'active', 'inactive', 'archived'] as const;
@@ -25,6 +25,16 @@ export class ListAdminProductsQuery {
   @IsString()
   @MaxLength(80)
   q?: string;
+
+  @IsOptional() @IsString() @MaxLength(10000) slugs?: string;
+
+  @IsOptional() @IsString() @MaxLength(100) category?: string;
+  @IsOptional() @IsIn(['healthy', 'low', 'out']) stock?: 'healthy' | 'low' | 'out';
+  @IsOptional() @IsBooleanString() featured?: string;
+  @IsOptional() @IsBooleanString() bestseller?: string;
+  @IsOptional() @IsBooleanString() newArrival?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) minPricePaise?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) maxPricePaise?: number;
 
   @IsOptional()
   @Type(() => Number)

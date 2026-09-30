@@ -44,8 +44,9 @@ export class Product {
   @Prop({ required: true })
   image!: string;
 
-  @Prop({ type: [String], default: [] })
-  images!: string[];
+  /** Ordered gallery. Legacy string entries are normalised on admin reads. */
+  @Prop({ type: [{ url: { type: String, required: true }, alt: { type: String, default: '' }, position: { type: Number, default: 0 } }], default: [] })
+  images!: Array<{ url: string; alt: string; position: number }>;
 
   @Prop({ required: true })
   category!: string;

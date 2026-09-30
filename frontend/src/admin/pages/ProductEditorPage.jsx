@@ -20,9 +20,13 @@ import { can } from '../lib/permissions.js';
 import { useResource } from '../lib/useResource.js';
 import { Link, useRouter } from '../router.jsx';
 import { useSession } from '../session/session-context.js';
+import { StorefrontPreview } from '../components/StorefrontPreview.jsx';
+import { ImageCropper } from '../components/ImageCropper.jsx';
+import { Modal } from '../components/Modal.jsx';
+import { categoryOptions } from '../lib/catalogue.js';
 
 function blankVariant() {
-  return { size: '', price: '', mrp: '', sku: '', barcode: '', taxPercent: '', stock: '0', lowStockLimit: '0', weightGrams: '', isActive: true };
+  return { size: '', price: '', mrp: '', sku: '', barcode: '', taxPercent: '', stock: '0', lowStockLimit: '0', weightGrams: '', images: [], isActive: true };
 }
 
 function blankProduct() {
@@ -41,7 +45,7 @@ function blankProduct() {
     mrp: '',
     discountPercent: '',
     image: '',
-    images: '',
+    images: [],
     tags: '',
     seoTitle: '',
     seoDescription: '',
@@ -56,6 +60,8 @@ function blankProduct() {
 
 /** API product → editable rupees/percent strings. */
 function fromProduct(product) {
+  const gallery = (product.images ?? []).map((image, position) => typeof image === 'string' ? { url: image, alt: product.title ?? '', position } : { url: image.url, alt: image.alt ?? '', position: image.position ?? position });
+  if (product.image && !gallery.some((image) => image.url === product.image)) gallery.unshift({ url: product.image, alt: product.title ?? '', position: 0 });
   return {
     title: product.title ?? '',
     slug: product.slug ?? '',
@@ -71,7 +77,7 @@ function fromProduct(product) {
     mrp: paiseToRupees(product.mrpPaise),
     discountPercent: basisPointsToPercent(product.discountBasisPoints),
     image: product.image ?? '',
-    images: (product.images ?? []).join('\n'),
+    images: gallery.map((image, position) => ({ ...image, position })),
     tags: (product.tags ?? []).join(', '),
     seoTitle: product.seoTitle ?? '',
     seoDescription: product.seoDescription ?? '',
@@ -91,6 +97,7 @@ function fromProduct(product) {
       lowStockLimit: String(variant.lowStockLimit ?? 0),
       weightGrams:
         variant.weightGrams === undefined || variant.weightGrams === null ? '' : String(variant.weightGrams),
+      images: variant.images ?? [],
       isActive: variant.isActive !== false,
     })),
   };
@@ -119,6 +126,23 @@ const toNumber = (value) => Math.max(0, Number(String(value ?? '').replace(/[^0-
  * opening balance — the one moment a balance legitimately starts.
  */
 function buildPayload(form, { isNew, sourceVariants }) {
+  const variants = form.variants.map((variant, index) => ({
+    size: variant.size.trim(),
+    pricePaise: rupeesToPaise(variant.price),
+    mrpPaise: variant.mrp === '' ? undefined : rupeesToPaise(variant.mrp),
+    sku: variant.sku.trim() || undefined,
+    barcode: variant.barcode.trim() || undefined,
+    taxBasisPoints: variant.taxPercent === '' ? 0 : percentToBasisPoints(variant.taxPercent),
+    lowStockLimit: toNumber(variant.lowStockLimit),
+    weightGrams: variant.weightGrams === '' ? undefined : toNumber(variant.weightGrams),
+    images: variant.images ?? [],
+    isActive: variant.isActive,
+    stockQuantity: isNew ? toNumber(variant.stock) : toNumber(sourceVariants?.[index]?.stockQuantity),
+  }));
+  // Variants are the pricing source of truth. The legacy product-level amounts
+  // remain populated for public-card compatibility, derived from the least
+  // expensive active pack rather than independently maintained by an operator.
+  const defaultPack = variants.filter((variant) => variant.isActive && variant.pricePaise > 0).sort((a, b) => a.pricePaise - b.pricePaise)[0];
   return {
     slug: form.slug.trim().toLowerCase(),
     title: form.title.trim(),
@@ -130,11 +154,11 @@ function buildPayload(form, { isNew, sourceVariants }) {
     description: form.description.trim(),
     shortDescription: form.shortDescription.trim(),
     fullDescription: form.fullDescription.trim(),
-    pricePaise: rupeesToPaise(form.price),
-    mrpPaise: form.mrp === '' ? undefined : rupeesToPaise(form.mrp),
-    discountBasisPoints: form.discountPercent === '' ? 0 : percentToBasisPoints(form.discountPercent),
+    pricePaise: defaultPack?.pricePaise ?? rupeesToPaise(form.price),
+    mrpPaise: defaultPack?.mrpPaise,
+    discountBasisPoints: 0,
     image: form.image.trim(),
-    images: splitLines(form.images),
+    images: (form.images ?? []).map((image, position) => ({ url: image.url, alt: image.alt?.trim() || form.title.trim(), position })),
     tags: splitList(form.tags),
     seoTitle: form.seoTitle.trim(),
     seoDescription: form.seoDescription.trim(),
@@ -143,18 +167,7 @@ function buildPayload(form, { isNew, sourceVariants }) {
     isFeatured: form.isFeatured,
     isBestseller: form.isBestseller,
     isNewArrival: form.isNewArrival,
-    variants: form.variants.map((variant, index) => ({
-      size: variant.size.trim(),
-      pricePaise: rupeesToPaise(variant.price),
-      mrpPaise: variant.mrp === '' ? undefined : rupeesToPaise(variant.mrp),
-      sku: variant.sku.trim() || undefined,
-      barcode: variant.barcode.trim() || undefined,
-      taxBasisPoints: variant.taxPercent === '' ? 0 : percentToBasisPoints(variant.taxPercent),
-      lowStockLimit: toNumber(variant.lowStockLimit),
-      weightGrams: variant.weightGrams === '' ? undefined : toNumber(variant.weightGrams),
-      isActive: variant.isActive,
-      stockQuantity: isNew ? toNumber(variant.stock) : toNumber(sourceVariants?.[index]?.stockQuantity),
-    })),
+    variants,
   };
 }
 
@@ -166,8 +179,6 @@ function validate(form) {
   else if (!/^[a-z0-9-]+$/.test(form.slug.trim())) errors.slug = 'Use lowercase letters, numbers and hyphens only.';
   if (!form.description.trim()) errors.description = 'A short description is required.';
   if (!form.image.trim()) errors.image = 'A primary image filename is required, e.g. almonds_ze0A.jpg.';
-  if (form.price === '' || rupeesToPaise(form.price) <= 0) errors.price = 'A selling price above zero is required.';
-  if (form.mrp !== '' && rupeesToPaise(form.mrp) < rupeesToPaise(form.price)) errors.mrp = 'MRP cannot be below the selling price.';
   if (!form.variants.length) errors.variants = 'At least one pack size is required.';
   else if (form.variants.some((variant) => !variant.size.trim())) errors.variants = 'Every pack needs a size label.';
   else if (new Set(form.variants.map((variant) => variant.size.trim().toLowerCase())).size !== form.variants.length) errors.variants = 'Pack sizes must be unique.';
@@ -198,6 +209,9 @@ export default function ProductEditorPage({ params }) {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [cropTarget, setCropTarget] = useState(null);
+  const [altEditor, setAltEditor] = useState(null);
+  const [variantImageEditor, setVariantImageEditor] = useState(null);
 
   const sourceVariants = useRef([]);
   const slugTouched = useRef(!isNew);
@@ -217,6 +231,7 @@ export default function ProductEditorPage({ params }) {
   }, [data]);
 
   const canWrite = can(role, 'catalogue:write');
+  const defaultPack = useMemo(() => form.variants.filter((variant) => variant.isActive && rupeesToPaise(variant.price) > 0).sort((a, b) => rupeesToPaise(a.price) - rupeesToPaise(b.price))[0] ?? null, [form.variants]);
 
   /**
    * Category names for the suggestions datalist. `Product.category` is a string
@@ -224,10 +239,9 @@ export default function ProductEditorPage({ params }) {
    * exist instead of letting a typo invent a new one.
    */
   const categories = useResource(() => adminApi.categories.list(), []);
-  const categoryNames = useMemo(
-    () => Array.from(new Set((categories.data ?? []).map((category) => category.name).filter(Boolean))).sort(),
-    [categories.data],
-  );
+  const categoryChoices = useMemo(() => categoryOptions((categories.data ?? []).filter((category) => category.isActive !== false)), [categories.data]);
+  const categoryNames = categoryChoices.map((category) => category.name);
+  const subCategoryChoices = useMemo(() => { const parent = (categories.data ?? []).find((category) => category.name === form.category); return parent ? (categories.data ?? []).filter((category) => String(category.parentId) === String(parent._id) && category.isActive !== false) : []; }, [categories.data, form.category]);
 
   const setField = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -273,20 +287,26 @@ export default function ProductEditorPage({ params }) {
   };
 
   const uploadImage = async (event, destination = 'primary') => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     event.target.value = '';
-    if (!file) return;
+    if (!files.length) return;
     setUploading(true);
     try {
-      const result = await adminApi.cms.uploadImage(file);
-      const url = result.url.startsWith('http') ? result.url : `${API_URL}${result.url}`;
+      const uploaded = await Promise.all(files.map((file) => adminApi.cms.uploadImage(file)));
+      const urls = uploaded.map((result) => result.url.startsWith('http') ? result.url : `${API_URL}${result.url}`);
       setForm((current) => destination === 'primary'
-        ? { ...current, image: url }
-        : { ...current, images: current.images ? `${current.images}\n${url}` : url });
+        ? { ...current, image: urls[0], images: [{ url: urls[0], alt: current.title, position: 0 }, ...current.images.filter((image) => image.url !== urls[0]).map((image, position) => ({ ...image, position: position + 1 }))] }
+        : { ...current, images: [...current.images, ...urls.filter((url) => !current.images.some((image) => image.url === url)).map((url, position) => ({ url, alt: current.title, position: current.images.length + position }))] });
       setDirty(true);
-      toast.success(destination === 'primary' ? 'Primary image uploaded.' : 'Gallery image uploaded.');
+      const saved = uploaded.reduce((total, result) => total + Math.max(0, Number(result.originalBytes) - Number(result.optimisedBytes)), 0);
+      toast.success(`${destination === 'primary' ? 'Primary image' : `${urls.length} gallery image${urls.length === 1 ? '' : 's'}`} uploaded${saved ? ` and optimised (${Math.round(saved / 1024)} KB saved)` : ''}.`);
     } catch (failure) { toast.error(failure.message); }
     finally { setUploading(false); }
+  };
+
+  const saveCrop = async (file) => {
+    if (!cropTarget) return; setUploading(true);
+    try { const result = await adminApi.cms.uploadImage(file); const url = result.url.startsWith('http') ? result.url : `${API_URL}${result.url}`; setForm((current) => ({ ...current, image: current.image === cropTarget ? url : current.image, images: current.images.map((image) => image.url === cropTarget ? { ...image, url } : image) })); setDirty(true); setCropTarget(null); toast.success('Cropped image uploaded and applied.'); } catch (failure) { toast.error(failure.message); } finally { setUploading(false); }
   };
 
   const save = async (event) => {
@@ -296,6 +316,14 @@ export default function ProductEditorPage({ params }) {
     if (Object.keys(nextErrors).length) {
       toast.error('Fix the highlighted fields before saving.');
       return;
+    }
+    if (form.status === 'active') {
+      const activeVariants = form.variants.filter((variant) => variant.isActive);
+      const warnings = [!form.seoTitle.trim() && 'SEO title is empty', !form.seoDescription.trim() && 'SEO description is empty'].filter(Boolean);
+      if (!form.image || !activeVariants.some((variant) => rupeesToPaise(variant.price) > 0)) { toast.error('Publishing requires a primary image and an active priced variant.'); return; }
+      if (!activeVariants.some((variant, index) => Number(isNew ? variant.stock : sourceVariants.current[index]?.stockQuantity) > 0)) { toast.error('Publishing requires an active variant with stock. Adjust existing stock in Inventory.'); return; }
+      const accepted = await confirm({ title: 'Publish this product?', message: warnings.length ? `Publishing checks passed. Warning: ${warnings.join('; ')}.` : 'Publishing checks passed: image, price and stock are present.', confirmLabel: 'Publish' });
+      if (!accepted) return;
     }
 
     setSaving(true);
@@ -421,7 +449,7 @@ export default function ProductEditorPage({ params }) {
                 label="Slug"
                 required
                 error={errors.slug}
-                hint="Public product id. Changing it breaks existing links."
+                hint={`Public URL: /products/${form.slug || 'your-product'} · Canonical: ${window.location.origin}/products/${form.slug || 'your-product'}`}
               >
                 <input
                   className="admin-input admin-mono"
@@ -450,23 +478,22 @@ export default function ProductEditorPage({ params }) {
                 label="Category"
                 required
                 error={errors.category}
-                hint="Free text; suggestions come from the categories that exist."
+                hint="Only active categories can be selected."
               >
-                <input
+                <select
                   className="admin-input"
-                  list="admin-category-suggestions"
                   value={form.category}
-                  onChange={(event) => setField('category', event.target.value)}
+                  onChange={(event) => { setField('category', event.target.value); setField('subCategory', ''); }}
                   disabled={!canWrite}
-                />
+                ><option value="">Select category</option>{categoryChoices.map((category) => <option key={category.id} value={category.name}>{'— '.repeat(category.depth)}{category.name}</option>)}</select>
               </FormField>
               <FormField label="Sub-category">
-                <input
+                <select
                   className="admin-input"
                   value={form.subCategory}
                   onChange={(event) => setField('subCategory', event.target.value)}
                   disabled={!canWrite}
-                />
+                ><option value="">No sub-category</option>{subCategoryChoices.map((category) => <option key={category._id} value={category.name}>{category.name}</option>)}</select>
               </FormField>
               <FormField label="Brand">
                 <input
@@ -485,11 +512,6 @@ export default function ProductEditorPage({ params }) {
                 />
               </FormField>
             </FormGrid>
-            <datalist id="admin-category-suggestions">
-              {categoryNames.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
           </FormSection>
 
                     <FormSection
@@ -522,7 +544,7 @@ export default function ProductEditorPage({ params }) {
                   disabled={!canWrite}
                 />
               </FormField>
-              <FormField label="Primary image" required error={errors.image} hint="Upload JPEG, PNG or WebP (up to 5 MB), or enter an existing asset filename.">
+              <FormField label="Primary image" required error={errors.image} hint="Recommended: 4:3 landscape (e.g. 1600 × 1200 px), JPEG/PNG/WebP. Upload up to 12 MB; it is automatically rotated, resized to a max 1600 px edge, and compressed to WebP quality 82.">
                 <input
                   className="admin-input admin-mono"
                   value={form.image}
@@ -531,18 +553,17 @@ export default function ProductEditorPage({ params }) {
                 />
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadImage(event, 'primary')} disabled={!canWrite || uploading} />
               </FormField>
-              <FormField label="Gallery images" hint="One image URL or filename per line. Uploads are appended in display order.">
-                <textarea
-                  className="admin-input admin-mono admin-textarea"
-                  rows={3}
-                  value={form.images}
-                  onChange={(event) => setField('images', event.target.value)}
-                  disabled={!canWrite}
-                />
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadImage(event, 'gallery')} disabled={!canWrite || uploading} />
+              <FormField label="Gallery images" hint="Drag to reorder. Choose a primary image, edit accessible alt text, or remove an image. Uploads are optimised to WebP (max 1600 px edge, quality 82).">
+                <div className="admin-image-gallery">
+                  {form.images.map((image, index) => <div className="admin-image-tile" key={`${image.url}-${index}`} draggable={canWrite} onDragStart={(event) => event.dataTransfer.setData('text/plain', String(index))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = Number(event.dataTransfer.getData('text/plain')); if (!Number.isInteger(from) || from === index) return; setForm((current) => { const images = [...current.images]; const [moved] = images.splice(from, 1); images.splice(index, 0, moved); return { ...current, images: images.map((item, position) => ({ ...item, position })) }; }); setDirty(true); }}>
+                    <img src={assetUrl(image.url)} alt={image.alt || ''} />
+                    <div className="admin-image-tile-actions"><button type="button" className="admin-btn admin-btn-small" disabled={!canWrite || form.image === image.url} onClick={() => setField('image', image.url)}>{form.image === image.url ? 'Primary' : 'Make primary'}</button><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" disabled={!canWrite} onClick={() => setCropTarget(image.url)}>Crop</button><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" disabled={!canWrite} onClick={() => setAltEditor({ index, value: image.alt ?? '' })}>Alt text</button><button type="button" className="admin-btn admin-btn-small admin-btn-quiet" disabled={!canWrite} onClick={() => setForm((current) => ({ ...current, image: current.image === image.url ? (current.images.find((item, position) => position !== index)?.url ?? '') : current.image, images: current.images.filter((_, position) => position !== index).map((item, position) => ({ ...item, position })) }))}>Delete</button></div>
+                  </div>)}
+                </div>
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => uploadImage(event, 'gallery')} disabled={!canWrite || uploading} />
               </FormField>
               <FormGrid>
-                <FormField label="SEO title">
+                <FormField label={`SEO title (${form.seoTitle.length}/60)`}>
                   <input
                     className="admin-input"
                     value={form.seoTitle}
@@ -550,7 +571,7 @@ export default function ProductEditorPage({ params }) {
                     disabled={!canWrite}
                   />
                 </FormField>
-                <FormField label="SEO description">
+                <FormField label={`SEO description (${form.seoDescription.length}/160)`}>
                   <input
                     className="admin-input"
                     value={form.seoDescription}
@@ -559,41 +580,25 @@ export default function ProductEditorPage({ params }) {
                   />
                 </FormField>
               </FormGrid>
+              <div className="admin-seo-preview" aria-label="Search result preview">
+                <small>SEARCH RESULT PREVIEW</small>
+                <a href={`/products/${form.slug || 'your-product'}`} onClick={(event) => event.preventDefault()}>{form.seoTitle || form.title || 'Product title'}</a>
+                <code>{window.location.origin}/products/{form.slug || 'your-product'}</code>
+                <p>{form.seoDescription || form.description || 'Product description will appear here.'}</p>
+              </div>
             </FormGrid>
           </FormSection>
 
                     <FormSection
-            title="Commerce"
-            description="All amounts are stored as integer paise; the API is authoritative for what a customer pays."
+            title="Selling model"
+            description="Pack variants are the single source of truth for customer pricing. Product-level prices are derived automatically for catalogue-card compatibility."
           >
             <FormGrid>
-              <FormField label="Selling price (₹)" required error={errors.price} hint="The price for the default pack.">
-                <input
-                  className="admin-input admin-mono"
-                  inputMode="decimal"
-                  value={form.price}
-                  onChange={(event) => setField('price', event.target.value)}
-                  disabled={!canWrite}
-                />
-              </FormField>
-              <FormField label="MRP (₹)" error={errors.mrp} hint="Optional. Shown struck through when above the selling price.">
-                <input
-                  className="admin-input admin-mono"
-                  inputMode="decimal"
-                  value={form.mrp}
-                  onChange={(event) => setField('mrp', event.target.value)}
-                  disabled={!canWrite}
-                />
-              </FormField>
-              <FormField label="Discount (%)" hint="Stored as basis points (12% → 1200).">
-                <input
-                  className="admin-input admin-mono"
-                  inputMode="decimal"
-                  value={form.discountPercent}
-                  onChange={(event) => setField('discountPercent', event.target.value)}
-                  disabled={!canWrite}
-                />
-              </FormField>
+              <div className="admin-pricing-rule admin-field-span-2">
+                <b>Customer price comes from Packs</b>
+                <p>{defaultPack ? <>Default display pack: <strong>{defaultPack.size}</strong> at <strong>{formatPaise(rupeesToPaise(defaultPack.price))}</strong>{defaultPack.mrp && rupeesToPaise(defaultPack.mrp) > rupeesToPaise(defaultPack.price) ? <> · MRP <s>{formatPaise(rupeesToPaise(defaultPack.mrp))}</s></> : null}.</> : 'Add an active pack with a selling price below. Its price becomes the default catalogue display price.'}</p>
+                <small>Enter each pack’s selling price and optional MRP once in the Packs section. The checkout always uses the pack selected by the customer; product-level price fields are no longer independently editable.</small>
+              </div>
               <FormField label="Status" hint={productStatusMeta(form.status).hint}>
                 <select
                   className="admin-input"
@@ -667,6 +672,7 @@ export default function ProductEditorPage({ params }) {
                 <span>{isNew ? 'Opening stock' : 'Stock'}</span>
                 <span>Low-stock at</span>
                 <span>Weight (g)</span>
+                <span>Images</span>
                 <span>Live</span>
                 <span aria-hidden="true" />
               </div>
@@ -725,6 +731,7 @@ export default function ProductEditorPage({ params }) {
                     onChange={(event) => setVariant(index, 'weightGrams', event.target.value)}
                     disabled={!canWrite}
                   />
+                  <button type="button" className="admin-btn admin-btn-small admin-btn-ghost" disabled={!canWrite} onClick={() => setVariantImageEditor({ index, selected: variant.images ?? [] })}>Images ({(variant.images ?? []).length})</button>
                   <label className="admin-check admin-check-compact">
                     <input
                       type="checkbox"
@@ -754,27 +761,7 @@ export default function ProductEditorPage({ params }) {
             </p>
           </FormSection></div>
         <aside className="admin-editor-aside">
-          <div className="admin-preview">
-            {form.image ? (
-              <img className="admin-preview-image" src={assetUrl(form.image)} alt="" />
-            ) : (
-              <div className="admin-preview-empty">No image yet</div>
-            )}
-            <p className="admin-eyebrow">STOREFRONT PREVIEW</p>
-            <h3>{form.title || 'Untitled product'}</h3>
-            <p className="admin-muted">{form.description || 'No card description yet.'}</p>
-            <p className="admin-preview-price">
-              <b>{formatPaise(rupeesToPaise(form.price))}</b>
-              {form.mrp !== '' && rupeesToPaise(form.mrp) > rupeesToPaise(form.price) ? (
-                <s>{formatPaise(rupeesToPaise(form.mrp))}</s>
-              ) : null}
-            </p>
-            <div className="admin-row-actions">
-              <StatusPill status={form.status} />
-              <Pill tone="muted">{form.variants.length === 1 ? '1 pack' : `${form.variants.length} packs`}</Pill>
-              {form.isFeatured ? <Pill tone="info">Featured</Pill> : null}
-            </div>
-          </div>
+          <StorefrontPreview form={form} />
 
           {isNew ? (
             <Card title="Creating a product" description="The API requires the fields below — the form blocks the save until they exist.">
@@ -803,6 +790,7 @@ export default function ProductEditorPage({ params }) {
                 >
                   Deactivate product
                 </button>
+                {form.status === 'archived' ? <button type="button" className="admin-btn admin-btn-ghost admin-btn-block" onClick={() => adminApi.products.recover(slug, 'draft').then(reload).catch((failure) => toast.error(failure.message))} disabled={!canWrite || busy}>Recover as draft</button> : <button type="button" className="admin-btn admin-btn-quiet admin-btn-block" onClick={() => adminApi.products.archive(slug).then(reload).catch((failure) => toast.error(failure.message))} disabled={!canWrite || busy}>Archive product</button>}
               </div>
               <dl className="admin-meta-list">
                 <div>
@@ -835,6 +823,9 @@ export default function ProductEditorPage({ params }) {
           </button>
         </div>
       </div>
+      <ImageCropper open={Boolean(cropTarget)} source={cropTarget} onClose={() => setCropTarget(null)} onSave={saveCrop} />
+      <Modal open={Boolean(altEditor)} title="Image alt text" description="Describe the image for screen-reader users and search engines." onClose={() => setAltEditor(null)} size="sm" footer={<><button type="button" className="admin-btn admin-btn-ghost" onClick={() => setAltEditor(null)}>Cancel</button><button type="button" className="admin-btn admin-btn-primary" onClick={() => { setForm((current) => ({ ...current, images: current.images.map((image, index) => index === altEditor.index ? { ...image, alt: altEditor.value } : image) })); setDirty(true); setAltEditor(null); }}>Save alt text</button></>}><label className="admin-field-label">Alt text<input className="admin-input" autoFocus value={altEditor?.value ?? ''} onChange={(event) => setAltEditor((current) => ({ ...current, value: event.target.value }))} /></label></Modal>
+      <Modal open={Boolean(variantImageEditor)} title="Variant images" description="Select gallery images shown for this pack." onClose={() => setVariantImageEditor(null)} size="md" footer={<><button type="button" className="admin-btn admin-btn-ghost" onClick={() => setVariantImageEditor(null)}>Cancel</button><button type="button" className="admin-btn admin-btn-primary" onClick={() => { setVariant(variantImageEditor.index, 'images', variantImageEditor.selected); setVariantImageEditor(null); }}>Save selection</button></>}><div className="admin-image-selector">{[form.image, ...form.images.map((image) => image.url)].filter(Boolean).map((url) => <label key={url} className="admin-image-selector-item"><img src={assetUrl(url)} alt="" /><span><input type="checkbox" checked={variantImageEditor?.selected.includes(url) ?? false} onChange={(event) => setVariantImageEditor((current) => ({ ...current, selected: event.target.checked ? [...current.selected, url] : current.selected.filter((image) => image !== url) }))} /> Use this image</span></label>)}</div></Modal>
     </form>
   );
 }

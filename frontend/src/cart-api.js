@@ -37,6 +37,7 @@ export const storefrontApi = {
   getProduct: (slug) => request(`/products/${encodeURIComponent(slug)}`),
   listCategories: () => request('/categories'),
   quote: (lines) => request('/products/quote', { method: 'POST', body: JSON.stringify({ lines }) }),
+  quoteCoupon: (code, lines, email) => request('/coupons/quote', { method: 'POST', body: JSON.stringify({ code, lines, email }) }),
     placeOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload) }),
   getOrder: (id) => request(`/orders/${encodeURIComponent(id)}`),
   publicSettings: () => request('/storefront/settings'),

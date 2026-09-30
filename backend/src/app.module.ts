@@ -14,6 +14,9 @@ import { PaymentsModule } from './payments/payments.module';
 import { CustomerModule } from './customers/customer.module';
 import { CmsModule } from './cms/cms.module';
 import { MediaModule } from './media/media.module';
+import { OffersModule } from './offers/offers.module';
+import { AuditModule } from './audit/audit.module';
+import { CouponsModule } from './coupons/coupons.module';
 
 @Module({
   imports: [
@@ -48,6 +51,9 @@ import { MediaModule } from './media/media.module';
     CustomerModule,
     CmsModule,
     MediaModule,
+    OffersModule,
+    AuditModule,
+    CouponsModule,
   ],
   controllers: [HealthController],
 })

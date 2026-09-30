@@ -1,0 +1,36 @@
+import { useState } from 'react';
+import { Card, PageHeader } from '../components/PageHeader.jsx';
+import { EmptyState, ErrorState } from '../components/Feedback.jsx';
+import { Modal } from '../components/Modal.jsx';
+import { adminApi } from '../lib/api.js';
+import { formatDateTime } from '../lib/format.js';
+import { useResource } from '../lib/useResource.js';
+import { useToast } from '../components/ToastProvider.jsx';
+
+const blank = () => ({ code: '', discountType: 'percentage', amount: '', minimum: '', maximum: '', usageLimit: '', startsAt: '', endsAt: '' });
+const asIso = (value) => value ? new Date(value).toISOString() : undefined;
+const asLocal = (value) => { if (!value) return ''; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
+export default function CouponsPage() {
+  const toast = useToast(); const { data, error, reload } = useResource(() => adminApi.coupons.list(), []);
+  const [form, setForm] = useState(blank); const [busy, setBusy] = useState(false); const [selected, setSelected] = useState(null); const [redemptions, setRedemptions] = useState(null); const [editing, setEditing] = useState(null);
+  const change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const create = async (event) => { event.preventDefault(); setBusy(true); try {
+    const divisor = form.discountType === 'percentage' ? 100 : 1;
+    const payload = { code: form.code.trim().toUpperCase(), discountType: form.discountType, discountValue: Math.round(Number(form.amount) * divisor), minimumOrderPaise: Math.round(Number(form.minimum || 0) * 100), maximumDiscountPaise: Math.round(Number(form.maximum || 0) * 100), usageLimit: Number(form.usageLimit || 0), startsAt: asIso(form.startsAt), endsAt: asIso(form.endsAt), isActive: true };
+    if (editing) await adminApi.coupons.update(editing, payload); else await adminApi.coupons.create(payload);
+    setForm(blank()); setEditing(null); toast.success(editing ? 'Coupon updated.' : 'Coupon created.'); reload();
+  } catch (failure) { toast.error(failure.message); } finally { setBusy(false); } };
+  const showRedemptions = async (coupon) => { try { setSelected(coupon); setRedemptions(await adminApi.coupons.redemptions(coupon.code)); } catch (failure) { toast.error(failure.message); } };
+  const edit = (coupon) => { setEditing(coupon._id); setForm({ code: coupon.code, discountType: coupon.discountType, amount: String(coupon.discountValue / 100), minimum: String((coupon.minimumOrderPaise ?? 0) / 100), maximum: String((coupon.maximumDiscountPaise ?? 0) / 100), usageLimit: String(coupon.usageLimit ?? 0), startsAt: asLocal(coupon.startsAt), endsAt: asLocal(coupon.endsAt) }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  return <><PageHeader eyebrow="MARKETING" title="Coupons" description="Create scheduled discount codes with order minimums, savings caps and usage limits." />
+    <Card title="New coupon" description="Percentages are entered as percent; fixed amounts and limits are entered in rupees.">
+      <form className="admin-stack" onSubmit={create}>
+        <div className="admin-toolbar"><input className="admin-input" required maxLength={32} placeholder="Code, e.g. PANTRY10" value={form.code} onChange={(event) => change('code', event.target.value)} /><select className="admin-input" value={form.discountType} onChange={(event) => change('discountType', event.target.value)}><option value="percentage">Percentage</option><option value="flat">Fixed amount</option></select><input className="admin-input" required type="number" min="0.01" step="0.01" max={form.discountType === 'percentage' ? '100' : undefined} placeholder={form.discountType === 'percentage' ? 'Discount %' : 'Discount ₹'} value={form.amount} onChange={(event) => change('amount', event.target.value)} /></div>
+        <div className="admin-toolbar"><input className="admin-input" type="number" min="0" step="0.01" placeholder="Minimum order ₹ (optional)" value={form.minimum} onChange={(event) => change('minimum', event.target.value)} /><input className="admin-input" type="number" min="0" step="0.01" placeholder="Maximum saving ₹ (optional)" value={form.maximum} onChange={(event) => change('maximum', event.target.value)} /><input className="admin-input" type="number" min="0" step="1" placeholder="Total uses (0 = unlimited)" value={form.usageLimit} onChange={(event) => change('usageLimit', event.target.value)} /></div>
+        <div className="admin-toolbar"><label className="admin-field">Starts at<input className="admin-input" type="datetime-local" value={form.startsAt} onChange={(event) => change('startsAt', event.target.value)} /></label><label className="admin-field">Ends at<input className="admin-input" type="datetime-local" value={form.endsAt} onChange={(event) => change('endsAt', event.target.value)} /></label><button className="admin-btn admin-btn-primary" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Create coupon'}</button>{editing && <button type="button" className="admin-btn admin-btn-ghost" onClick={() => { setEditing(null); setForm(blank()); }}>Cancel edit</button>}</div>
+      </form>
+    </Card>
+    <Card title="Saved coupons">{error ? <ErrorState error={error} onRetry={reload} /> : !data?.length ? <EmptyState title="No coupons yet" description="New coupon codes will appear here." /> : <div className="admin-stack-tight">{data.map((coupon) => <article className="admin-row-actions" key={coupon._id}><div><b>{coupon.code}</b><small className="admin-hint">{coupon.discountType === 'percentage' ? `${coupon.discountValue / 100}% off` : `₹${(coupon.discountValue / 100).toFixed(2)} off`} · {coupon.usageCount}/{coupon.usageLimit || '∞'} uses</small><small className="admin-hint">{coupon.startsAt ? formatDateTime(coupon.startsAt) : 'Now'} – {coupon.endsAt ? formatDateTime(coupon.endsAt) : 'No expiry'}</small></div><span>{coupon.isActive ? 'Active' : 'Inactive'}</span><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => edit(coupon)}>Edit</button><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => showRedemptions(coupon)}>Redemptions</button>{coupon.isActive ? <button type="button" className="admin-btn admin-btn-small admin-btn-quiet" onClick={() => adminApi.coupons.deactivate(coupon._id).then(reload).catch((failure) => toast.error(failure.message))}>Deactivate</button> : <button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => adminApi.coupons.update(coupon._id, { isActive: true }).then(reload).catch((failure) => toast.error(failure.message))}>Reactivate</button>}</article>)}</div>}</Card>
+    <Modal open={Boolean(selected)} title={`${selected?.code ?? ''} redemptions`} onClose={() => { setSelected(null); setRedemptions(null); }} size="md">{redemptions?.length ? <div className="admin-stack-tight">{redemptions.map((redemption) => <p key={redemption._id}>{redemption.customerEmail} · order {redemption.orderId} · ₹{(redemption.discountPaise / 100).toFixed(2)} · {formatDateTime(redemption.createdAt)}</p>)}</div> : <EmptyState title="No redemptions yet" />}</Modal>
+  </>;
+}

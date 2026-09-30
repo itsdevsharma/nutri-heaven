@@ -1,0 +1,14 @@
+import { useEffect, useRef, useState } from 'react';
+import { Modal } from './Modal.jsx';
+
+/** Lightweight canvas cropper: product cards use a consistent 4:3 frame. */
+export function ImageCropper({ source, open, onClose, onSave }) {
+  const canvas = useRef(null); const image = useRef(null); const drag = useRef(null); const [zoom, setZoom] = useState(1); const [offset, setOffset] = useState({ x: 0, y: 0 });
+  useEffect(() => { if (!open || !source) return undefined; const next = new Image(); next.crossOrigin = 'anonymous'; next.onload = () => { image.current = next; draw(); }; next.src = source; return () => { image.current = null; }; }, [open, source]);
+  const draw = () => { const target = canvas.current, picture = image.current; if (!target || !picture) return; const width = 800, height = 600; target.width = width; target.height = height; const scale = Math.max(width / picture.width, height / picture.height) * zoom; const drawnWidth = picture.width * scale, drawnHeight = picture.height * scale; const maxX = Math.max(0, (drawnWidth - width) / 2), maxY = Math.max(0, (drawnHeight - height) / 2); const context = target.getContext('2d'); context.fillStyle = '#f3eee3'; context.fillRect(0, 0, width, height); context.drawImage(picture, (width - drawnWidth) / 2 + Math.max(-maxX, Math.min(maxX, offset.x)), (height - drawnHeight) / 2 + Math.max(-maxY, Math.min(maxY, offset.y)), drawnWidth, drawnHeight); };
+  useEffect(draw, [zoom, offset]);
+  const save = () => canvas.current?.toBlob((blob) => { if (blob) onSave(new File([blob], 'product-crop.webp', { type: 'image/webp' })); }, 'image/webp', .9);
+  const start = (event) => { const point = event.touches?.[0] ?? event; drag.current = { x: point.clientX, y: point.clientY, offset }; };
+  const move = (event) => { if (!drag.current) return; const point = event.touches?.[0] ?? event; const scale = 800 / canvas.current.getBoundingClientRect().width; setOffset({ x: drag.current.offset.x + (point.clientX - drag.current.x) * scale, y: drag.current.offset.y + (point.clientY - drag.current.y) * scale }); };
+  return <Modal open={open} title="Crop product image" description="Drag to position the focal point; use zoom to fill the standard 4:3 product frame." onClose={onClose} size="md" footer={<><button type="button" className="admin-btn admin-btn-ghost" onClick={onClose}>Cancel</button><button type="button" className="admin-btn admin-btn-primary" onClick={save}>Use crop</button></>}><canvas className="admin-crop-canvas" ref={canvas} onMouseDown={start} onMouseMove={move} onMouseUp={() => { drag.current = null; }} onMouseLeave={() => { drag.current = null; }} onTouchStart={start} onTouchMove={move} onTouchEnd={() => { drag.current = null; }} /><label className="admin-field-label">Zoom <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label></Modal>;
+}
