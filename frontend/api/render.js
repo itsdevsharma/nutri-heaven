@@ -1,8 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import template from '../seo/generated-template.js';
 import { PUBLIC_PAGES, pageSeo, seoHead, renderContent } from '../seo/site.js';
 import { apiGet, getOrigin } from '../seo/server.js';
-let templatePromise;
 export default async function handler(req, res) {
   try {
     const raw = typeof req.query.path === 'string' ? req.query.path : '';
@@ -24,8 +22,6 @@ export default async function handler(req, res) {
       if (isProduct) product = results[1];
       else products = results[1];
     }
-    templatePromise ||= readFile(join(process.cwd(), 'dist/index.html'), 'utf8').catch(error => { templatePromise = undefined; throw error; });
-    const template = await templatePromise;
     const data = { path, origin: getOrigin(), settings, product, products, missing };
     const html = template.replace(/<!-- SEO_START -->[\s\S]*?<!-- SEO_END -->/, seoHead(pageSeo(data)))
       .replace('<div id="root"></div>', `<div id="root">${renderContent(data)}</div>`);

@@ -1,5 +1,8 @@
 import test from 'node:test';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import template from './generated-template.js';
 import assert from 'node:assert/strict';
 import { pageSeo, seoHead, sitemapXml, robotsTxt, renderContent, PUBLIC_PAGES } from './site.js';
 import render from '../api/render.js';
@@ -111,6 +114,30 @@ test('Vercel routes render the homepage before static files and retain asset ser
   const root = config.routes.findIndex(route => route.src === '^/$');
   assert.ok(root >= 0 && root < filesystem);
   assert.equal(config.routes[root].dest, '/api/render?path=');
-  assert.equal(config.functions['api/render.js'].includeFiles, 'dist/index.html');
+  assert.equal(config.buildCommand, 'npm run build');
+  assert.equal(config.outputDirectory, 'dist');
+  assert.ok(config.routes.findIndex(route => route.dest === '/assets/nutri-heaven-logo.jpeg') < filesystem);
   assert.ok(config.routes.findIndex(route => route.src === '^/(.*)$') > filesystem);
+});
+
+
+test('renderer works without a runtime dist directory and retains built asset URLs', async () => {
+  const built = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
+  assert.equal(template, built);
+  const cwd = process.cwd();
+  const directory = await mkdtemp(join(tmpdir(), 'nutri-render-'));
+  try {
+    process.chdir(directory);
+    const result = response();
+    await render({ query: { path: 'account' } }, result);
+    assert.equal(result.statusCode, 200);
+    assert.match(result.body, /src="\/assets\/index-[^"]+\.js"/);
+    assert.match(result.body, /href="\/assets\/index-[^"]+\.css"/);
+    const missing = response();
+    await render({ query: { path: 'not-a-page' } }, missing);
+    assert.equal(missing.statusCode, 404);
+  } finally {
+    process.chdir(cwd);
+    await rm(directory, { recursive: true, force: true });
+  }
 });

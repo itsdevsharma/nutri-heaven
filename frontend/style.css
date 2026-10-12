@@ -417,3 +417,6 @@ footer{background:var(--cream)}
   .shop-page .shop-product h2{font-size:20px!important}
   .shop-page .shop-buy button{min-width:100px}
 }
+@media(max-width:760px){
+  .shop-page .catalogue-head>.shop-sort>span{white-space:nowrap;min-width:48px}
+}

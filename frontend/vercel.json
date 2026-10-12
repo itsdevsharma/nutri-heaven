@@ -1,9 +1,4 @@
 {
-  "functions": {
-    "api/render.js": {
-      "includeFiles": "dist/index.html"
-    }
-  },
   "routes": [
     {
       "src": "^/(.+)/$",
@@ -11,6 +6,10 @@
         "Location": "/$1"
       },
       "status": 308
+    },
+    {
+      "src": "^/favicon\\.ico$",
+      "dest": "/assets/nutri-heaven-logo.jpeg"
     },
     {
       "src": "^/$",
@@ -45,5 +44,7 @@
       "src": "^/(.*)$",
       "dest": "/api/render?path=$1"
     }
-  ]
+  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
 }

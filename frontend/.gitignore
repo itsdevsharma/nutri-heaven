@@ -6,3 +6,6 @@ dist/
 .vite/
 *.log
 .DS_Store
+
+# HTML module emitted by the Vite build for the SEO function
+seo/generated-template.js

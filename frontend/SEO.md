@@ -1,7 +1,10 @@
 SEO runs on the existing Vercel deployment. Public pages receive HTML titles, descriptions, canonical URLs, Open Graph/Twitter metadata and JSON-LD before React loads. The server also renders the main page text and product links. The browser refreshes metadata from the same SEO rules. The root route is explicitly handled before Vercel checks static files so the built index.html cannot bypass the homepage verification token. Admin and account pages are excluded from indexing; unknown pages and unpublished products return HTTP 404. API outages return HTTP 503 instead of pretending the product does not exist.
 
+The Vite build embeds the final HTML (including hashed asset URLs) in `seo/generated-template.js`. The SEO function imports this generated module, so it does not depend on `dist/index.html` being present in the function filesystem. Run the frontend build before loading or testing the function.
+
 Deployment settings:
 
+- Set the Vercel Root Directory to `frontend`. The checked-in configuration runs `npm run build` and publishes `dist`. Redeploy after changing the build or function code.
 - Set `VITE_API_URL` to the deployed backend origin in Vercel. Public page rendering and sitemap generation need this API at runtime as well as in the browser.
 - Set `VITE_SITE_URL` to the public storefront origin, for example `https://nutri-heaven-topaz.vercel.app`. When adding a custom domain, update this value and redeploy. Optional runtime `SITE_URL` overrides the server origin; keep it identical to `VITE_SITE_URL`.
 - Deploy the backend changes alongside the frontend to enable the new SEO settings.
