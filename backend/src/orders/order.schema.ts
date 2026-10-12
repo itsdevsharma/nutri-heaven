@@ -15,6 +15,8 @@ export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
  */
 @Schema({ collection: 'orders', timestamps: true })
 export class Order {
+  @Prop({ index: true }) customerId?: string;
+
   @Prop({ required: true, unique: true, trim: true })
   id!: string; // `NHxxxxxx` for display / `order:<id>` for idempotency
 

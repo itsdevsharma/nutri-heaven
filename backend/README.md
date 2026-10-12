@@ -198,3 +198,14 @@ CI/CD and database backups.
   a healthcheck to any new Compose service.
 - Never commit `node_modules/`, `dist/`, `.next/`, or `.env` files.
 - Handle money as integer paise, never floating point.
+
+
+## Customer completion features
+
+- Configure `RESEND_API_KEY`, a verified `MAIL_FROM`, and public `STOREFRONT_URL` for reset and transactional email. Keep the key server-side. The continuously running API drains the notification email queue every 30 seconds; delivery failures retry up to five times. The admin insights screen shows configuration and pending counts.
+- `/products/browse` provides paginated public catalogue search, category filtering and sorting.
+- `/customer/me` supports account/address/wishlist management, customer-ID-owned order actions and receipts. New signed-in checkout sends the customer bearer token; guest/legacy orders are not automatically attached by matching email.
+- `/customer/me/notifications` provides the persistent inbox. `/newsletter/subscribe`, `/newsletter/confirm` and `/newsletter/unsubscribe` implement explicit consent and double opt-in.
+- `/reviews/:slug` returns approved reviews; delivered purchasers submit through `/customer/me/reviews`. Super admins moderate through `/admin/engagement/reviews` and view reporting at `/admin/insights`.
+- Order receipts are downloadable HTML suitable for Print → Save as PDF. They are not tax invoices. Courier integration is deferred; manual tracking fields remain available.
+- Audit plan and release checklist: `../docs/audits/WEBSITE_COMPLETION.md`. Updated evidence: `../audit-reports/08-test-execution-report.md`.

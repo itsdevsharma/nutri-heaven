@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "test:seo": "node --test seo/*.test.js",
-    "test:payments": "node --test test/razorpay.test.js"
+    "test:payments": "node --test test/razorpay.test.js",
+    "audit:deployment": "node scripts/deployment-smoke.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",

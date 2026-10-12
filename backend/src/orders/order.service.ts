@@ -5,6 +5,7 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
 import { Order, OrderDocument, OrderStatus } from './order.schema';
 import { OrderCreateDto } from './order.dto';
+import { NotificationService } from '../engagement/notification.service';
 import { ProductsService } from '../products/products.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { CouponsService } from '../coupons/coupons.service';
@@ -30,7 +31,13 @@ export class OrderService {
     private readonly products: ProductsService,
     private readonly inventory: InventoryService,
     private readonly coupons: CouponsService,
+    private readonly notifications: NotificationService,
   ) {}
+
+  private async notify(order: Order) {
+    // A delivery-provider outage must never roll back a committed order.
+    await this.notifications.add(order.customerEmail, `Order ${order.id}: ${order.status.replaceAll('_', ' ')}`, `Your order ${order.id} is ${order.status.replaceAll('_', ' ')}. View details and tracking in your account.`, `order-${order.id}-${order.status}`, true).catch(() => {});
+  }
 
   async getOrder(id: string): Promise<Order> {
     const order = await this.orders.findOne({ id }).lean().exec();
@@ -52,13 +59,13 @@ export class OrderService {
     return this.orders.find().sort({ createdAt: -1 }).lean().exec();
   }
 
-  async createOrder(dto: OrderCreateDto): Promise<Order> {
+  async createOrder(dto: OrderCreateDto, customerId?: string): Promise<Order> {
     const idempotencyKey = dto.idempotencyKey ?? `order:${dto.cartId}:${Date.now()}`;
     const existing = await this.orders
       .findOne({ idempotencyKey })
       .lean()
       .exec();
-    if (existing) { if (existing.cartId !== dto.cartId) throw new ForbiddenException('This checkout belongs to another shopping session'); return existing; }
+    if (existing) { if (existing.cartId !== dto.cartId || existing.customerId !== customerId) throw new ForbiddenException('This checkout belongs to another shopping session'); return existing; }
 
     // Re-price from the database — the client's totals are advisory only.
     const quote = await this.products.quote({
@@ -106,6 +113,7 @@ export class OrderService {
           const [created] = await this.orders.create([{
       id: orderId,
       cartId: dto.cartId,
+      customerId,
       customerName: dto.customerName,
       customerEmail: dto.customerEmail,
       customerPhone: dto.customerPhone,
@@ -129,12 +137,13 @@ export class OrderService {
         });
       } finally { await session.endSession(); }
       if (!order) throw new Error('Order transaction produced no order');
+      await this.notify(order.toObject());
       return order.toObject();
     } catch (error) {
       if (redeemed) await this.coupons.refundRedemption(orderId);
       if ((error as { code?: number })?.code === 11000) {
         const raced = await this.orders.findOne({ idempotencyKey }).lean().exec();
-        if (raced) { if (raced.cartId !== dto.cartId) throw new ForbiddenException('This checkout belongs to another shopping session'); return raced; }
+        if (raced) { if (raced.cartId !== dto.cartId || raced.customerId !== customerId) throw new ForbiddenException('This checkout belongs to another shopping session'); return raced; }
       }
       throw error;
     }
@@ -166,6 +175,7 @@ export class OrderService {
     }); } finally { await session.endSession(); }
     if (!result) throw new Error('Order update transaction produced no order');
     if (status === 'cancelled' || status === 'returned') await this.coupons.refundRedemption(result.id);
+    await this.notify(result);
     return result;
   }
 
@@ -176,7 +186,7 @@ export class OrderService {
       const order = await this.orders.findOne({ id }).session(session).exec();
       if (!order) throw new NotFoundException(`No order found for "${id}"`);
       if (order.paymentStatus === 'refunded') { result = order.toObject(); return; }
-      if (order.status !== 'returned' || order.paymentStatus !== 'paid') throw new BadRequestException('Only returned, paid orders can be refunded');
+      if (!['returned', 'cancelled'].includes(order.status) || order.paymentStatus !== 'paid') throw new BadRequestException('Only returned or cancelled, paid orders can be refunded');
       order.status = 'refunded'; order.paymentStatus = 'refunded'; order.refundReference = refundReference;
       order.paymentReconciliationRequired = false;
       order.paymentReconciliationNote = '';
@@ -185,6 +195,7 @@ export class OrderService {
     }); } finally { await session.endSession(); }
     if (!result) throw new Error('Refund update transaction produced no order');
     await this.coupons.refundRedemption(result.id);
+    await this.notify(result);
     return result;
   }
 
@@ -212,6 +223,7 @@ export class OrderService {
     } finally { await session.endSession(); }
     if (!result) throw new Error('Cancellation transaction produced no order');
     await this.coupons.refundRedemption(result.id);
+    await this.notify(result);
     return result;
   }
 
@@ -270,6 +282,8 @@ export class OrderService {
       order.statusHistory.push({ status: 'confirmed', at: new Date(), actor: 'razorpay-webhook', note: 'Payment captured' });
       await order.save({ session });
     }); } finally { await session.endSession(); }
+    const captured = await this.orders.findOne({ razorpayOrderId }).lean().exec();
+    if (captured) await this.notify(captured);
   }
 
   async failRazorpayPayment(razorpayOrderId: string): Promise<void> {

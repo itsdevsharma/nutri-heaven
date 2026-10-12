@@ -110,8 +110,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   async refundOrder(orderId: string, actor = 'razorpay') {
     const order = await this.orders.getOrder(orderId);
     if (order.paymentStatus === 'refunded') return order;
-    if (order.paymentMethod !== 'razorpay' || order.paymentStatus !== 'paid' || order.status !== 'returned' || !order.razorpayPaymentId) {
-      throw new BadRequestException('Only captured Razorpay payments on returned orders can be refunded');
+    if (order.paymentMethod !== 'razorpay' || order.paymentStatus !== 'paid' || !['returned', 'cancelled'].includes(order.status) || !order.razorpayPaymentId) {
+      throw new BadRequestException('Only captured Razorpay payments on returned or cancelled orders can be refunded');
     }
     const refund = await this.client().payments.refund(order.razorpayPaymentId, {
       amount: order.totalPaise,

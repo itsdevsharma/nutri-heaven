@@ -38,6 +38,7 @@ export function roleLabel(role) {
  * implicitly, and `can()` reproduces that rule in one place.
  */
 export const CAPABILITIES = {
+  'reports:read': [],
   'catalogue:read': [ROLES.CATALOGUE_MANAGER, ROLES.INVENTORY_MANAGER, ROLES.MARKETING_MANAGER, ROLES.SUPPORT],
   'catalogue:write': [ROLES.CATALOGUE_MANAGER],
   'categories:write': [ROLES.CATALOGUE_MANAGER],

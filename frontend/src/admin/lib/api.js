@@ -130,6 +130,12 @@ function toQuery(params = {}) {
 }
 
 export const adminApi = {
+  engagement: {
+    report: () => request('/admin/engagement/report'),
+    subscribers: () => request('/admin/engagement/subscribers'),
+    reviews: () => request('/admin/engagement/reviews'),
+    moderate: (id, status) => request(`/admin/engagement/reviews/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status } }),
+  },
   customers: {
     list: (params = {}) => request(`/customer/admin${toQuery(params)}`),
     get: (id) => request(`/customer/admin/${encodeURIComponent(id)}`),
@@ -198,7 +204,7 @@ export const adminApi = {
   orders: {
     list: () => request('/orders/admin'),
     get: (id) => request(`/orders/admin/${encodeURIComponent(id)}`),
-    updateStatus: (id, status) => request(`/orders/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } }),
+    updateStatus: (id, status, details = {}) => request(`/orders/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status, ...details } }),
     cancel: (id, reason) => request(`/orders/admin/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: { reason } }),
   },
   payments: {

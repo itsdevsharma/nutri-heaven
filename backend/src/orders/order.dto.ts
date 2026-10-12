@@ -79,7 +79,7 @@ export class UpdateOrderStatusDto {
   status!: OrderStatus;
 
   @IsOptional() @IsString() trackingNumber?: string;
-  @IsOptional() @IsString() trackingUrl?: string;
+  @IsOptional() @IsString() @Matches(/^(https?:\/\/[^\s]+)?$/) trackingUrl?: string;
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsString() refundReference?: string;
 }

@@ -1,3 +1,4 @@
+import EngagementPage from './pages/EngagementPage.jsx';
 import CustomersPage from './pages/CustomersPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import CategoriesPage from './pages/CategoriesPage.jsx';
@@ -27,6 +28,7 @@ import CouponsPage from './pages/CouponsPage.jsx';
  * the router, the layout or the permission map.
  */
 export const ROUTES = [
+  { id: 'engagement', path: '/admin/insights', title: 'Sales & engagement', label: 'Sales & engagement', group: 'Overview', icon: '▥', capability: 'reports:read', element: EngagementPage },
   { id: 'customers', path: '/admin/customers', title: 'Customers', label: 'Customers', group: 'Operations', icon: '♧', capability: 'customers:read', element: CustomersPage },
   { id: 'users', path: '/admin/users', title: 'Users', label: 'Users', group: 'System', icon: '♙', capability: 'users:write', element: UsersPage },
   {

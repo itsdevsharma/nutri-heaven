@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectModel } from '@nestjs/mongoose';
 import { orderTotalForPaise, shippingFeeForPaise } from '../common/pricing';
 import { FilterQuery, Model } from 'mongoose';
+import { BrowseProductsQuery } from './dto/browse-products.query';
 import { QuoteRequest } from './dto/quote.request';
 import { Product, ProductDocument } from './product.schema';
 import { Category, CategoryDocument } from '../categories/category.schema';
@@ -44,6 +45,28 @@ export class ProductsService {
     private readonly audit: AuditService,
     private readonly offers: OffersService,
   ) {}
+
+  async browse(query: BrowseProductsQuery) {
+    const filter: FilterQuery<ProductDocument> = { isActive: true, status: 'active' };
+    const clauses: FilterQuery<ProductDocument>[] = [];
+    if (query.q?.trim()) {
+      const needle = query.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      clauses.push({ $or: ['title', 'description', 'category', 'subCategory'].map(key => ({ [key]: { $regex: needle, $options: 'i' } })) });
+    }
+    if (query.category) {
+      const categories = await this.categories.find({ isActive: true }).lean().exec();
+      const names = new Set([query.category]);
+      const ids = new Set(categories.filter(c => c.name === query.category).map(c => String(c._id)));
+      let changed = true;
+      while (changed) { changed = false; for (const c of categories) if (c.parentId && ids.has(String(c.parentId)) && !ids.has(String(c._id))) { ids.add(String(c._id)); names.add(c.name); changed = true; } }
+      clauses.push({ $or: [{ category: { $in: [...names] } }, { subCategory: { $in: [...names] } }] });
+    }
+    if (clauses.length) filter.$and = clauses;
+    const sort: Record<string, 1 | -1> = query.sort === 'price_asc' ? { pricePaise: 1, _id: 1 } : query.sort === 'price_desc' ? { pricePaise: -1, _id: 1 } : { isFeatured: -1, _id: 1 };
+    const limit = query.limit ?? 24, offset = query.offset ?? 0;
+    const [items, total] = await Promise.all([this.products.find(filter).sort(sort).skip(offset).limit(limit).lean().exec(), this.products.countDocuments(filter)]);
+    return { items, total, limit, offset };
+  }
 
   private async validateCommerce(input: Partial<Product>, exceptSlug?: string) {
     if (input.pricePaise !== undefined && (!Number.isInteger(input.pricePaise) || input.pricePaise <= 0)) throw new BadRequestException('Selling price must be a positive integer amount in paise');

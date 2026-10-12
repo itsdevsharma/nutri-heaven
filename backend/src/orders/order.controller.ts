@@ -1,3 +1,4 @@
+import { OptionalCustomerAuthGuard } from '../customers/optional-customer-auth.guard';
 import { Body, Controller, Get, Headers, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CancelOrderDto, OrderCreateDto, UpdateOrderStatusDto } from './order.dto';
@@ -13,8 +14,9 @@ export class OrderController {
 
   /** Create an order (idempotent). Public endpoint — the storefront only. */
   @Post()
-  create(@Body() dto: OrderCreateDto) {
-    return this.service.createOrder(dto);
+  @UseGuards(OptionalCustomerAuthGuard)
+  create(@Body() dto: OrderCreateDto, @Request() request: { customer?: { id: string; email: string } }) {
+    return this.service.createOrder({ ...dto, ...(request.customer ? { customerEmail: request.customer.email } : {}) }, request.customer?.id);
   }
 
   /** Customer-facing order detail. Public endpoint — the storefront only. */

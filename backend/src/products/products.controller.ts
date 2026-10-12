@@ -16,6 +16,7 @@ import {
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UseInterceptors } from '@nestjs/common';
+import { BrowseProductsQuery } from './dto/browse-products.query';
 import { ListProductsQuery } from './dto/list-products.query';
 import { ListAdminProductsQuery } from './dto/list-admin-products.query';
 import { QuoteRequest } from './dto/quote.request';
@@ -30,6 +31,9 @@ import { BulkProductActionDto } from './dto/bulk-product-action.dto';
 @Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
+
+  @Get('browse')
+  browse(@Query() query: BrowseProductsQuery) { return this.products.browse(query); }
 
   @Get()
   list(@Query() query: ListProductsQuery) {

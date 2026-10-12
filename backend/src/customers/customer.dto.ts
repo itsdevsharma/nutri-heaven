@@ -10,7 +10,7 @@ export class SignupDto {
 export class LoginDto { @IsEmail() email!: string; @IsString() @MinLength(1) password!: string; }
 export class ForgotPasswordDto { @IsEmail() email!: string; }
 export class ResetPasswordDto { @IsString() @MinLength(20) token!: string; @IsString() @MinLength(12) @MaxLength(128) password!: string; }
-export class UpdateProfileDto { @IsOptional() @IsString() @MinLength(2) @MaxLength(100) name?: string; @IsOptional() @Matches(/^\d{10}$/) phone?: string; }
+export class UpdateProfileDto { @IsOptional() @IsString() @MinLength(2) @MaxLength(100) name?: string; @IsOptional() @Matches(/^(\d{10})?$/) phone?: string; }
 export class AddressDto {
   @IsOptional() @IsString() id?: string;
   @IsString() @MinLength(2) @MaxLength(40) label!: string;

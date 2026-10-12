@@ -24,6 +24,7 @@ describe('Razorpay checkout (e2e)', () => {
       fetchPayments: jest.fn(async (id: string) => ({ items: [...payments.values()].filter(payment => payment.order_id === id) })),
     },
     payments: {
+      refund: jest.fn(async () => ({ id: 'rfnd_audit_cancelled' })),
       fetch: jest.fn(async (id: string) => payments.get(id)),
       capture: jest.fn(async (id: string) => { const captured = { ...payments.get(id), status: 'captured' }; payments.set(id, captured); return captured; }),
     },
@@ -131,6 +132,17 @@ describe('Razorpay checkout (e2e)', () => {
     await app.get(PaymentsService).expirePendingOrders();
     expect(await app.get(OrderService).getOrder(abandoned.order.id)).toMatchObject({ status: 'cancelled' });
     expect(await app.get(OrderService).getOrder(paid.order.id)).toMatchObject({ status: 'confirmed', paymentStatus: 'paid' });
+  });
+
+  it('refunds a captured cancelled order without charging or releasing stock twice', async () => {
+    const { order, payment } = await create();
+    await webhook({ id: 'pay_cancel_refund', order_id: payment.razorpayOrderId, status: 'captured', amount: order.totalPaise, currency: 'INR' });
+    await app.get(OrderService).cancel(order.id, 'Customer requested cancellation', 'audit');
+    const before = remote.payments.refund.mock.calls.length;
+    const refunded = await app.get(PaymentsService).refundOrder(order.id, 'audit');
+    expect(refunded).toMatchObject({ paymentStatus: 'refunded', status: 'refunded', paymentReconciliationRequired: false });
+    await app.get(PaymentsService).refundOrder(order.id, 'audit');
+    expect(remote.payments.refund.mock.calls.length).toBe(before + 1);
   });
 
 });

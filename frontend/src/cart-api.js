@@ -35,14 +35,18 @@ export const cartApi = {
 
 /** Storefront order placement — idempotent via `idempotencyKey`. */
 export const storefrontApi = {
+  browse: params => request(`/products/browse?${new URLSearchParams(params)}`),
   listProducts: (limit = 50, offset = 0) => request(`/products?limit=${limit}&offset=${offset}`),
   getProduct: (slug) => request(`/products/${encodeURIComponent(slug)}`),
   listCategories: () => request('/categories'),
   quote: (lines) => request('/products/quote', { method: 'POST', body: JSON.stringify({ lines }) }),
   quoteCoupon: (code, lines, email) => request('/coupons/quote', { method: 'POST', body: JSON.stringify({ code, lines, email }) }),
-    placeOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload) }),
+    placeOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload), headers: localStorage.getItem(CUSTOMER_TOKEN_KEY) ? { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_TOKEN_KEY)}` } : {} }),
   getOrder: (id) => request(`/orders/${encodeURIComponent(id)}`),
   publicSettings: () => request('/storefront/settings'),
+  subscribe: payload => request('/newsletter/subscribe', { method: 'POST', body: JSON.stringify(payload) }),
+  newsletterAction: (action, token) => request(`/newsletter/${action}`, { method: 'POST', body: JSON.stringify({ token }) }),
+  reviews: slug => request(`/reviews/${encodeURIComponent(slug)}`),
   publicCms: () => request('/storefront/cms'),
 };
 
@@ -66,10 +70,22 @@ export const customerApi = {
   update: payload => customerRequest('/customer/me', { method: 'PATCH', body: JSON.stringify(payload) }),
   addresses: () => customerRequest('/customer/me/addresses'),
   addAddress: payload => customerRequest('/customer/me/addresses', { method: 'POST', body: JSON.stringify(payload) }),
+  updateAddress: (id, payload) => customerRequest(`/customer/me/addresses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  defaultAddress: id => customerRequest(`/customer/me/addresses/${encodeURIComponent(id)}/default`, { method: 'PATCH' }),
   removeAddress: id => customerRequest(`/customer/me/addresses/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   wishlist: () => customerRequest('/customer/me/wishlist'),
   addWishlist: productSlug => customerRequest('/customer/me/wishlist', { method: 'POST', body: JSON.stringify({ productSlug }) }),
   removeWishlist: slug => customerRequest(`/customer/me/wishlist/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+  notifications: () => customerRequest('/customer/me/notifications'),
+  readNotification: id => customerRequest(`/customer/me/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH' }),
+  review: payload => customerRequest('/customer/me/reviews', { method: 'POST', body: JSON.stringify(payload) }),
+  orderAction: (id, action, reason) => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  downloadReceipt: async id => {
+    const response = await fetch(`${API_URL}/customer/me/orders/${encodeURIComponent(id)}/receipt`, { headers: { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_TOKEN_KEY)}` } });
+    if (!response.ok) throw new Error('Could not download this receipt. Please sign in and try again.');
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a'); link.href = url; link.download = `receipt-${id}.html`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
   orders: () => customerRequest('/customer/me/orders'),
 };
 
