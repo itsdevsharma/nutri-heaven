@@ -130,6 +130,17 @@ function toQuery(params = {}) {
 }
 
 export const adminApi = {
+  customers: {
+    list: (params = {}) => request(`/customer/admin${toQuery(params)}`),
+    get: (id) => request(`/customer/admin/${encodeURIComponent(id)}`),
+    update: (id, payload) => request(`/customer/admin/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
+    status: (id, isActive) => request(`/customer/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { isActive } }),
+  },
+  users: {
+    list: () => request('/admin/users'),
+    create: (payload) => request('/admin/users', { method: 'POST', body: payload }),
+    update: (id, payload) => request(`/admin/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
+  },
   /** `POST /admin/auth/login` → `{ accessToken, admin }`. */
   login: (email, password) =>
     request('/admin/auth/login', { method: 'POST', body: { email, password }, auth: false }),

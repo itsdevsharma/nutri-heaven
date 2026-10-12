@@ -1,3 +1,4 @@
+import { shippingFeeForPaise } from '../src/common/pricing';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -107,7 +108,7 @@ describe('Products (e2e)', () => {
       .post('/products/quote')
       .send({ lines: [{ slug: 'almonds', quantity: 2 }] })
       .expect(200);
-    // 2 × ₹275 = ₹550 subtotal, below ₹999 so + ₹79 shipping.
+    // 2 × ₹275 = ₹550 subtotal, below ₹5,000 so + ₹79 shipping.
     expect(res.body).toMatchObject({
       subtotalPaise: 55000,
       shippingPaise: 7900,
@@ -115,21 +116,20 @@ describe('Products (e2e)', () => {
     });
   });
 
-  it('POST /products/quote ships free at ₹999', async () => {
+  it('POST /products/quote ships free above ₹5,000', async () => {
     const res = await request(app.getHttpServer())
       .post('/products/quote')
       .send({
         lines: [
-          { slug: 'almonds', quantity: 2 },
-          { slug: 'cashews', quantity: 2 },
+          { slug: 'almonds', quantity: 20 },
         ],
       })
       .expect(200);
-    // 2 × ₹275 + 2 × ₹299 = ₹1148 — over the threshold.
+    // 20 × ₹275 = ₹5,500 — above the free-delivery threshold.
     expect(res.body).toMatchObject({
-      subtotalPaise: 114800,
+      subtotalPaise: 550000,
       shippingPaise: 0,
-      totalPaise: 114800,
+      totalPaise: 550000,
     });
   });
 
@@ -143,4 +143,12 @@ describe('Products (e2e)', () => {
       .send({ lines: [{ slug: 'nope', quantity: 1 }] })
       .expect(404);
   });
+  it.each([
+    [499999, 7900],
+    [500000, 7900],
+    [500001, 0],
+  ])('charges the correct delivery fee for subtotal %i paise', (subtotal, fee) => {
+    expect(shippingFeeForPaise(subtotal)).toBe(fee);
+  });
+
 });

@@ -71,14 +71,6 @@ export class OrderCreateDto {
 
   @IsOptional()
   @IsString()
-  razorpayOrderId?: string;
-
-  @IsOptional()
-  @IsString()
-  razorpayPaymentId?: string;
-
-  @IsOptional()
-  @IsString()
   couponCode?: string;
 }
 

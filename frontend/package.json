@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test:seo": "node --test seo/*.test.js",
+    "test:payments": "node --test test/razorpay.test.js"
   },
   "dependencies": {
     "react": "^19.3.0",

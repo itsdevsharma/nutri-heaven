@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CancelOrderDto, OrderCreateDto, UpdateOrderStatusDto } from './order.dto';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
@@ -47,5 +47,5 @@ export class OrderController {
   }
 
   @Get(':id')
-  get(@Param('id') id: string) { return this.service.getOrder(id); }
+  get(@Param('id') id: string, @Headers('x-cart-id') cartId?: string) { return this.service.getCustomerOrder(id, cartId); }
 }

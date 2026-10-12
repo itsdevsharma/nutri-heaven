@@ -5,6 +5,9 @@ export type CustomerAddress = { id: string; label: string; name: string; phone: 
 
 @Schema({ collection: 'customers', timestamps: true })
 export class Customer {
+  createdAt!: Date;
+  updatedAt!: Date;
+
   @Prop({ required: true, trim: true })
   name!: string;
 
@@ -28,6 +31,9 @@ export class Customer {
 
   @Prop({ select: false })
   passwordResetExpiresAt?: Date;
+
+  @Prop({ default: 0 })
+  authVersion!: number;
 
   @Prop({ default: true })
   isActive!: boolean;

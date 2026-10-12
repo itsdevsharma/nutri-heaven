@@ -34,7 +34,7 @@ Premium dry fruits, nuts and seeds — storefront for the Indian market.
 | Payments | Demo only. The checkout screen is labelled "Secure demo checkout" |
 | Notifications | None. The confirmation screen promises updates by email but no message is sent |
 | Authentication | None |
-| Shipping | The free-shipping rule (`₹999`, else `₹79`) is still duplicated inside the cart and checkout components and can drift apart — they already disagree about an empty cart. The backend uses one local definition in `backend/src/common/pricing.ts`; the UI does not import it yet. |
+| Shipping | The free-shipping rule (`subtotal > ₹5,000`, else `₹79`) is still duplicated inside the cart and checkout components and can drift apart — they already disagree about an empty cart. The backend uses one local definition in `backend/src/common/pricing.ts`; the UI does not import it yet. |
 | Pricing | Totals are computed in the browser, so prices are trusted from the client |
 
 ## Tech stack

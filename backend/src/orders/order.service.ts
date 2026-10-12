@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Connection, Model } from 'mongoose';
 import { InjectConnection } from '@nestjs/mongoose';
@@ -38,6 +38,16 @@ export class OrderService {
     return order;
   }
 
+  async getCustomerOrder(id: string, cartId?: string): Promise<Order> {
+    const order = await this.getOrder(id);
+    if (!cartId || order.cartId !== cartId) throw new ForbiddenException('This order belongs to another shopping session');
+    return order;
+  }
+
+  async staleOnlineOrders(before: Date) {
+    return this.orders.find({ paymentMethod: 'razorpay', status: 'pending', paymentStatus: { $in: ['pending', 'failed'] }, stockReserved: true, createdAt: { $lt: before } }).select('id cartId').limit(100).lean().exec();
+  }
+
   async listAdmin(): Promise<Order[]> {
     return this.orders.find().sort({ createdAt: -1 }).lean().exec();
   }
@@ -48,7 +58,7 @@ export class OrderService {
       .findOne({ idempotencyKey })
       .lean()
       .exec();
-    if (existing) return existing;
+    if (existing) { if (existing.cartId !== dto.cartId) throw new ForbiddenException('This checkout belongs to another shopping session'); return existing; }
 
     // Re-price from the database — the client's totals are advisory only.
     const quote = await this.products.quote({
@@ -108,8 +118,6 @@ export class OrderService {
       totalPaise,
       paymentMethod: dto.paymentMethod,
       paymentStatus: 'pending',
-      razorpayOrderId: dto.razorpayOrderId,
-      razorpayPaymentId: dto.razorpayPaymentId,
       status: isCod ? 'confirmed' : 'pending',
       idempotencyKey,
       stockReserved: true,
@@ -126,7 +134,7 @@ export class OrderService {
       if (redeemed) await this.coupons.refundRedemption(orderId);
       if ((error as { code?: number })?.code === 11000) {
         const raced = await this.orders.findOne({ idempotencyKey }).lean().exec();
-        if (raced) return raced;
+        if (raced) { if (raced.cartId !== dto.cartId) throw new ForbiddenException('This checkout belongs to another shopping session'); return raced; }
       }
       throw error;
     }
@@ -180,13 +188,14 @@ export class OrderService {
     return result;
   }
 
-  async cancel(id: string, reason: string, actor = 'admin'): Promise<Order> {
+  async cancel(id: string, reason: string, actor = 'admin', pendingOnly = false): Promise<Order> {
     const session = await this.connection.startSession();
     let result: Order | undefined;
     try {
       await session.withTransaction(async () => {
         const order = await this.orders.findOne({ id }).session(session).exec();
         if (!order) throw new NotFoundException(`No order found for "${id}"`);
+        if (pendingOnly && (order.paymentMethod !== 'razorpay' || order.paymentStatus === 'paid' || order.status !== 'pending')) throw new BadRequestException('Only unpaid pending online orders can be cancelled');
         if (order.status === 'cancelled') { result = order.toObject(); return; }
         if (!['pending', 'confirmed', 'packed'].includes(order.status)) throw new BadRequestException(`Cannot cancel an order in ${order.status}`);
         if (order.stockReserved) await this.inventory.releaseForOrder(order.idempotencyKey, order.lines.map((line) => ({ productSlug: line.productSlug, packSize: line.packSize, quantity: line.quantity })), 'cancelled', actor, session);
@@ -206,14 +215,16 @@ export class OrderService {
     return result;
   }
 
-  async attachRazorpayOrder(id: string, razorpayOrderId: string): Promise<void> {
-    await this.orders.updateOne({ id, paymentMethod: 'razorpay', paymentStatus: 'pending' }, { $set: { razorpayOrderId } }).exec();
+  async attachRazorpayOrder(id: string, razorpayOrderId: string): Promise<Order> {
+    // The first provider order wins; concurrent checkout requests reuse it.
+    await this.orders.updateOne({ id, paymentMethod: 'razorpay', paymentStatus: 'pending', status: 'pending', razorpayOrderId: { $exists: false } }, { $set: { razorpayOrderId } }).exec();
+    return this.getOrder(id);
   }
 
   async prepareRazorpayRetry(id: string): Promise<Order> {
     const order = await this.orders.findOneAndUpdate(
       { id, paymentMethod: 'razorpay', paymentStatus: 'failed', status: 'pending', stockReserved: true },
-      { $set: { paymentStatus: 'pending' }, $unset: { razorpayOrderId: 1 } },
+      { $set: { paymentStatus: 'pending' } },
       { new: true },
     ).lean().exec();
     if (!order) throw new BadRequestException('This order cannot be retried for payment');

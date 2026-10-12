@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AdminRole } from '../admin/admin.schema';
-import { AdminAuthGuard } from '../auth/admin-auth.guard';
+import { AdminUpdateCustomerDto, AdminCustomerStatusDto } from './admin-customer.dto';
+import { AdminAuthGuard, AdminRequest } from '../auth/admin-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AddressDto, CustomerQueryDto, ForgotPasswordDto, LoginDto, ResetPasswordDto, SignupDto, UpdateProfileDto, WishlistDto } from './customer.dto';
@@ -28,6 +29,8 @@ export class CustomerController {
   @Delete('me/wishlist/:slug') @UseGuards(CustomerAuthGuard) removeWishlist(@Req() req: CustomerRequest, @Param('slug') slug: string) { return this.service.removeWishlist(req.customer.id, slug); }
   @Get('me/orders') @UseGuards(CustomerAuthGuard) orders(@Req() req: CustomerRequest) { return this.service.ordersFor(req.customer.email); }
 
-  @Get('admin') @UseGuards(AdminAuthGuard, RolesGuard) @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT) adminList(@Query() query: CustomerQueryDto) { return this.service.adminList(query.q, query.limit, query.offset); }
+  @Get('admin') @UseGuards(AdminAuthGuard, RolesGuard) @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT) adminList(@Query() query: CustomerQueryDto) { return this.service.adminList(query.q, query.limit, query.offset, query.status); }
+  @Patch('admin/:id') @UseGuards(AdminAuthGuard, RolesGuard) @Roles(AdminRole.SUPPORT) adminUpdate(@Param('id') id: string, @Body() dto: AdminUpdateCustomerDto, @Req() req: AdminRequest) { return this.service.adminUpdate(id, dto, req.admin!); }
+  @Patch('admin/:id/status') @UseGuards(AdminAuthGuard, RolesGuard) @Roles(AdminRole.SUPER_ADMIN) adminStatus(@Param('id') id: string, @Body() dto: AdminCustomerStatusDto, @Req() req: AdminRequest) { return this.service.adminStatus(id, dto.isActive, req.admin!); }
   @Get('admin/:id') @UseGuards(AdminAuthGuard, RolesGuard) @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT) adminGet(@Param('id') id: string) { return this.service.adminGet(id); }
 }

@@ -18,7 +18,9 @@ async function request(path, options = {}) {
   }); } catch { throw new Error('The store service is temporarily unavailable. Please try again shortly.'); }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.message ?? 'Cart request failed');
+    const error = new Error(Array.isArray(body.message) ? body.message.join('. ') : body.message ?? 'Request failed');
+    error.status = response.status;
+    throw error;
   }
   return response.json();
 }
@@ -69,4 +71,12 @@ export const customerApi = {
   addWishlist: productSlug => customerRequest('/customer/me/wishlist', { method: 'POST', body: JSON.stringify({ productSlug }) }),
   removeWishlist: slug => customerRequest(`/customer/me/wishlist/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
   orders: () => customerRequest('/customer/me/orders'),
+};
+
+export const paymentsApi = {
+  config: () => request('/payments/razorpay/config'),
+  create: id => request(`/payments/razorpay/orders/${encodeURIComponent(id)}`, { method: 'POST' }),
+  status: id => request(`/payments/razorpay/orders/${encodeURIComponent(id)}`),
+  verify: (id, payment) => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/verify`, { method: 'POST', body: JSON.stringify(payment) }),
+  cancel: id => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
 };

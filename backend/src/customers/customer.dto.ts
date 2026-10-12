@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsInt, Min, Max, IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsString() @MinLength(2) @MaxLength(100) name!: string;
@@ -23,4 +23,9 @@ export class AddressDto {
   @IsOptional() @IsString() @MaxLength(120) landmark?: string;
 }
 export class WishlistDto { @IsString() @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) productSlug!: string; }
-export class CustomerQueryDto { @IsOptional() @IsString() q?: string; @IsOptional() @Type(() => Number) limit?: number; @IsOptional() @Type(() => Number) offset?: number; }
+export class CustomerQueryDto {
+  @IsOptional() @IsString() @MaxLength(100) q?: string;
+  @IsOptional() @IsEnum(['active', 'inactive']) status?: 'active' | 'inactive';
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) offset?: number;
+}

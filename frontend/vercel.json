@@ -1,8 +1,49 @@
 {
-  "rewrites": [
+  "functions": {
+    "api/render.js": {
+      "includeFiles": "dist/index.html"
+    }
+  },
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "^/(.+)/$",
+      "headers": {
+        "Location": "/$1"
+      },
+      "status": 308
+    },
+    {
+      "src": "^/$",
+      "dest": "/api/render?path="
+    },
+    {
+      "src": "^/sitemap\\.xml$",
+      "dest": "/api/sitemap"
+    },
+    {
+      "src": "^/robots\\.txt$",
+      "dest": "/api/robots"
+    },
+    {
+      "src": "^/admin(?:/.*)?$",
+      "dest": "/index.html",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow"
+      }
+    },
+    {
+      "src": "^/account$",
+      "dest": "/api/render?path=account",
+      "headers": {
+        "X-Robots-Tag": "noindex, follow"
+      }
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/(.*)$",
+      "dest": "/api/render?path=$1"
     }
   ]
 }

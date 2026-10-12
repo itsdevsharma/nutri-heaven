@@ -9,7 +9,7 @@ import { UpdateStoreSettingsDto } from './store-settings.dto';
 @Controller('storefront/settings')
 export class StorefrontSettingsController {
   constructor(private readonly service: StoreSettingsService) {}
-  @Get() get() { return this.service.get().then(record => { const value = record?.value ?? {}; return { content: value.content ?? {}, legalName: value.legalName ?? 'NUTRI HEAVEN', supportEmail: value.supportEmail ?? 'nutriheavenhsr@gmail.com', supportPhone: value.supportPhone ?? '90172-25722', whatsappNumber: value.whatsappNumber ?? '90172-25722', address: value.address ?? '258, Siwach complex Bishnoi colony near HAU gate no. 4 (sec-15) Hisar', businessHours: value.businessHours ?? '' }; }); }
+  @Get() get() { return this.service.get().then(record => { const value = record?.value ?? {}; return { seo: { title: value.seo?.title ?? '', description: value.seo?.description ?? '', googleSiteVerification: value.seo?.googleSiteVerification ?? '' }, metaPixel: { enabled: value.metaPixel?.enabled === true, pixelId: value.metaPixel?.pixelId ?? '' }, content: value.content ?? {}, legalName: value.legalName ?? 'NUTRI HEAVEN', supportEmail: value.supportEmail ?? 'nutriheavenhsr@gmail.com', supportPhone: value.supportPhone ?? '90172-25722', whatsappNumber: value.whatsappNumber ?? '90172-25722', address: value.address ?? '258, Siwach complex Bishnoi colony near HAU gate no. 4 (sec-15) Hisar', businessHours: value.businessHours ?? '' }; }); }
 }
 
 @Controller('admin/settings')

@@ -1,3 +1,5 @@
+import CustomersPage from './pages/CustomersPage.jsx';
+import UsersPage from './pages/UsersPage.jsx';
 import CategoriesPage from './pages/CategoriesPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import InventoryPage from './pages/InventoryPage.jsx';
@@ -6,6 +8,7 @@ import ProductEditorPage from './pages/ProductEditorPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import ProductsPage from './pages/ProductsPage.jsx';
 import StoreContentPage from './pages/StoreContentPage.jsx';
+import BannersPage from './pages/BannersPage.jsx';
 import CmsCollectionsPage from './pages/CmsCollectionsPage.jsx';
 import OffersPage from './pages/OffersPage.jsx';
 import AuditPage from './pages/AuditPage.jsx';
@@ -24,6 +27,8 @@ import CouponsPage from './pages/CouponsPage.jsx';
  * the router, the layout or the permission map.
  */
 export const ROUTES = [
+  { id: 'customers', path: '/admin/customers', title: 'Customers', label: 'Customers', group: 'Operations', icon: '♧', capability: 'customers:read', element: CustomersPage },
+  { id: 'users', path: '/admin/users', title: 'Users', label: 'Users', group: 'System', icon: '♙', capability: 'users:write', element: UsersPage },
   {
     id: 'login',
     path: '/admin/login',
@@ -31,7 +36,7 @@ export const ROUTES = [
     public: true,
     element: LoginPage,
   },
-  { id:'cms-banners', path:'/admin/banners', title:'Banners', label:'Banners', group:'Marketing', icon:'▧', capability:'settings:write', element:CmsCollectionsPage },
+  { id:'cms-banners', path:'/admin/banners', title:'Banners', label:'Banners', group:'Marketing', icon:'▧', capability:'settings:write', element:BannersPage },
   { id:'cms-faqs', path:'/admin/faqs', title:'FAQs', label:'FAQs', group:'Marketing', icon:'?', capability:'settings:write', element:CmsCollectionsPage },
   { id:'cms-socials', path:'/admin/socials', title:'Social links', label:'Social links', group:'Marketing', icon:'@', capability:'settings:write', element:CmsCollectionsPage },
   {

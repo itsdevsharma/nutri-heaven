@@ -47,6 +47,10 @@ export const CAPABILITIES = {
   'inventory:write': [ROLES.INVENTORY_MANAGER],
   'orders:read': [ROLES.SUPPORT],
   'marketing:read': [ROLES.MARKETING_MANAGER],
+  'customers:read': [ROLES.SUPPORT],
+  'customers:write': [ROLES.SUPPORT],
+  'customers:status': [],
+  'users:write': [],
   'audit:read': [],
   'settings:write': [],
 };

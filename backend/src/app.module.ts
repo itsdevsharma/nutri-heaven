@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HealthController } from './health.controller';
 import { ProductsModule } from './products/products.module';
+import { AdminUsersModule } from './admin/admin-users.module';
 import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
@@ -38,6 +39,7 @@ import { CouponsModule } from './coupons/coupons.module';
     }),
     ProductsModule,
     AdminModule,
+    AdminUsersModule,
     AuthModule,
     CategoriesModule,
     CartModule,
