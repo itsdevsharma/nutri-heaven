@@ -11,7 +11,8 @@
     "clean": "rm -rf dist",
     "test:seo": "node --test seo/*.test.js",
     "test:payments": "node --test test/razorpay.test.js",
-    "audit:deployment": "node scripts/deployment-smoke.mjs"
+    "audit:deployment": "node scripts/deployment-smoke.mjs",
+    "test:meta": "node --test test/meta-pixel.test.js"
   },
   "dependencies": {
     "react": "^19.3.0",

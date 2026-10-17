@@ -5,7 +5,7 @@ import WishlistButton from './customer/WishlistButton.jsx';
 import Account from './customer/Account.jsx';
 import { openRazorpay, readPendingCheckout, savePendingCheckout } from './razorpay.js';
 import { updateSeo } from './seo.js';
-import { initializeMetaPixel } from './meta-pixel.js';
+import { initializeMetaPixel, trackMetaEvent, commerceData, trackProductView, trackPurchase } from './meta-pixel.js';
 import { useEffect, useMemo, useState } from 'react';
 import { cartApi, cartId, customerApi, storefrontApi, paymentsApi } from './cart-api.js';
 
@@ -162,10 +162,19 @@ export default function App() {
   useEffect(() => { paymentsApi.config().then(config=>setPaymentConfig({...config,loading:false})).catch(()=>setPaymentConfig({enabled:false,loading:false})); }, []);
   const loadCart = async () => { const next = await cartApi.get(); setCart(next); return next; };
   useEffect(() => { storefrontApi.listProducts().then(setProducts).catch(e => setError(e.message)).finally(() => setLoading(false)); storefrontApi.publicSettings().then(setStoreSettings).catch(()=>{}); storefrontApi.publicCms().then(setCms).catch(()=>{}); storefrontApi.listCategories().then(setCategories).catch(()=>{}); loadCart().catch(e => setError(e.message)); const match = location.pathname.match(/^\/products\/([^/]+)$/); if (match) storefrontApi.getProduct(match[1]).then(product=>setSelectedProduct(product)).catch(e => setError(e.message)); }, []);
-  useEffect(() => { initializeMetaPixel(storeSettings.metaPixel); }, [storeSettings.metaPixel]);
+  useEffect(() => {
+    initializeMetaPixel(storeSettings.metaPixel);
+    if (selectedProduct && screen === 'shop') trackProductView(selectedProduct);
+    if (screen === 'checkout' && cart?.items?.length) {
+      trackMetaEvent('InitiateCheckout', commerceData(cart.items, cart.totalPaise), { once: 'checkout' });
+    }
+    if (screen === 'confirmed') trackPurchase(order);
+  }, [storeSettings.metaPixel, selectedProduct, screen, cart, order]);
   useEffect(() => { updateSeo({ settings: storeSettings, product: /^\/products\//.test(location.pathname) ? selectedProduct : undefined, privateScreen: screen !== 'shop' }); }, [storeSettings, selectedProduct, screen]);
   const count = useMemo(() => (cart?.items ?? []).reduce((n,i) => n+i.quantity, 0), [cart]);
-  const add = async (slug,size) => { setBusy(true); try { setCart(await cartApi.add(slug,size)); setDrawer(true); } catch(e) { setError(e.message); } finally { setBusy(false); } };
+  const add = async (slug,size) => { setBusy(true); try { const next = await cartApi.add(slug,size); setCart(next); setDrawer(true);
+    const line = next.items.find(item => item.productId === slug && item.packSize === size);
+    if (line) trackMetaEvent('AddToCart', commerceData([{ ...line, quantity: 1 }], line.unitPricePaise)); } catch(e) { setError(e.message); } finally { setBusy(false); } };
   const change = async (index,quantity,packSize) => { setBusy(true); try { setCart(quantity ? await cartApi.update(index,{quantity, ...(packSize ? {packSize} : {})}) : await cartApi.remove(index)); } catch(e) { setError(e.message); } finally { setBusy(false); } };
   const completeCheckout = async result => {
     setOrder(result); setScreen('confirmed'); persistPayment(null);
