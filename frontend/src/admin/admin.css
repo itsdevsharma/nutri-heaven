@@ -59,6 +59,12 @@
 .admin-body { display: flex; flex-direction: column; min-width: 0; }
 .admin-main { flex: 1; padding: clamp(18px, 3vw, 32px) clamp(16px, 3vw, 34px) 46px; }
 .admin-content { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.admin-guide-trigger { margin-left: auto; flex-shrink: 0; }
+.admin-guide-icon { display: grid; place-items: center; flex: 0 0 22px; height: 22px; border: 1px solid currentColor; border-radius: 50%; font: 700 14px Georgia, serif; }
+.admin-guide-body { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.admin-guide-body ol { margin: 12px 0; padding-left: 22px; }
+.admin-guide-body li + li { margin-top: 7px; }
+.admin-guide-tip { padding-top: 12px; border-top: 1px solid #bfd3e4; }
 .admin-footer {
   display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
   padding: 14px clamp(16px, 3vw, 34px) 22px; border-top: 1px solid var(--line);
@@ -615,3 +621,45 @@
 @media(max-width:700px) { .banner-card .banner-preview { aspect-ratio: 36/20; } .banner-preview-editor { aspect-ratio: 36/22; } .banner-preview-copy h3 { font-size: 18px!important; } }
 .banner-image-placeholder { justify-content: flex-start; align-items: flex-end; padding: 20px; }
 .banner-card .banner-image-placeholder { padding-top: 50px; }
+
+/* Order workspace and details dialog. */
+.admin-orders-page { display: flex; flex-direction: column; gap: 22px; }
+.admin-orders-page .admin-stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-orders-filters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.admin-orders-filter-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.admin-orders-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.admin-orders-cell small { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.admin-orders-link { border: 0; padding: 0; background: none; color: var(--green); font: 700 12px 'DM Mono', monospace; cursor: pointer; text-align: left; }
+.admin-orders-link:hover { text-decoration: underline; }
+.admin-orders-page .admin-empty { padding-block: 54px; }
+.admin-order-status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.admin-order-status > strong { margin-left: auto; font-size: 20px; color: var(--dark); }
+.admin-order-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; padding: 20px; background: #f6f2e6; border: 1px solid #ded7c5; border-radius: 12px; }
+.admin-order-detail-grid p { margin: 10px 0 0; line-height: 1.8; overflow-wrap: anywhere; }
+.admin-order-section { padding-top: 18px; border-top: 1px solid #ded7c5; }
+.admin-order-section > h3 { margin: 0 0 16px; }
+.admin-order-totals { margin: 16px 0 0 auto; max-width: 320px; }
+.admin-order-totals > div { display: flex; justify-content: space-between; gap: 24px; padding: 6px 0; }
+.admin-order-totals dd { margin: 0; }
+.admin-order-totals > div:last-child { border-top: 1px solid #ded7c5; margin-top: 8px; padding-top: 12px; font-weight: 700; }
+.admin-order-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.admin-order-actions > .admin-field { flex: 1 1 200px; }
+.admin-order-timeline { list-style: none; margin: 0; padding: 0 0 0 10px; }
+.admin-order-timeline li { position: relative; border-left: 2px solid #ded7c5; padding: 0 0 20px 20px; }
+.admin-order-timeline li::before { content: ''; position: absolute; left: -6px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: #153f2f; }
+.admin-order-timeline time { display: block; margin-top: 4px; font-size: 12px; color: #6f7b72; }
+.admin-order-timeline p { margin-top: 6px; }
+@media (max-width: 760px) {
+  .admin-orders-page .admin-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-orders-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-orders-filters > :first-child { grid-column: 1 / -1; }
+  .admin-order-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-order-status > strong { width: 100%; margin-left: 0; }
+}
+
+.admin-guide-locations { margin: 20px 0; }
+.admin-guide-locations > h3 { margin-bottom: 8px; }
+.admin-guide-locations > p { margin-bottom: 14px; color: #6f7b72; }
+.admin-guide-locations table { min-width: 0; width: 100%; }
+.admin-guide-locations tbody th { width: 30%; text-align: left; font: 600 13px/1.6 Manrope, Arial, sans-serif; text-transform: none; letter-spacing: normal; background: #f6f2e6; }
+.admin-guide-locations td { font-size: 13px; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }

@@ -1,5 +1,6 @@
 import { API_URL } from '../lib/api.js';
 import { Link } from '../router.jsx';
+import { ModuleGuide } from './ModuleGuide.jsx';
 
 /** Breadcrumb + mobile navigation toggle. Deliberately thin: no global search. */
 export function Topbar({ route, onToggleNav }) {
@@ -19,6 +20,7 @@ export function Topbar({ route, onToggleNav }) {
         <span aria-hidden="true">/</span>
         <b>{route?.title ?? 'Not found'}</b>
       </nav>
+      {route?.id && <ModuleGuide key={route.id} route={route} />}
       <div className="admin-topbar-meta">
         <span className="admin-api-chip admin-mono" title={`API base URL: ${API_URL}`}>
           {API_URL.replace(/^https?:\/\//, '')}

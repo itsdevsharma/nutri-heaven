@@ -222,7 +222,7 @@ body{background:linear-gradient(135deg,#f7f2e8 0%,#fbf8ef 46%,#f0eadc 100%)}.sho
 .nav .tools button,.nav .menu{color:var(--cream)}
 .nav .bag{border-left-color:#647153!important}
 .nav nav a:hover,.nav nav a:focus-visible{color:#e1c37a}
-footer{background:var(--cream)}
+footer{background:#d4c19d}
 .product-image-button,.home-product-image,.product-modal-image,.product-modal-media{background:var(--paper)}
 .shop-filters{top:90px}
 @media(max-width:760px){

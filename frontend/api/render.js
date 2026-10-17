@@ -31,7 +31,12 @@ export default async function handler(req, res) {
     return res.status(missing ? 404 : 200).send(html);
   } catch (error) {
     console.error('SEO rendering failed:', error.message);
+    // Keep the storefront bootable during API outages without caching an
+    // incomplete catalogue or telling crawlers that a product is missing.
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(503).send('The store is temporarily unavailable. Please try again shortly.');
+    res.setHeader('Retry-After', '60');
+    const html = template.replace('<div id="root"></div>', '<div id="root"><main><h1>Nutri Heaven</h1><p>The store is temporarily unavailable. Please try again shortly.</p><a href="">Try again</a></main></div>');
+    return res.status(503).send(html);
   }
 }

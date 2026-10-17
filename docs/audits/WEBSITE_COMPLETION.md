@@ -88,3 +88,9 @@ Existing unrelated working-tree changes are preserved.
 ## External release follow-up — 2026-10-12
 
 Production probes: `nutri-heaven-mu.vercel.app` home/shop/sitemap return 503; the older `nutri-heaven-topaz.vercel.app` returns 404. HTTPS responds but release gates remain open. See [external verification](../../audit-reports/11-external-release-verification.md). Smoke tooling now checks CORS GET/preflight and HTTPS redirect downgrade; production API origin and provider access remain pending.
+
+## Runtime failure follow-up — 2026-10-16
+
+Owner-supplied Vercel logs show the SEO renderer received HTTP 503 from the Store API. The logs do not distinguish `/storefront/settings` from `/products`, or establish why the upstream service is unavailable. The `url.parse()` deprecation warning does not establish the cause of that HTTP response.
+
+Local mitigation: renderer failures now return bootable storefront HTML with the existing 503 status, `no-store` and `Retry-After: 60`, rather than a plain-text response that prevents React from loading. API HTTP errors identify the requested endpoint without logging response bodies or credentials. No fabricated product data is served. Frontend build and seven SEO tests pass, including upstream 503 and network-failure coverage. Deployment and restoration of the production backend remain unverified. Check the hosted `VITE_API_URL`/`API_URL` and backend health/logs for both public endpoints; redeploy the frontend after correcting configuration.

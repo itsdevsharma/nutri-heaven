@@ -5,7 +5,7 @@ export async function apiGet(path) {
   if (!origin) throw new Error('Set VITE_API_URL to the public backend origin for SEO rendering');
   const response = await fetch(`${origin.replace(/\/$/, '')}${path}`, { signal: AbortSignal.timeout(8000) });
   if (!response.ok) {
-    const error = new Error(`Store API returned ${response.status}`);
+    const error = new Error(`Store API ${path} returned ${response.status}`);
     error.status = response.status;
     throw error;
   }
