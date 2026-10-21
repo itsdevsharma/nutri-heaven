@@ -25,7 +25,7 @@ import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from '../admin/admin.schema';
-import { AdminRequest } from '../auth/admin-auth.guard';
+import type { AdminRequest } from '../auth/admin-auth.guard';
 import { BulkProductActionDto } from './dto/bulk-product-action.dto';
 
 @Controller('products')

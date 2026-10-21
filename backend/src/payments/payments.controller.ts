@@ -3,7 +3,7 @@ import type { Request as ExpressRequest } from 'express';
 import { CancelOrderDto } from '../orders/order.dto';
 import { VerifyRazorpayPaymentDto } from './payments.dto';
 import { PaymentsService } from './payments.service';
-import { AdminAuthGuard, AdminRequest } from '../auth/admin-auth.guard';
+import { AdminAuthGuard, type AdminRequest } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from '../admin/admin.schema';

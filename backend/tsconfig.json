@@ -1,9 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
-    "module": "CommonJS",
-    "moduleResolution": "Node10",
+    "lib": [
+      "ES2023"
+    ],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
@@ -21,10 +23,15 @@
     "emitDecoratorMetadata": true,
     "verbatimModuleSyntax": false,
     "outDir": "dist",
-    "baseUrl": "./",
-    "allowJs": false
-    ,"isolatedModules": true
+    "allowJs": false,
+    "isolatedModules": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test/**/*"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test/**/*"
+  ]
 }

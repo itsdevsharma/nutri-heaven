@@ -5,7 +5,7 @@ import { isValidObjectId, Model } from 'mongoose';
 import { Admin, AdminDocument } from './admin.schema';
 import { CreateAdminUserDto, UpdateAdminUserDto } from './admin-users.dto';
 import { AuditService } from '../audit/audit.service';
-import { AdminRequest } from '../auth/admin-auth.guard';
+import type { AdminRequest } from '../auth/admin-auth.guard';
 
 const publicFields = '_id name email role isActive createdAt updatedAt';
 @Injectable()

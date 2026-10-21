@@ -4,7 +4,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, Use
 import type { Request, Response } from 'express';
 import { AdminRole } from '../admin/admin.schema';
 import { AdminUpdateCustomerDto, AdminCustomerStatusDto } from './admin-customer.dto';
-import { AdminAuthGuard, AdminRequest } from '../auth/admin-auth.guard';
+import { AdminAuthGuard, type AdminRequest } from '../auth/admin-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AddressDto, CustomerQueryDto, ForgotPasswordDto, LoginDto, ResetPasswordDto, SignupDto, UpdateProfileDto, WishlistDto } from './customer.dto';

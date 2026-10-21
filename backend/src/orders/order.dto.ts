@@ -1,6 +1,6 @@
 import { IsString, IsEmail, MinLength, IsNotEmpty, ValidateNested, IsOptional, IsArray, IsIn, Min, IsEnum, Matches, IsInt, ArrayMinSize, MaxLength, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OrderStatus } from './order.schema';
+import type { OrderStatus } from './order.schema';
 
 export class OrderLineDto {
   @IsString()

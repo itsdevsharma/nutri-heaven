@@ -7,7 +7,7 @@ import { OrderService } from '../orders/order.service';
 import { NotificationService } from '../engagement/notification.service';
 import { MailService } from '../mail/mail.module';
 import { AuditService } from '../audit/audit.service';
-import { AdminRequest } from '../auth/admin-auth.guard';
+import type { AdminRequest } from '../auth/admin-auth.guard';
 import { AdminUpdateCustomerDto } from './admin-customer.dto';
 import { isValidObjectId, Model } from 'mongoose';
 import { Order, OrderDocument } from '../orders/order.schema';

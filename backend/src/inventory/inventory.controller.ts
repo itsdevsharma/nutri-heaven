@@ -10,7 +10,7 @@ import {
 import { InventoryService } from './inventory.service';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { ListInventoryQuery, ListMovementsQuery } from './dto/list-inventory.query';
-import { AdminAuthGuard, AdminRequest } from '../auth/admin-auth.guard';
+import { AdminAuthGuard, type AdminRequest } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from '../admin/admin.schema';

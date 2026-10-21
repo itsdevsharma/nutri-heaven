@@ -1,6 +1,6 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
-import { AdminAuthGuard, AdminRequest } from './admin-auth.guard';
+import { AdminAuthGuard, type AdminRequest } from './admin-auth.guard';
 import { AuthService } from './auth.service';
 import { LoginRequest } from './dto/login.request';
 

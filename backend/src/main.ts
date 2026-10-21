@@ -22,7 +22,7 @@ async function bootstrap(): Promise<void> {
   // Canvas-based image editing needs the upload origin to be CORS-readable.
   // Static middleware runs before Nest's regular route handling, so it must
   // emit the header itself rather than relying on `app.enableCors()` below.
-  app.use('/uploads', serveStatic(uploads, { setHeaders: (response) => response.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGINS?.split(',')[0]?.trim() || 'http://localhost:5173') }));
+  app.use('/uploads', serveStatic(uploads, { setHeaders: (response) => response.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGINS?.split(',')[0]?.trim() || 'http://localhost:5174') }));
 
   // Baseline browser protections without adding a second middleware stack.
   // A deployed reverse proxy remains responsible for HTTPS/HSTS.
@@ -47,8 +47,9 @@ async function bootstrap(): Promise<void> {
 
   // An empty host environment variable must not silently produce an empty
   // allow-list (which causes successful OPTIONS responses with no CORS header).
+  // Vite falls back to 5174 when 5173 is occupied during local development.
   // Production deployments should still set CORS_ORIGINS explicitly.
-  const origins = (process.env.CORS_ORIGINS?.trim() || 'http://localhost:5173,https://nutri-heaven-topaz.vercel.app')
+  const origins = (process.env.CORS_ORIGINS?.trim() || 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,https://nutri-heaven-topaz.vercel.app')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);

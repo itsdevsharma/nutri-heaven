@@ -3,7 +3,7 @@ import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nest
 import { AdminModule } from './admin.module';
 import { AuthModule } from '../auth/auth.module';
 import { AuditModule } from '../audit/audit.module';
-import { AdminAuthGuard, AdminRequest } from '../auth/admin-auth.guard';
+import { AdminAuthGuard, type AdminRequest } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from './admin.schema';
