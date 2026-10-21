@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model } from 'mongoose';
 import { InjectConnection } from '@nestjs/mongoose';
+import { StockReservation, StockReservationDocument } from './stock-reservation.schema';
 import { Product, ProductDocument } from '../products/product.schema';
 import {
   InventoryMovement,
@@ -18,6 +19,9 @@ export interface InventoryRow {
   image: string;
   packSize: string;
   stockQuantity: number;
+  reservedQuantity: number;
+  allocatedQuantity: number;
+  physicalQuantity: number;
   lowStockLimit: number;
   pricePaise: number;
   state: 'healthy' | 'low' | 'out';
@@ -63,6 +67,7 @@ export class InventoryService {
     @InjectModel(Product.name) private readonly products: Model<ProductDocument>,
     @InjectModel(InventoryMovement.name)
     private readonly movements: Model<InventoryMovementDocument>,
+    @InjectModel(StockReservation.name) private readonly reservations: Model<StockReservationDocument>,
   ) {}
 
   /**
@@ -95,6 +100,11 @@ export class InventoryService {
       : {};
     const docs = await this.products.find(match).sort({ title: 1, slug: 1 }).lean().exec();
 
+    const held = await this.reservations.aggregate<{ _id: { slug: string; size: string; status: string }; quantity: number }>([
+      { $match: { status: { $in: ['reserved', 'allocated'] } } }, { $unwind: '$lines' },
+      { $group: { _id: { slug: '$lines.productSlug', size: '$lines.packSize', status: '$status' }, quantity: { $sum: '$lines.quantity' } } },
+    ]);
+    const quantities = new Map(held.map(item => [`${item._id.slug}:${item._id.size}:${item._id.status}`, item.quantity]));
     const rows: InventoryRow[] = [];
     for (const product of docs) {
       for (const variant of (product.variants ?? []) as Array<Record<string, unknown>>) {
@@ -111,6 +121,9 @@ export class InventoryService {
           image: product.image,
           packSize: String(variant.size ?? ''),
           stockQuantity: stock,
+          reservedQuantity: quantities.get(`${product.slug}:${variant.size}:reserved`) ?? 0,
+          allocatedQuantity: quantities.get(`${product.slug}:${variant.size}:allocated`) ?? 0,
+          physicalQuantity: stock + (quantities.get(`${product.slug}:${variant.size}:reserved`) ?? 0) + (quantities.get(`${product.slug}:${variant.size}:allocated`) ?? 0),
           lowStockLimit: limitFor,
           pricePaise: Number(variant.pricePaise) || 0,
           state,
@@ -211,7 +224,7 @@ export class InventoryService {
       const set: Record<string, unknown> = { 'variants.$[v].stockQuantity': balance };
       if (input.setLowStockLimit !== undefined) set['variants.$[v].lowStockLimit'] = input.setLowStockLimit;
       const updated = await this.products.updateOne({ slug, ...stockPredicate }, { $set: set }, { arrayFilters: [{ 'v.size': input.packSize }], session }).exec();
-      if (!updated.modifiedCount) throw new BadRequestException(`Stock changed concurrently; retry adjustment for ${slug} (${input.packSize})`);
+      if (!updated.matchedCount) throw new BadRequestException(`Stock changed concurrently; retry adjustment for ${slug} (${input.packSize})`);
       const createdRows = await this.movements.create([{ productSlug: slug, packSize: input.packSize, quantity: delta, balance, type: input.type, reason: input.reason.trim(), actor: input.actor, referenceId: input.referenceId ?? '', idempotencyKey: input.idempotencyKey }], { session });
       const created = createdRows[0];
       if (!created) throw new Error('Inventory ledger insert failed');
@@ -299,6 +312,7 @@ export class InventoryService {
       }
     }
 
+    await this.reservations.updateOne({ referenceId }, { $setOnInsert: { referenceId, lines: uniqueLines, status: 'reserved', expiresAt: new Date(Date.now() + 30 * 60000) } }, { upsert: true, session });
     const applied = [];
     for (const line of uniqueLines) {
       const slug = line.productSlug;
@@ -355,7 +369,23 @@ export class InventoryService {
         }),
       );
     }
+    await this.reservations.updateOne({ referenceId }, { $set: { status: kind === 'return' ? 'closed' : 'released', releasedAt: new Date() }, $unset: { expiresAt: 1 } }, { session });
     return applied;
+  }
+
+  async markDispatched(referenceId: string, session: ClientSession) {
+    await this.reservations.updateOne({ referenceId, status: 'allocated' }, { $set: { status: 'dispatched' } }, { session });
+  }
+  async closeReturnedReservation(referenceId: string, session: ClientSession) {
+    await this.reservations.updateOne({ referenceId }, { $set: { status: 'closed' }, $unset: { expiresAt: 1 } }, { session });
+  }
+
+  // Returned goods already left sellable stock at reservation; write-off is a
+  // zero-delta ledger entry rather than a second deduction.
+  async recordWriteOff(referenceId: string, lines: Array<{ productSlug: string; packSize: string; quantity: number }>, actor: string, session: ClientSession) {
+    const grouped = new Map<string, { productSlug: string; packSize: string; quantity: number }>();
+    for (const line of lines) { const key = `${line.productSlug}:${line.packSize}`; const previous = grouped.get(key); grouped.set(key, { ...line, quantity: (previous?.quantity ?? 0) + line.quantity }); }
+    for (const line of grouped.values()) await this.apply({ ...line, delta: 0, type: 'write-off', reason: `Inspected return: ${line.quantity} units not resellable`, actor, referenceId, idempotencyKey: `write-off:${referenceId}:${line.productSlug}:${line.packSize}`, session });
   }
 
   /** Records that a prior reservation has become a completed sale. Stock was
@@ -391,6 +421,7 @@ export class InventoryService {
         session,
       }));
     }
+    await this.reservations.updateOne({ referenceId }, { $set: { status: 'allocated' }, $unset: { expiresAt: 1 } }, { session });
     return applied;
   }
 }

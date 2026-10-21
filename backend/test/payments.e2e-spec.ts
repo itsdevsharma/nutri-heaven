@@ -9,6 +9,10 @@ import { PaymentsService } from '../src/payments/payments.service';
 import { Order, OrderDocument } from '../src/orders/order.schema';
 import { OrderService } from '../src/orders/order.service';
 import { Product, ProductDocument } from '../src/products/product.schema';
+import { OrderRefund } from '../src/payments/refund.schema';
+import { PaymentWebhookEvent } from '../src/payments/webhook-event.schema';
+import { StockReservation } from '../src/inventory/stock-reservation.schema';
+import { OrderOutbox } from '../src/orders/order-outbox.schema';
 import { InventoryMovement } from '../src/inventory/inventory-movement.schema';
 
 describe('Razorpay checkout (e2e)', () => {
@@ -24,7 +28,7 @@ describe('Razorpay checkout (e2e)', () => {
       fetchPayments: jest.fn(async (id: string) => ({ items: [...payments.values()].filter(payment => payment.order_id === id) })),
     },
     payments: {
-      refund: jest.fn(async () => ({ id: 'rfnd_audit_cancelled' })),
+      refund: jest.fn(async (id: string, options: any) => ({ id: 'rfnd_' + id, payment_id: id, amount: options.amount, currency: 'INR', status: 'processed', receipt: options.receipt })),
       fetch: jest.fn(async (id: string) => payments.get(id)),
       capture: jest.fn(async (id: string) => { const captured = { ...payments.get(id), status: 'captured' }; payments.set(id, captured); return captured; }),
     },
@@ -44,6 +48,7 @@ describe('Razorpay checkout (e2e)', () => {
     jest.spyOn(app.get(PaymentsService) as any, 'client').mockReturnValue(remote);
     products = app.get(getModelToken(Product.name));
     await products.deleteMany({});
+    for (const model of [OrderRefund.name, PaymentWebhookEvent.name, StockReservation.name, OrderOutbox.name]) await app.get<Model<any>>(getModelToken(model)).deleteMany({});
     await app.get<Model<OrderDocument>>(getModelToken(Order.name)).deleteMany({});
     await app.get<Model<any>>(getModelToken(InventoryMovement.name)).deleteMany({});
     await products.create({ slug: 'almonds', title: 'Almonds', description: 'Fresh nuts', image: 'almonds.jpg', category: 'Nuts', pricePaise: 27500, status: 'active', isActive: true, variants: [{ size: '250g', pricePaise: 27500, stockQuantity: 100, isActive: true }] });
@@ -136,11 +141,13 @@ describe('Razorpay checkout (e2e)', () => {
 
   it('refunds a captured cancelled order without charging or releasing stock twice', async () => {
     const { order, payment } = await create();
+    payments.set('pay_cancel_refund', { id: 'pay_cancel_refund', order_id: payment.razorpayOrderId, status: 'captured', amount: order.totalPaise, currency: 'INR' });
     await webhook({ id: 'pay_cancel_refund', order_id: payment.razorpayOrderId, status: 'captured', amount: order.totalPaise, currency: 'INR' });
     await app.get(OrderService).cancel(order.id, 'Customer requested cancellation', 'audit');
     const before = remote.payments.refund.mock.calls.length;
     const refunded = await app.get(PaymentsService).refundOrder(order.id, 'audit');
-    expect(refunded).toMatchObject({ paymentStatus: 'refunded', status: 'refunded', paymentReconciliationRequired: false });
+    expect(refunded).toMatchObject({ status: 'completed', amountPaise: order.totalPaise });
+    expect(await app.get(OrderService).getOrder(order.id)).toMatchObject({ paymentStatus: 'refunded', status: 'refunded', paymentReconciliationRequired: false });
     await app.get(PaymentsService).refundOrder(order.id, 'audit');
     expect(remote.payments.refund.mock.calls.length).toBe(before + 1);
   });

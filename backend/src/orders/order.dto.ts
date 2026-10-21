@@ -1,4 +1,4 @@
-import { IsString, IsEmail, MinLength, IsNotEmpty, ValidateNested, IsOptional, IsArray, IsIn, IsNumber, Min, IsEnum, Matches } from 'class-validator';
+import { IsString, IsEmail, MinLength, IsNotEmpty, ValidateNested, IsOptional, IsArray, IsIn, Min, IsEnum, Matches, IsInt, ArrayMinSize, MaxLength, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderStatus } from './order.schema';
 
@@ -9,7 +9,7 @@ export class OrderLineDto {
   @IsString()
   packSize!: string;
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
   quantity!: number;
 }
@@ -58,6 +58,7 @@ export class OrderCreateDto {
   deliveryAddress!: OrderAddressDto;
 
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => OrderLineDto)
   lines!: OrderLineDto[];
@@ -89,4 +90,22 @@ export class CancelOrderDto {
   @IsNotEmpty()
   @MinLength(3)
   reason!: string;
+}
+
+export class ReturnInspectionLineDto {
+  @IsString() @IsNotEmpty() productSlug!: string;
+  @IsString() @IsNotEmpty() packSize!: string;
+  @IsInt() @Min(1) quantity!: number;
+  @IsIn(['restock', 'write_off']) disposition!: 'restock' | 'write_off';
+  @IsIn(['sealed', 'opened', 'damaged', 'expired']) condition!: 'sealed' | 'opened' | 'damaged' | 'expired';
+}
+export class OrderActionDto {
+  @IsUUID() idempotencyKey!: string;
+  @IsString() @IsNotEmpty() @MaxLength(2000) reason!: string;
+  @IsOptional() @IsString() @MaxLength(200) courier?: string;
+  @IsOptional() @IsString() @MaxLength(200) trackingNumber?: string;
+  @IsOptional() @IsString() @Matches(/^https?:\/\/[^\s]+$/) trackingUrl?: string;
+  @IsOptional() @IsString() @MaxLength(500) reference?: string;
+  @IsOptional() @IsInt() @Min(1) amountPaise?: number;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => ReturnInspectionLineDto) inspection?: ReturnInspectionLineDto[];
 }

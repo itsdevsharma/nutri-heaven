@@ -34,7 +34,7 @@ describe('Website completion audit', () => {
     const orders = app.get<Model<Order>>(getModelToken(Order.name));
     const me = await request(app.getHttpServer()).get('/customer/me').set(auth(customerToken));
     const base = { customerId: me.body.id, cartId: 'audit-cart', customerName: '<script>buyer</script>', customerEmail: 'buyer@example.com', customerPhone: '9876543210', deliveryAddress: { street: '12 Main Street', city: 'Hisar', state: 'Haryana', pin: '125001' }, lines: [{ productSlug: 'audit-product-0', productName: 'Audit product', packSize: '250g', quantity: 1, unitPricePaise: 10000, lineTotalPaise: 10000 }], subtotalPaise: 10000, totalPaise: 10000, shippingPaise: 0, paymentMethod: 'cod', paymentStatus: 'paid', stockReserved: false };
-    await orders.create({ ...base, id: 'AUDIT-DELIVERED', idempotencyKey: 'audit-delivered', status: 'delivered' });
+    await orders.create({ ...base, id: 'AUDIT-DELIVERED', idempotencyKey: 'audit-delivered', status: 'delivered', statusHistory: [{ status: 'delivered', at: new Date(), actor: 'fixture' }] });
     await orders.create({ ...base, id: 'AUDIT-CONFIRMED', idempotencyKey: 'audit-confirmed', status: 'confirmed', paymentStatus: 'pending' });
   });
   afterAll(async () => { await app?.close(); await mongo?.stop(); });

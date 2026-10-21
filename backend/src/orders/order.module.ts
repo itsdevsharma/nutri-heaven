@@ -1,3 +1,4 @@
+import { OrderOutbox, OrderOutboxSchema } from './order-outbox.schema';
 import { OptionalCustomerAuthGuard } from '../customers/optional-customer-auth.guard';
 import { Customer, CustomerSchema } from '../customers/customer.schema';
 import { EngagementModule } from '../engagement/engagement.module';
@@ -20,10 +21,10 @@ import { CouponsModule } from '../coupons/coupons.module';
     ProductsModule,
     InventoryModule,
     CouponsModule,
-    MongooseModule.forFeature([{ name: Customer.name, schema: CustomerSchema }, { name: Order.name, schema: OrderSchema }]),
+    MongooseModule.forFeature([{ name: OrderOutbox.name, schema: OrderOutboxSchema }, { name: Customer.name, schema: CustomerSchema }, { name: Order.name, schema: OrderSchema }]),
   ],
   controllers: [OrderController],
   providers: [OrderService, OptionalCustomerAuthGuard],
-  exports: [OrderService, MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }])],
+  exports: [OrderService, MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }, { name: OrderOutbox.name, schema: OrderOutboxSchema }])],
 })
 export class OrderModule {}

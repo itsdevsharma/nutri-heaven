@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import type { OrderOperations } from './order-workflow';
 
 export type OrderStatus = 'pending' | 'confirmed' | 'packed' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'return_requested' | 'returned' | 'refunded';
 export type PaymentMethod = 'cod' | 'razorpay';
@@ -102,6 +103,15 @@ export class Order {
 
   @Prop({ trim: true, default: '' })
   idempotencyKey!: string;
+
+  @Prop({ type: Object })
+  operations?: OrderOperations;
+
+  @Prop({ type: [Object], default: [] })
+  activity!: Array<{ action: string; actor: string; at: Date; reason: string; idempotencyKey?: string; fingerprint?: string; before?: unknown; after?: unknown }>;
+
+  @Prop({ default: 0, min: 0 }) refundReservedPaise!: number;
+  @Prop({ default: 0, min: 0 }) refundedPaise!: number;
 
   @Prop({ default: false })
   stockReserved!: boolean;

@@ -19,6 +19,7 @@ export const INVENTORY_MOVEMENT_TYPES = [
   'order-reserved',
   'order-committed',
   'return',
+  'write-off',
   'cancelled',
 ] as const;
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];

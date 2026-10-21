@@ -1,11 +1,12 @@
 import { OptionalCustomerAuthGuard } from '../customers/optional-customer-auth.guard';
 import { Body, Controller, Get, Headers, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { OrderService } from './order.service';
-import { CancelOrderDto, OrderCreateDto, UpdateOrderStatusDto } from './order.dto';
+import { CancelOrderDto, OrderCreateDto, UpdateOrderStatusDto, OrderActionDto } from './order.dto';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from '../admin/admin.schema';
+import { allowedOrderActions, operationsFor, type OrderAction } from './order-workflow';
 import { AdminRequest } from '../auth/admin-auth.guard';
 
 @Controller('orders')
@@ -23,14 +24,18 @@ export class OrderController {
   @Get('admin')
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
-  adminList() { return this.service.listAdmin(); }
+  async adminList(@Request() request: AdminRequest) {
+    const orders = await this.service.listAdmin();
+    return orders.map(order => ({ ...order, operations: operationsFor(order), allowedActions: allowedOrderActions(order, request.admin?.role ?? '') }));
+  }
 
   /** Admin read of an order. Protected by RBAC. */
   @Get('admin/:id')
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
-  adminGet(@Param('id') id: string) {
-    return this.service.getOrder(id);
+  async adminGet(@Param('id') id: string, @Request() request: AdminRequest) {
+    const order = await this.service.getOrder(id);
+    return { ...order, operations: operationsFor(order), allowedActions: allowedOrderActions(order, request.admin?.role ?? '') };
   }
 
   /** Admin update of fulfilment state. Protected by RBAC. */
@@ -39,6 +44,13 @@ export class OrderController {
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
   adminUpdateStatus(@Param('id') id: string, @Body() body: UpdateOrderStatusDto, @Request() request: AdminRequest) {
     return this.service.updateStatus(id, body.status, { ...body, actor: request.admin?.email ?? 'unknown-admin' });
+  }
+
+  @Post('admin/:id/actions/:action')
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
+  action(@Param('id') id: string, @Param('action') action: OrderAction, @Body() dto: OrderActionDto, @Request() request: AdminRequest) {
+    return this.service.performAction(id, action, dto, request.admin?.email ?? 'unknown-admin', request.admin?.role ?? '');
   }
 
   @Post('admin/:id/cancel')

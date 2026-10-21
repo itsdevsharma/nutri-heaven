@@ -1,7 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { PaymentWebhookEvent, PaymentWebhookEventDocument } from './webhook-event.schema';
+import { createHmac, createHash, timingSafeEqual } from 'crypto';
 import Razorpay from 'razorpay';
 import { VerifyRazorpayPaymentDto } from './payments.dto';
+import { RefundsService } from './refunds.service';
 import { OrderService } from '../orders/order.service';
 
 @Injectable()
@@ -19,6 +23,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (this.expiring) return;
     this.expiring = true;
     try {
+      await this.replayWebhooks();
       const stale = await this.orders.staleOnlineOrders(new Date(Date.now() - 30 * 60_000));
       for (const record of stale) {
         try {
@@ -28,6 +33,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
           }
         } catch { this.logger.warn(`Could not reconcile expiring online order ${record.id}; will retry`); }
       }
+      if (this.configuration().enabled) await this.refunds.reconcileDue(this.client());
     } catch { this.logger.warn('Could not check expiring payment reservations; will retry'); }
     finally { this.expiring = false; }
   }
@@ -39,7 +45,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return new Razorpay({ key_id, key_secret });
   }
 
-  constructor(private readonly orders: OrderService) {}
+  constructor(private readonly orders: OrderService, private readonly refunds: RefundsService, @InjectModel(PaymentWebhookEvent.name) private readonly events: Model<PaymentWebhookEventDocument>) {}
 
   configuration() {
     return { enabled: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET), testMode: process.env.RAZORPAY_KEY_ID?.startsWith('rzp_test_') === true };
@@ -90,10 +96,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return this.orders.getOrder(order.id);
   }
 
-  async paymentStatus(orderId: string, cartId?: string) {
+  async paymentStatus(orderId: string, cartId?: string, force = false) {
     const order = await this.ownedOrder(orderId, cartId);
     // Recover captured payments if the browser closed before verification or a webhook was delayed.
-    if (order.razorpayOrderId && !['paid', 'refunded'].includes(order.paymentStatus)) {
+    if (order.razorpayOrderId && (force || !['paid', 'refunded'].includes(order.paymentStatus))) {
       const payments = await this.client().orders.fetchPayments(order.razorpayOrderId);
       for (const payment of payments.items.filter(payment => payment.status === 'captured')) {
         await this.orders.captureRazorpayPayment(order.razorpayOrderId, payment.id, Number(payment.amount), payment.currency);
@@ -107,20 +113,18 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return this.orders.cancel(order.id, 'Customer cancelled online checkout', 'customer', true);
   }
 
-  async refundOrder(orderId: string, actor = 'razorpay') {
+  async refundOrder(orderId: string, actor = 'razorpay', reason = 'Full refund of cancelled or inspected returned order') {
+    return this.refunds.request(orderId, actor, reason, this.client());
+  }
+  retryRefund(orderId: string, actor: string) { return this.refunds.request(orderId, actor, 'Authorized retry of provider-confirmed failed refund', this.client(), true); }
+  listRefunds(orderId?: string) { return this.refunds.list(orderId); }
+  reconcileRefund(orderId: string) { return this.refunds.reconcile(orderId, this.client()); }
+  async reconcilePayment(orderId: string) {
     const order = await this.orders.getOrder(orderId);
-    if (order.paymentStatus === 'refunded') return order;
-    if (order.paymentMethod !== 'razorpay' || order.paymentStatus !== 'paid' || !['returned', 'cancelled'].includes(order.status) || !order.razorpayPaymentId) {
-      throw new BadRequestException('Only captured Razorpay payments on returned or cancelled orders can be refunded');
-    }
-    const refund = await this.client().payments.refund(order.razorpayPaymentId, {
-      amount: order.totalPaise,
-      notes: { orderId: order.id },
-    });
-    return this.orders.markRefunded(order.id, refund.id, actor);
+    return this.paymentStatus(orderId, order.cartId, true);
   }
 
-  async handleWebhook(rawBody: Buffer, signature?: string) {
+  async handleWebhook(rawBody: Buffer, signature?: string, providerEventId?: string) {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
     if (!secret || !signature) throw new BadRequestException('Invalid Razorpay webhook');
     const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
@@ -130,6 +134,47 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     let event: { event?: string; payload?: { payment?: { entity?: { id?: string; order_id?: string; amount?: number; currency?: string } } } };
     try { event = JSON.parse(rawBody.toString()); }
     catch { throw new BadRequestException('Malformed Razorpay webhook payload'); }
+    const payloadHash = createHash('sha256').update(rawBody).digest('hex');
+    const eventKey = providerEventId || payloadHash;
+    // Persist only the fields needed for recovery, not the customer's provider payload.
+    const payload = { event: event.event, payload: { payment: event.payload?.payment ? { entity: event.payload.payment.entity } : undefined, refund: (event.payload as Record<string, unknown>)?.refund } };
+    try { await this.events.updateOne({ eventKey }, { $setOnInsert: { eventKey, payloadHash, payload, status: 'pending', nextAttemptAt: new Date() } }, { upsert: true }); }
+    catch (error) { if ((error as { code?: number }).code !== 11000) throw error; }
+    const stored = await this.events.findOne({ eventKey }).lean().exec();
+    if (stored?.payloadHash !== payloadHash) throw new BadRequestException('Webhook ID was reused with a different payload');
+    if (stored?.status === 'completed') return { received: true, duplicate: true };
+    await this.processStoredWebhook(eventKey);
+    return { received: true };
+  }
+
+  async replayWebhooks() {
+    const due = await this.events.find({ status: { $in: ['pending', 'processing'] }, nextAttemptAt: { $lte: new Date() } }).limit(25).lean().exec();
+    for (const event of due) { try { await this.processStoredWebhook(event.eventKey); } catch { /* Persisted retry/dead-letter state is shown to operations. */ } }
+  }
+
+  listWebhookFailures() { return this.events.find({ status: { $ne: 'completed' } }).select('eventKey status attempts nextAttemptAt error createdAt').sort({ createdAt: -1 }).limit(100).lean().exec(); }
+
+  private async processStoredWebhook(eventKey: string) {
+    const record = await this.events.findOneAndUpdate({ eventKey, status: { $in: ['pending', 'processing'] }, nextAttemptAt: { $lte: new Date() } }, { $set: { status: 'processing', nextAttemptAt: new Date(Date.now() + 300000) }, $inc: { attempts: 1 } }, { new: true }).lean().exec();
+    if (!record) return; // Another worker owns the durable lease, or the event is complete.
+    try {
+      await this.processVerifiedEvent(record.payload as Parameters<PaymentsService['processVerifiedEvent']>[0]);
+      await this.events.updateOne({ eventKey, attempts: record.attempts, status: 'processing' }, { $set: { status: 'completed', error: '' } });
+    } catch (error) {
+      await this.events.updateOne({ eventKey, attempts: record.attempts }, { $set: { status: record.attempts >= 8 ? 'dead_letter' : 'pending', nextAttemptAt: new Date(Date.now() + Math.min(3600000, 30000 * 2 ** record.attempts)), error: 'Processing failed; inspect provider references and reconcile' } });
+      throw error;
+    }
+  }
+
+  private async processVerifiedEvent(event: { event?: string; payload?: { payment?: { entity?: { id?: string; order_id?: string; amount?: number; currency?: string } } } }) {
+    if (event.event?.startsWith('refund.')) {
+      const refund = (event.payload as unknown as { refund?: { entity?: Parameters<RefundsService['apply']>[0] } })?.refund?.entity;
+      if (!refund?.id) throw new BadRequestException('Refund event has no refund entity');
+      // Re-fetch instead of trusting out-of-order payload status.
+      if (!refund.payment_id) throw new BadRequestException('Refund payment reference is missing');
+      await this.refunds.apply(await this.client().payments.fetchRefund(refund.payment_id, refund.id), 'razorpay-webhook');
+      return { received: true };
+    }
     const payment = event.payload?.payment?.entity;
     if (!payment?.order_id) return { received: true, ignored: true };
     if (event.event === 'payment.captured') {

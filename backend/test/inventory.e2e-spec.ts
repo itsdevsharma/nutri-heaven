@@ -1,3 +1,8 @@
+import { randomUUID } from 'crypto';
+import { StockReservation } from '../src/inventory/stock-reservation.schema';
+import { OrderOutbox } from '../src/orders/order-outbox.schema';
+import { RefundsService } from '../src/payments/refunds.service';
+import { OrderRefund } from '../src/payments/refund.schema';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
@@ -61,6 +66,7 @@ describe('Inventory (e2e)', () => {
 
     const products = app.get<Model<ProductDocument>>(getModelToken(Product.name));
     await products.deleteMany({});
+    for (const model of [OrderRefund.name, StockReservation.name, OrderOutbox.name]) await app.get<Model<any>>(getModelToken(model)).deleteMany({});
     await app.get<Model<OrderDocument>>(getModelToken(Order.name)).deleteMany({});
     await app.get<Model<CartDocument>>(getModelToken(Cart.name)).deleteMany({});
     await products.insertMany([
@@ -339,13 +345,19 @@ describe('Inventory (e2e)', () => {
     });
     await orders.attachRazorpayOrder(order.id, 'rzp-return-test');
     await orders.captureRazorpayPayment('rzp-return-test', 'pay-return-test', order.totalPaise, 'INR');
-    for (const status of ['packed', 'shipped', 'out_for_delivery', 'delivered', 'return_requested', 'returned'] as const) {
-      await orders.updateStatus(order.id, status);
+    for (const action of ['accept', 'pick', 'pack', 'ready', 'dispatch', 'out_for_delivery', 'deliver'] as const) {
+      await orders.performAction(order.id, action, { idempotencyKey: randomUUID(), reason: 'Warehouse verified', courier: 'Manual carrier', trackingNumber: 'TRACK-1', reference: 'POD-1' }, 'test-admin', 'super_admin');
+    }
+    await orders.updateStatus(order.id, 'return_requested', { actor: 'test-admin', note: 'Unopened return requested' });
+    for (const action of ['approve_return', 'receive_return', 'inspect_return'] as const) {
+      await orders.performAction(order.id, action, { idempotencyKey: randomUUID(), reason: 'Inspected sealed', inspection: [{ productSlug: 'almonds', packSize: '250g', quantity: 1, condition: 'sealed', disposition: 'restock' }] }, 'test-admin', 'super_admin');
     }
     const afterReturn = await app.get<Model<ProductDocument>>(getModelToken(Product.name)).findOne({ slug: 'almonds' }).lean().exec();
     expect(afterReturn?.variants?.find((variant) => variant.size === '250g')?.stockQuantity).toBe(startingStock);
-    await expect(orders.updateStatus(order.id, 'refunded', { refundReference: 'forged-ref' })).rejects.toThrow(/refund workflow/i);
-    const refunded = await orders.markRefunded(order.id, 'rfnd_test_provider_id', 'test-admin');
+    await expect(orders.updateStatus(order.id, 'refunded', { refundReference: 'forged-ref' })).rejects.toThrow(/validated order action/i);
+    await app.get<Model<any>>(getModelToken(OrderRefund.name)).create({ orderId: order.id, requestId: randomUUID(), paymentId: 'pay-return-test', amountPaise: order.totalPaise, status: 'processing', actor: 'test-admin', reason: 'Approved return' });
+    await app.get(RefundsService).apply({ id: 'rfnd_test_provider_id', payment_id: 'pay-return-test', amount: order.totalPaise, currency: 'INR', status: 'processed' }, 'test-admin', (await app.get<Model<any>>(getModelToken(OrderRefund.name)).findOne({ orderId: order.id }))!.requestId);
+    const refunded = await orders.getOrder(order.id);
     expect(refunded).toMatchObject({ status: 'refunded', paymentStatus: 'refunded', refundReference: 'rfnd_test_provider_id' });
     expect((await orderModel.findOne({ id: order.id }).lean().exec())?.statusHistory.at(-1)?.actor).toBe('test-admin');
   });

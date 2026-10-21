@@ -205,10 +205,16 @@ export const adminApi = {
     list: () => request('/orders/admin'),
     get: (id) => request(`/orders/admin/${encodeURIComponent(id)}`),
     updateStatus: (id, status, details = {}) => request(`/orders/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status, ...details } }),
+    action: (id, action, payload) => request(`/orders/admin/${encodeURIComponent(id)}/actions/${encodeURIComponent(action)}`, { method: 'POST', body: payload }),
     cancel: (id, reason) => request(`/orders/admin/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: { reason } }),
   },
   payments: {
-    refund: (id) => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/refund`, { method: 'POST' }),
+    refunds: () => request('/payments/razorpay/admin/refunds'),
+    webhookFailures: () => request('/payments/razorpay/admin/webhook-failures'),
+    reconcile: id => request(`/payments/razorpay/admin/${encodeURIComponent(id)}/reconcile`, { method: 'POST' }),
+    retryRefund: id => request(`/payments/razorpay/admin/${encodeURIComponent(id)}/retry-refund`, { method: 'POST' }),
+    reconcileRefund: id => request(`/payments/razorpay/admin/${encodeURIComponent(id)}/reconcile-refund`, { method: 'POST' }),
+    refund: (id, reason) => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/refund`, { method: 'POST', body: { reason } }),
   },
 
   settings: {

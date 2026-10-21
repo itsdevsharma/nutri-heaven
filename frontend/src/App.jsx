@@ -87,7 +87,42 @@ function Shop({ products, add, open, categories = [] }) {
   const requestedCategory = new URLSearchParams(location.search).get('category');
   const [category, setCategory] = useState(requestedCategory || 'All products'); const [query, setQuery] = useState(''); const [sort, setSort] = useState('Featured');
   const activeCategories = categories.filter(item => item.isActive !== false);
-  const cats = activeCategories.length ? activeCategories.map(item => ({ name: item.name, depth: (() => { let depth=0, parent=item; while(parent.parentId) { parent=activeCategories.find(candidate => String(candidate._id)===String(parent.parentId)); if (!parent) break; depth++; } return depth; })() })) : [...new Set(products.map(p => p.category))].map(name => ({ name, depth: 0 }));
+  const categoryRows = activeCategories.length ? activeCategories : [...new Set(products.map(p => p.category))].filter(Boolean).map(name => ({ name }));
+  const byId = new Map(categoryRows.filter(item => item._id).map(item => [String(item._id), item]));
+  const children = new Map();
+  categoryRows.forEach(item => {
+    const parentKey = item.parentId && byId.has(String(item.parentId)) ? String(item.parentId) : null;
+    if (!children.has(parentKey)) children.set(parentKey, []);
+    children.get(parentKey).push(item);
+  });
+  children.forEach(items => items.sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name)));
+  const cats = [];
+  const visited = new Set();
+  function visitCategory(item, depth = 0) {
+    if (visited.has(item)) return;
+    visited.add(item);
+    cats.push({ ...item, depth });
+    (children.get(String(item._id)) ?? []).forEach(child => visitCategory(child, depth + 1));
+  }
+  (children.get(null) ?? []).forEach(item => visitCategory(item));
+  categoryRows.forEach(item => visitCategory(item));
+  const [expandedCategories, setExpandedCategories] = useState({});
+  const categoryAncestors = [];
+  const categoryBranches = cats.map((item, index) => {
+    categoryAncestors.length = item.depth;
+    const ancestors = [...categoryAncestors];
+    categoryAncestors[item.depth] = item.name;
+    const hasChildren = cats[index + 1]?.depth > item.depth;
+    const descendants = [];
+    for (let next = index + 1; next < cats.length && cats[next].depth > item.depth; next++) descendants.push(cats[next].name);
+    return { ...item, ancestors, hasChildren, containsSelection: descendants.includes(category) };
+  });
+  const isExpanded = item => expandedCategories[item.name] ?? item.containsSelection;
+  const selectCategory = name => {
+    setCategory(name); setPage(0);
+    const selected = categoryBranches.find(item => item.name === name);
+    if (selected) setExpandedCategories(current => ({ ...current, ...Object.fromEntries(selected.ancestors.map(ancestor => [ancestor, true])) }));
+  };
   const [page, setPage] = useState(0);
   const [result, setResult] = useState({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
@@ -103,7 +138,22 @@ function Shop({ products, add, open, categories = [] }) {
     return () => { active = false; clearTimeout(timer); };
   }, [query, category, sort, page, retry]);
   const view = result.items;
-  return <main className="shop-page"><section className="shop-banner"><p className="eyebrow">THE PANTRY EDIT</p><h1>Find your everyday<br /><em>favourite.</em></h1><p>Live catalogue prices and availability.</p></section><section className="catalogue"><aside className="shop-filters"><label className="shop-category-mobile">Browse by<select value={category} onChange={event => (setCategory(event.target.value), setPage(0))}><option value="All products">All products</option>{cats.map(c => <option key={c.name} value={c.name}>{`${"— ".repeat(c.depth)}${c.name}`}</option>)}</select></label><p className="eyebrow">BROWSE BY</p><button className={category === 'All products' ? 'active' : ''} onClick={() => (setCategory('All products'), setPage(0))}>All products</button>{cats.map(c => <button className={category === c.name ? 'active' : ''} style={{ paddingLeft: `${c.depth * 13}px` }} onClick={() => (setCategory(c.name), setPage(0))} key={c.name}>{c.name}</button>)}</aside><div className="catalogue-products"><div className="catalogue-head"><label className="shop-search">⌕<input type="search" aria-label="Search products" value={query} onChange={e => (setQuery(e.target.value), setPage(0))} placeholder="Search products" /></label><span className="shop-result-count" aria-live="polite">{result.total} {result.total === 1 ? 'product' : 'products'}</span><label className="shop-sort"><span>Sort by</span><select value={sort} onChange={e => (setSort(e.target.value), setPage(0))}><option>Featured</option><option>Price: low to high</option><option>Price: high to low</option></select></label></div>{failure ? <p role="alert">{failure} <button onClick={() => setRetry(retry + 1)}>Retry</button></p> : loading ? <p>Loading catalogue…</p> : <div className="shop-grid">{view.map(p => <ProductCard key={p.slug} product={p} add={add} open={open} />)}</div>}{!failure && !loading && !view.length && <p className="no-results">No products match your search.</p>}{!loading && !failure && result.total > 24 && <nav className="shop-pagination" aria-label="Product pages"><button disabled={page === 0} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page + 1} of {Math.ceil(result.total / 24)}</span><button disabled={(page + 1) * 24 >= result.total} onClick={() => setPage(page + 1)}>Next →</button></nav>}</div></section></main>;
+  return <main className="shop-page"><section className="shop-banner"><p className="eyebrow">THE PANTRY EDIT</p><h1>Find your everyday<br /><em>favourite.</em></h1><p>Live catalogue prices and availability.</p></section><section className="catalogue"><aside className="shop-filters" aria-label="Browse product categories">
+        <label className="shop-category-mobile">Browse by<select value={category} onChange={event => selectCategory(event.target.value)}><option value="All products">All products</option>{cats.map(c => <option key={c.name} value={c.name}>{`${"— ".repeat(c.depth)}${c.name}`}</option>)}</select></label>
+        <nav className="shop-category-nav" aria-label="Product categories">
+          <p className="eyebrow">BROWSE BY</p>
+          <button type="button" className={`shop-category-all${category === 'All products' ? ' active' : ''}`} aria-current={category === 'All products' ? 'true' : undefined} onClick={() => selectCategory('All products')}>All products<span aria-hidden="true">→</span></button>
+          <ul className="shop-category-list">{categoryBranches.map(c => {
+            const visible = c.ancestors.every(name => isExpanded(categoryBranches.find(item => item.name === name)));
+            return <li key={c.name} hidden={!visible} className={c.depth === 0 ? 'shop-category-root' : 'shop-category-child'} style={{ '--category-depth': c.depth }}>
+              <div className="shop-category-row">
+                <button type="button" className={category === c.name ? 'active' : ''} aria-current={category === c.name ? 'true' : undefined} onClick={() => selectCategory(c.name)}>{c.name}</button>
+                {c.hasChildren && <button type="button" className="shop-category-toggle" aria-label={`${isExpanded(c) ? 'Collapse' : 'Expand'} ${c.name}`} aria-expanded={Boolean(isExpanded(c))} onClick={() => setExpandedCategories(current => ({ ...current, [c.name]: !isExpanded(c) }))}><span aria-hidden="true">{isExpanded(c) ? '−' : '+'}</span></button>}
+              </div>
+            </li>;
+          })}</ul>
+        </nav>
+      </aside><div className="catalogue-products"><div className="catalogue-head"><label className="shop-search">⌕<input type="search" aria-label="Search products" value={query} onChange={e => (setQuery(e.target.value), setPage(0))} placeholder="Search products" /></label><span className="shop-result-count" aria-live="polite">{result.total} {result.total === 1 ? 'product' : 'products'}</span><label className="shop-sort"><span>Sort by</span><select value={sort} onChange={e => (setSort(e.target.value), setPage(0))}><option>Featured</option><option>Price: low to high</option><option>Price: high to low</option></select></label></div>{failure ? <p role="alert">{failure} <button onClick={() => setRetry(retry + 1)}>Retry</button></p> : loading ? <p>Loading catalogue…</p> : <div className="shop-grid">{view.map(p => <ProductCard key={p.slug} product={p} add={add} open={open} />)}</div>}{!failure && !loading && !view.length && <p className="no-results">No products match your search.</p>}{!loading && !failure && result.total > 24 && <nav className="shop-pagination" aria-label="Product pages"><button disabled={page === 0} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page + 1} of {Math.ceil(result.total / 24)}</span><button disabled={(page + 1) * 24 >= result.total} onClick={() => setPage(page + 1)}>Next →</button></nav>}</div></section></main>;
 }
 
 function ProductStrip({ eyebrow, title, products, add, open }) {

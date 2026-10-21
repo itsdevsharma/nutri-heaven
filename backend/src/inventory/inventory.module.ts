@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { AdminModule } from '../admin/admin.module';
 import { InventoryMovement, InventoryMovementSchema } from './inventory-movement.schema';
 import { InventoryController } from './inventory.controller';
+import { StockReservation, StockReservationSchema } from './stock-reservation.schema';
 import { InventoryService } from './inventory.service';
 
 /**
@@ -18,6 +19,7 @@ import { InventoryService } from './inventory.service';
     AuthModule,
     AdminModule,
     MongooseModule.forFeature([
+      { name: StockReservation.name, schema: StockReservationSchema },
       { name: InventoryMovement.name, schema: InventoryMovementSchema },
       // The overview derives stock from `products.variants[]`, so the product
       // model is registered here rather than reaching into ProductsModule.
