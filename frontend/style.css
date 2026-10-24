@@ -473,3 +473,16 @@ footer{background:#d4c19d}
 .shop-category-child>.shop-category-row>button:first-child{font-size:12px}
 .shop-category-row>.shop-category-toggle{flex:0 0 36px;width:36px;justify-content:center;align-items:center;padding:8px;font-size:20px}
 .shop-category-list>li[hidden]{display:none}
+.shop-gallery{padding:clamp(60px,8vw,105px) 7%;background:var(--paper)}
+.shop-gallery-heading{max-width:1240px;margin:0 auto 34px;display:flex;justify-content:space-between;align-items:end;gap:24px}
+.shop-gallery-heading .eyebrow{color:var(--orange)}
+.shop-gallery-heading h2{font-size:clamp(2.2rem,4vw,4rem)!important}
+.shop-gallery-grid{max-width:1240px;margin:auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.shop-gallery-card{height:clamp(220px,28vw,360px);position:relative;overflow:hidden;color:#fff;text-decoration:none;background:var(--green)}
+.shop-gallery-card img{width:100%;height:100%;object-fit:cover;transition:transform .45s}
+.shop-gallery-card:hover img{transform:scale(1.06)}
+.shop-gallery-card:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
+.shop-gallery-card:after{content:"";position:absolute;inset:35% 0 0;background:linear-gradient(transparent,rgba(0,0,0,.72));pointer-events:none}
+.shop-gallery-card span{position:absolute;z-index:1;left:18px;right:18px;bottom:17px;display:flex;justify-content:space-between;align-items:center;font:22px 'DM Serif Display',Georgia,serif}
+.shop-gallery-card span b{font:20px Manrope,sans-serif}
+@media(max-width:760px){.shop-gallery-heading{align-items:start;flex-direction:column}.shop-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.shop-gallery-card{height:clamp(190px,58vw,300px)}.shop-gallery-card span{left:12px;right:12px;bottom:12px;font-size:18px}}

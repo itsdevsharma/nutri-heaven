@@ -24,11 +24,13 @@ Set these variables on the service running `backend/`:
 NODE_ENV=production
 MONGODB_URI=<production MongoDB connection string>
 JWT_ACCESS_SECRET=<unique random secret of 32+ characters>
-CORS_ORIGINS=https://nutri-heaven-topaz.vercel.app
+CORS_ORIGINS=https://nutri-heaven-mu.vercel.app
 ```
 
 For preview deployments, append only the specific preview origins that need
-access, separated by commas. Do not use `*` with authenticated requests.
+access, separated by commas. Include local development origins only in the
+development environment, not production. Do not use `*` with authenticated
+requests.
 
 After deployment, verify `GET https://YOUR-PUBLIC-API-HOST/health`, then open
 the storefront and confirm `GET /products` succeeds in the browser network
