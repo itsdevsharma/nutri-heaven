@@ -1,3 +1,4 @@
+import ShippingPage from './pages/ShippingPage.jsx';
 import EngagementPage from './pages/EngagementPage.jsx';
 import CustomersPage from './pages/CustomersPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
@@ -28,6 +29,7 @@ import CouponsPage from './pages/CouponsPage.jsx';
  * the router, the layout or the permission map.
  */
 export const ROUTES = [
+  { id: 'shipping', path: '/admin/shipping', title: 'Shipping', label: 'Shipping', group: 'Operations', icon: '▱', capability: 'settings:write', element: ShippingPage },
   { id: 'engagement', path: '/admin/insights', title: 'Sales & engagement', label: 'Sales & engagement', group: 'Overview', icon: '▥', capability: 'reports:read', element: EngagementPage },
   { id: 'customers', path: '/admin/customers', title: 'Customers', label: 'Customers', group: 'Operations', icon: '♧', capability: 'customers:read', element: CustomersPage },
   { id: 'users', path: '/admin/users', title: 'Users', label: 'Users', group: 'System', icon: '♙', capability: 'users:write', element: UsersPage },
@@ -126,16 +128,6 @@ export const ROUTES = [
     icon: '◆',
     capability: 'marketing:read',
     element: OffersPage,
-    planned: {
-      summary: 'Product, category and festival offers with priority, validity windows and stackability rules.',
-      phase: 'Step 4 of backend/ADMIN_COMMERCE_PLAN.md (pricing and promotions).',
-      bullets: [
-        'Integer basis-point discounts with date windows and an explicit priority order.',
-        'Scopes limited to chosen products or categories, with a maximum saving cap.',
-        'One pricing service decides the final checkout price, so no screen can overrule it.',
-      ],
-      endpoints: ['GET /admin/offers', 'POST /admin/offers', 'PATCH /admin/offers/:id', 'PATCH /admin/offers/:id/deactivate'],
-    },
   },
   {
     id: 'coupons',
@@ -146,21 +138,6 @@ export const ROUTES = [
     icon: '◈',
     capability: 'marketing:read',
     element: CouponsPage,
-    planned: {
-      summary: 'Rule-based coupons with usage caps, expiry and optional product or category scopes.',
-      phase: 'Step 5 of backend/ADMIN_COMMERCE_PLAN.md (coupons).',
-      bullets: [
-        'Percentage or flat discounts with a minimum order and a maximum saving.',
-        'Redemption counters stored atomically when an order is placed.',
-        'Publish and unpublish without deleting history, so past redemptions stay explainable.',
-      ],
-      endpoints: [
-        'GET /admin/coupons',
-        'POST /admin/coupons',
-        'PATCH /admin/coupons/:id',
-        'GET /admin/coupons/:id/redemptions',
-      ],
-    },
   },
   {
     id: 'audit',
@@ -171,16 +148,6 @@ export const ROUTES = [
     icon: '≡',
     capability: 'audit:read',
     element: AuditPage,
-    planned: {
-      summary: 'Who changed what, before and after, with the request that caused it.',
-      phase: 'Audit events land in step 1 of backend/ADMIN_COMMERCE_PLAN.md and are consumed from step 6 on.',
-      bullets: [
-        'Actor, action, entity type and id, with redacted before/after snapshots.',
-        'A correlation id so a change can be traced back to the request that made it.',
-        'Every catalogue and inventory write emits one — this screen is where they surface.',
-      ],
-      endpoints: ['GET /admin/audit', 'GET /admin/audit/:entityType/:entityId'],
-    },
   },
 ];
 

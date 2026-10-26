@@ -1,6 +1,6 @@
 import type { Order } from './order.schema';
 
-export const ORDER_ACTIONS = ['accept', 'pick', 'pack', 'ready', 'dispatch', 'out_for_delivery', 'deliver', 'approve_return', 'reject_return', 'receive_return', 'inspect_return', 'record_cod_collection', 'record_cod_settlement'] as const;
+export const ORDER_ACTIONS = ['accept', 'pick', 'pack', 'ready', 'dispatch', 'out_for_delivery', 'deliver', 'approve_return', 'reject_return', 'receive_return', 'inspect_return', 'record_cod_collection', 'record_cod_settlement', 'record_cod_refund'] as const;
 export type OrderAction = typeof ORDER_ACTIONS[number];
 export interface OrderOperations {
   fulfillment: 'unaccepted' | 'accepted' | 'picking' | 'packed' | 'ready_to_dispatch' | 'dispatched' | 'completed' | 'cancelled';
@@ -44,5 +44,6 @@ export function allowedOrderActions(order: Order, role: string): OrderAction[] {
     if (!op.codCollectedPaise) actions.push('record_cod_collection');
     if (op.codCollectedPaise > op.codSettledPaise) actions.push('record_cod_settlement');
   }
+  if (role === 'super_admin' && order.paymentMethod === 'cod' && order.paymentStatus === 'paid' && order.totalPaise > 0 && ['cancelled', 'returned'].includes(order.status) && !order.paymentReconciliationRequired && !order.refundedPaise && !order.refundReservedPaise) actions.push('record_cod_refund');
   return actions;
 }

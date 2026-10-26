@@ -130,10 +130,17 @@ function toQuery(params = {}) {
 }
 
 export const adminApi = {
+  shipping: {
+    configuration: () => request('/admin/shipping/configuration'),
+    configure: payload => request('/admin/shipping/configuration', { method: 'PUT', body: payload }),
+    pickups: () => request('/admin/shipping/pickup-locations'),
+    get: id => request(`/admin/shipping/orders/${encodeURIComponent(id)}`),
+    action: (id, action, payload = {}) => request(`/admin/shipping/orders/${encodeURIComponent(id)}/${encodeURIComponent(action)}`, { method: 'POST', body: payload }),
+  },
   engagement: {
-    report: () => request('/admin/engagement/report'),
-    subscribers: () => request('/admin/engagement/subscribers'),
-    reviews: () => request('/admin/engagement/reviews'),
+    report: (params = {}) => request(`/admin/engagement/report${toQuery(params)}`),
+    subscribers: (params = {}) => request(`/admin/engagement/subscribers/page${toQuery(params)}`),
+    reviews: (params = {}) => request(`/admin/engagement/reviews/page${toQuery(params)}`),
     moderate: (id, status) => request(`/admin/engagement/reviews/${encodeURIComponent(id)}`, { method: 'PATCH', body: { status } }),
   },
   customers: {

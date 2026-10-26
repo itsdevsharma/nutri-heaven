@@ -1,3 +1,4 @@
+import { ShippingModule } from './shipping/shipping.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -49,6 +50,7 @@ import { CouponsModule } from './coupons/coupons.module';
     // reserve and release stock through the same service.
     InventoryModule,
     OrderModule,
+    ShippingModule,
     PaymentsModule,
     CustomerModule,
     CmsModule,

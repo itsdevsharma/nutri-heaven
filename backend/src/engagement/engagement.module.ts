@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Module, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Module, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Customer, CustomerSchema } from '../customers/customer.schema';
 import { Order, OrderSchema } from '../orders/order.schema';
@@ -16,7 +16,7 @@ import { MailModule } from '../mail/mail.module';
 import { CustomerNotification, CustomerNotificationSchema, Review, ReviewSchema, Subscriber, SubscriberSchema } from './engagement.schema';
 import { NotificationService } from './notification.service';
 import { EngagementService } from './engagement.service';
-import { CreateReviewDto, ModerateReviewDto, NewsletterTokenDto, SubscribeDto } from './engagement.dto';
+import { EngagementListQuery, SalesReportQuery, CreateReviewDto, ModerateReviewDto, NewsletterTokenDto, SubscribeDto } from './engagement.dto';
 type CustomerRequest = { customer: { id: string; email: string } };
 @Controller()
 export class EngagementController {
@@ -34,7 +34,9 @@ export class EngagementController {
 @Roles(AdminRole.SUPER_ADMIN)
 export class AdminEngagementController {
   constructor(private readonly service: EngagementService) {}
-  @Get('report') report() { return this.service.report(); }
+  @Get('report') report(@Query() query: SalesReportQuery) { return this.service.report(query); }
+  @Get('reviews/page') reviewPage(@Query() query: EngagementListQuery) { return this.service.paginated('reviews', query); }
+  @Get('subscribers/page') subscriberPage(@Query() query: EngagementListQuery) { return this.service.paginated('subscribers', query); }
   @Get('subscribers') subscribers() { return this.service.listSubscribers(); }
   @Get('reviews') reviews() { return this.service.listReviews(); }
   @Patch('reviews/:id') moderate(@Param('id') id: string, @Body() dto: ModerateReviewDto, @Req() req: AdminRequest) { return this.service.moderate(id, dto.status, req.admin!.sub); }
