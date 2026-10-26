@@ -90,6 +90,49 @@ function ProductCard({ product, add, open }) {
 }
 
 
+function MobileCategoryBrowser({ category, categories, selectCategory }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState({});
+  const search = query.trim().toLocaleLowerCase();
+  const matches = categories.filter(item => item.name.toLocaleLowerCase().includes(search));
+  const visible = search ? matches : categories.filter(item => item.ancestors.every(name => expanded[name]));
+  const choose = name => {
+    document.getElementById('mobile-category-panel')?.previousElementSibling.focus();
+    selectCategory(name); setOpen(false); setQuery('');
+  };
+  const toggle = () => {
+    if (!open) {
+      const selected = categories.find(item => item.name === category);
+      setExpanded(Object.fromEntries((selected?.ancestors ?? []).map(name => [name, true])));
+      setQuery('');
+    }
+    setOpen(current => !current);
+  };
+  return <div className="shop-category-mobile">
+    <span className="mobile-category-label">Browse by</span>
+    <button type="button" className="mobile-category-trigger" aria-expanded={open} aria-controls="mobile-category-panel" onClick={toggle}>
+      <span>{category}</span><span aria-hidden="true">{open ? '−' : '+'}</span>
+    </button>
+    {open && <div id="mobile-category-panel" className="mobile-category-panel" onKeyDown={event => {
+      if (event.key === 'Escape') { setOpen(false); event.currentTarget.previousElementSibling.focus(); }
+    }}>
+      <label className="mobile-category-search"><span className="mobile-category-label">Find a category</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Try almonds or seeds" /></label>
+      <nav className="mobile-category-options" aria-label="Browse categories">
+        <button type="button" className={`mobile-category-option${category === 'All products' ? ' active' : ''}`} aria-current={category === 'All products' ? 'true' : undefined} onClick={() => choose('All products')}>All products</button>
+        {visible.map(item => <div className="mobile-category-item" key={item.name}>
+          <div className="mobile-category-row" style={{ '--category-depth': search ? 0 : item.depth }}>
+            <button type="button" className={`mobile-category-option${category === item.name ? ' active' : ''}`} aria-current={category === item.name ? 'true' : undefined} onClick={() => choose(item.name)}><span>{item.name}{search && item.ancestors.length > 0 && <small>{item.ancestors.join(' / ')}</small>}</span>{category === item.name && <span aria-hidden="true">✓</span>}</button>
+            {!search && item.hasChildren && <button type="button" className="mobile-category-expand" aria-label={`${expanded[item.name] ? 'Collapse' : 'Expand'} ${item.name}`} aria-expanded={Boolean(expanded[item.name])} onClick={() => setExpanded(current => ({ ...current, [item.name]: !current[item.name] }))}>{expanded[item.name] ? '−' : '+'}</button>}
+          </div>
+        </div>)}
+        {search && !matches.length && <p role="status" className="mobile-category-empty">No categories found. Try another name or browse all products.</p>}
+      </nav>
+      <button type="button" className="mobile-category-done" onClick={toggle}>Done browsing</button>
+    </div>}
+  </div>;
+}
+
 function Shop({ products, add, open, categories = [] }) {
   const requestedCategory = new URLSearchParams(location.search).get('category');
   const [category, setCategory] = useState(requestedCategory || 'All products'); const [query, setQuery] = useState(''); const [sort, setSort] = useState('Featured');
@@ -147,7 +190,7 @@ function Shop({ products, add, open, categories = [] }) {
   const view = result.items;
   const productCount = result.total || products.length;
   return <main className="shop-page"><section className="shop-banner" aria-labelledby="shop-banner-title"><div className="shop-banner-copy"><p className="eyebrow">THE PANTRY EDIT <span>·</span> CURATED FOR EVERYDAY</p><h1 id="shop-banner-title">Find your everyday<br /><em>favourite.</em></h1></div><div className="shop-banner-aside"><p>Live catalogue prices and availability.</p><span>{productCount} carefully chosen {productCount === 1 ? 'item' : 'items'}</span><button type="button" onClick={() => document.querySelector('.catalogue')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Browse collection <b aria-hidden="true">→</b></button></div></section><section className="catalogue"><aside className="shop-filters" aria-label="Browse product categories">
-        <label className="shop-category-mobile">Browse by<select value={category} onChange={event => selectCategory(event.target.value)}><option value="All products">All products</option>{cats.map(c => <option key={c.name} value={c.name}>{`${"— ".repeat(c.depth)}${c.name}`}</option>)}</select></label>
+        <MobileCategoryBrowser category={category} categories={categoryBranches} selectCategory={selectCategory} />
         <nav className="shop-category-nav" aria-label="Product categories">
           <p className="eyebrow">BROWSE BY</p>
           <button type="button" className={`shop-category-all${category === 'All products' ? ' active' : ''}`} aria-current={category === 'All products' ? 'true' : undefined} onClick={() => selectCategory('All products')}>All products<span aria-hidden="true">→</span></button>

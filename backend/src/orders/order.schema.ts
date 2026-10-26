@@ -113,6 +113,8 @@ export class Order {
   @Prop({ default: 0, min: 0 }) refundReservedPaise!: number;
   @Prop({ default: 0, min: 0 }) refundedPaise!: number;
 
+  @Prop({ default: false }) shiprocketBookingStarted!: boolean;
+
   @Prop({ default: false })
   stockReserved!: boolean;
 

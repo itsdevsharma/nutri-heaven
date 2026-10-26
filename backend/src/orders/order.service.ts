@@ -260,6 +260,11 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
         case 'record_cod_collection':
           if (dto.amountPaise !== order.totalPaise || !dto.reference?.trim()) throw new BadRequestException('Record the full collected amount and collection evidence');
           op.codCollectedPaise = dto.amountPaise; op.codCollectionReference = dto.reference.trim(); order.paymentStatus = 'paid'; break;
+        case 'record_cod_refund':
+          if (dto.amountPaise !== order.totalPaise || !dto.reference?.trim()) throw new BadRequestException('Record the full refund amount and completed transfer reference');
+          order.refundedPaise = dto.amountPaise; order.refundReference = dto.reference.trim();
+          order.paymentStatus = 'refunded'; order.status = 'refunded';
+          break;
         case 'record_cod_settlement':
           if (!dto.amountPaise || !dto.reference?.trim() || op.codSettledPaise + dto.amountPaise > op.codCollectedPaise) throw new BadRequestException('Settlement must not exceed collected cash and requires a remittance reference');
           if (order.activity.some(item => item.action === 'record_cod_settlement' && (item.after as { reference?: string })?.reference === dto.reference?.trim())) throw new BadRequestException('This remittance reference has already been recorded');
@@ -283,6 +288,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
         if (!order) throw new NotFoundException(`No order found for "${id}"`);
         if (pendingOnly && (order.paymentMethod !== 'razorpay' || order.paymentStatus === 'paid' || order.status !== 'pending')) throw new BadRequestException('Only unpaid pending online orders can be cancelled');
         if (order.status === 'cancelled') { result = order.toObject(); return; }
+        if (order.shiprocketBookingStarted) throw new BadRequestException('Cancel the Shiprocket shipment and refresh provider details before cancelling this order');
         if (!['pending', 'confirmed', 'packed'].includes(order.status)) throw new BadRequestException(`Cannot cancel an order in ${order.status}`);
         if (order.stockReserved) await this.inventory.releaseForOrder(order.idempotencyKey, order.lines.map((line) => ({ productSlug: line.productSlug, packSize: line.packSize, quantity: line.quantity })), 'cancelled', actor, session);
         if (order.paymentMethod === 'razorpay' && order.paymentStatus === 'paid') {

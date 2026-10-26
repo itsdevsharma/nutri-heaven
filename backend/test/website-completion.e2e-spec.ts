@@ -117,4 +117,35 @@ describe('Website completion audit', () => {
     expect(responses.map(r => r.status).sort()).toEqual([201,400]);
     await request(app.getHttpServer()).get('/customer/me').set(auth(customerToken)).expect(401);
   });
+  it('paginates filtered engagement data and validates report periods', async () => {
+    const page = await request(app.getHttpServer()).get('/admin/engagement/reviews/page?limit=1&status=approved&q=audit-product').set(auth(adminToken)).expect(200);
+    expect(page.body.total).toBe(1); expect(page.body.items).toHaveLength(1);
+    const next = await request(app.getHttpServer()).get('/admin/engagement/reviews/page?limit=1&offset=1').set(auth(adminToken)).expect(200);
+    expect(next.body.items).toHaveLength(0);
+    const literal = await request(app.getHttpServer()).get('/admin/engagement/reviews/page?q=%5B').set(auth(adminToken)).expect(200);
+    expect(literal.body.total).toBe(0);
+    await request(app.getHttpServer()).get('/admin/engagement/reviews/page?limit=101').set(auth(adminToken)).expect(400);
+    await request(app.getHttpServer()).get('/admin/engagement/reviews/page?status=subscribed').set(auth(adminToken)).expect(400);
+    await request(app.getHttpServer()).get('/admin/engagement/subscribers/page').expect(401);
+    const subscribers = await request(app.getHttpServer()).get('/admin/engagement/subscribers/page?q=newsletter&status=unsubscribed').set(auth(adminToken)).expect(200);
+    expect(subscribers.body.total).toBe(1); expect(JSON.stringify(subscribers.body)).not.toMatch(/Hash|Token/);
+    for (const dates of ['from=2026-02-30&to=2026-03-01', 'from=2026-03-02&to=2026-03-01', 'from=2020-01-01&to=2026-01-01']) await request(app.getHttpServer()).get('/admin/engagement/report?' + dates).set(auth(adminToken)).expect(400);
+    const report = await request(app.getHttpServer()).get('/admin/engagement/report?from=2020-01-01&to=2020-01-03').set(auth(adminToken)).expect(200);
+    expect(report.body.daily).toHaveLength(3); expect(report.body.revenuePaise).toBe(0); expect(report.body.previous.to).toBe('2019-12-31');
+  });
+  it('records completed COD refunds once and rejects invalid amounts or repeated transfers', async () => {
+    const orders = app.get<Model<Order>>(getModelToken(Order.name));
+    const source = await orders.findOne({ id: 'AUDIT-DELIVERED' }).lean();
+    const { _id, ...copy } = source!;
+    await orders.create({ ...copy, id: 'COD-REFUND', idempotencyKey: 'cod-refund', status: 'returned', paymentStatus: 'paid', refundedPaise: 0, activity: [] });
+    const endpoint = '/orders/admin/COD-REFUND/actions/record_cod_refund';
+    const payload = { idempotencyKey: 'd6f9cb05-bb6e-4c6e-8e26-bd9f55f68a33', reason: 'Bank transfer completed', reference: 'BANK-123', amountPaise: 10000 };
+    await request(app.getHttpServer()).post(endpoint).set(auth(adminToken)).send({ ...payload, amountPaise: 1 }).expect(400);
+    await request(app.getHttpServer()).post(endpoint).set(auth(adminToken)).send(payload).expect(201);
+    await request(app.getHttpServer()).post(endpoint).set(auth(adminToken)).send(payload).expect(201);
+    await request(app.getHttpServer()).post(endpoint).set(auth(adminToken)).send({ ...payload, idempotencyKey: '26b4f162-8674-4e97-a482-eb5c0b699020' }).expect(403);
+    const saved = await orders.findOne({ id: 'COD-REFUND' });
+    expect(saved?.paymentStatus).toBe('refunded'); expect(saved?.refundedPaise).toBe(10000); expect(saved?.activity).toHaveLength(1);
+  });
+
 });

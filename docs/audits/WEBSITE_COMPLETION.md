@@ -94,3 +94,34 @@ Production probes: `nutri-heaven-mu.vercel.app` home/shop/sitemap return 503; th
 Owner-supplied Vercel logs show the SEO renderer received HTTP 503 from the Store API. The logs do not distinguish `/storefront/settings` from `/products`, or establish why the upstream service is unavailable. The `url.parse()` deprecation warning does not establish the cause of that HTTP response.
 
 Local mitigation: renderer failures now return bootable storefront HTML with the existing 503 status, `no-store` and `Retry-After: 60`, rather than a plain-text response that prevents React from loading. API HTTP errors identify the requested endpoint without logging response bodies or credentials. No fabricated product data is served. Frontend build and seven SEO tests pass, including upstream 503 and network-failure coverage. Deployment and restoration of the production backend remain unverified. Check the hosted `VITE_API_URL`/`API_URL` and backend health/logs for both public endpoints; redeploy the frontend after correcting configuration.
+
+## Admin backlog follow-up — 2026-10-25
+
+Implemented (email management excluded by owner):
+- Reviews and newsletter records: server pagination, literal text search, status filtering and filtered CSV exports across all matching pages. Legacy list endpoints remain compatible.
+- Sales reports: validated date ranges (up to 366 days), Asia/Kolkata day boundaries, zero-sale days, previous-period revenue/order totals and daily/top-product CSV exports. Default reporting now consistently uses the last 30 calendar days for all period metrics; customer count means new customers in that period.
+- Catalogue quality audit detects placeholder image paths and lets an admin hide flagged products pending correction. No catalogue records or owner-approved content were changed during implementation.
+- COD refunds: super-admin action records an already-completed external full refund, with transfer reference, reason, immutable activity and transaction/idempotency protection. It does not initiate a transfer. Only paid cancelled/returned orders without an existing/reserved refund qualify.
+- Removed obsolete planned metadata for implemented offers, coupons and audit screens.
+
+Still dependent on owner inputs:
+- Courier adapter/booking/labels/provider tracking: provider, pickup location, parcel details and credentials not supplied. Existing manual dispatch/tracking remains available.
+- Tax invoice issuance: seller legal identity, registration/tax status and approved product HSN/rates not supplied. Existing receipts remain explicitly receipts.
+- Production checks and merchant transaction verification: canonical website/API origins and merchant-approved test transaction/access not supplied. No live transaction or deployment performed.
+- Actual replacement product photography/copy still requires approved content. Hiding flagged entries is available through the admin UI.
+
+Validation:
+- Backend: all 10 suites / 77 tests passed, including report/list validation and COD refund retry/duplicate protection.
+- Backend and frontend production builds pass.
+- The broad existing website browser check timed out at checkout confirmation before admin checks; this is recorded separately from backend results.
+- Focused admin browser check lives in `backend/test/admin-backlog.browser.cjs`; run with Vite on :5173 and PLAYWRIGHT_MODULE pointing to Playwright if not locally installed. Uses a disposable database and API on :3102.
+
+## Shiprocket follow-up — 2026-10-25
+
+Owner selected Shiprocket. Added server-only API user authentication, pickup-location lookup, persisted parcel defaults, order booking, AWB assignment, pickup, label and manifest generation, provider cancellation, reconciliation and tracking refresh. Background tracking runs on a continuously running backend; it does not change payment/stock/fulfilment automatically. Settings are available at `/admin/shipping`; shipment controls are in each order.
+
+Booking uses stored order amounts and addresses and requires a reserved order ready to dispatch. A persisted order flag prevents cancellation while a provider shipment is active; confirmed provider cancellation clears the guard. Timeouts require reconciliation rather than automatic provider POST retries. Definitive provider validation/authentication failures permit a corrected booking attempt. Provider order linkage verifies the exact store order reference. Tests use mocked provider responses and disposable Mongo only.
+
+Setup and operational limits: `backend/SHIPROCKET.md`. Live activation still requires backend API user credentials, a registered Shiprocket pickup location, actual packed parcel dimensions/weight and an owner-reviewed first shipment. No live booking, charge or pickup was performed. Tax invoice and production verification dependencies above remain open.
+
+Focused admin browser check now passes mobile/desktop insights and persistent mobile shipping settings. Both production builds pass; Vite reports a non-blocking bundle-size advisory.

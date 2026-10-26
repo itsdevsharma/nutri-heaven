@@ -1,0 +1,31 @@
+import { useEffect, useState } from 'react';
+import { adminApi } from '../lib/api.js';
+import { useConfirm } from './ConfirmProvider.jsx';
+import { FormField, FormGrid } from './FormField.jsx';
+export default function ShiprocketShipment({ order, onUpdate }) {
+  const confirm = useConfirm();
+  const [shipment, setShipment] = useState(null), [config, setConfig] = useState(null), [busy, setBusy] = useState(true), [error, setError] = useState('');
+  const [parcel, setParcel] = useState({}), [courierId, setCourierId] = useState(''), [providerId, setProviderId] = useState('');
+  useEffect(() => { let active = true; Promise.all([adminApi.shipping.get(order.id), adminApi.shipping.configuration()]).then(([record, settings]) => { if (active) { setShipment(record); setConfig(settings); setParcel(record?.parcel ?? settings.defaults ?? {}); } }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setBusy(false); }); return () => { active = false; }; }, [order.id]);
+  const run = async action => {
+    if (action === 'cancel' && !await confirm({ title: 'Cancel Shiprocket shipment?', message: 'Request cancellation in Shiprocket. The store order can be cancelled after the provider confirms.', confirmLabel: 'Cancel shipment', tone: 'danger' })) return;
+    setBusy(true); setError('');
+    try { const payload = action === 'create' ? Object.fromEntries(['weight', 'length', 'breadth', 'height'].map(key => [key, Number(parcel[key])])) : action === 'awb' && courierId ? { courierId: Number(courierId) } : action === 'reconcile' && providerId ? { providerOrderId: Number(providerId) } : {}; setShipment(await adminApi.shipping.action(order.id, action, payload)); onUpdate?.(); } catch (e) { setError(e.message); const current = await adminApi.shipping.get(order.id).catch(() => null); if (current) setShipment(current); } finally { setBusy(false); }
+  };
+  const ready = order.operations?.fulfillment === 'ready_to_dispatch' && order.stockReserved && !order.paymentReconciliationRequired && (order.paymentMethod === 'cod' || order.paymentStatus === 'paid');
+  return <section className="admin-order-section"><h3>Shiprocket shipment</h3>{error && <p role="alert">{error}</p>}{!config?.configured && !busy && <p>Configure Shiprocket credentials and parcel defaults in Shipping settings.</p>}
+    {!shipment ? <><p>Pack this order and mark it ready to dispatch before booking. Booking creates a real order in Shiprocket.</p><FormGrid>{[['weight', 'Weight (kg)'], ['length', 'Length (cm)'], ['breadth', 'Width (cm)'], ['height', 'Height (cm)']].map(([key, label]) => <FormField key={key} label={label}><input aria-label={label} className="admin-input" type="number" min={key === 'weight' ? '0.001' : '0.51'} step="0.001" value={parcel[key] ?? ''} disabled={busy} onChange={e => setParcel({ ...parcel, [key]: e.target.value })} /></FormField>)}</FormGrid><button className="admin-btn admin-btn-primary" disabled={busy || !ready || !config?.configured || !config?.defaults} onClick={() => run('create')}>Book in Shiprocket</button></> : <>
+      <p>Shiprocket order: {shipment.providerOrderId ?? 'Unconfirmed'} · Shipment: {shipment.shipmentId ?? 'Unconfirmed'}<br />AWB: {shipment.awb ?? 'Not assigned'} · {shipment.courier ?? 'Courier not assigned'}<br />Pickup: {shipment.pickupScheduled ? 'Scheduled' : 'Not scheduled'}</p>
+      {shipment.providerCancelled && <p>Shiprocket cancellation confirmed. You can now cancel the store order.</p>}
+      {shipment.error && <p role="alert">{shipment.error} Use Refresh provider details before another booking action.</p>}
+      {!shipment.providerOrderId && <FormField label="Existing Shiprocket order ID (if booking was interrupted)"><input aria-label="Existing Shiprocket order ID" className="admin-input" type="number" min="1" value={providerId} onChange={e => setProviderId(e.target.value)} /></FormField>}
+      <div className="admin-row-actions"><button className="admin-btn admin-btn-ghost" disabled={busy} onClick={() => run('reconcile')}>Refresh provider details</button>{!shipment.awb && <><FormField label="Courier ID (optional)"><input aria-label="Courier ID (optional)" className="admin-input" type="number" min="1" value={courierId} onChange={e => setCourierId(e.target.value)} /></FormField><button className="admin-btn" disabled={busy || !!shipment.error || shipment.providerCancelled || !shipment.shipmentId} onClick={() => run('awb')}>Assign AWB</button></>}
+      {shipment.awb && <><button className="admin-btn" disabled={busy || !!shipment.error || shipment.providerCancelled || shipment.pickupScheduled} onClick={() => run('pickup')}>Schedule pickup</button><button className="admin-btn" disabled={busy || !!shipment.error || shipment.providerCancelled} onClick={() => run('label')}>Generate label</button><button className="admin-btn" disabled={busy || !!shipment.error || shipment.providerCancelled || !shipment.pickupScheduled} onClick={() => run('manifest')}>Generate manifest</button></>}
+      {shipment.providerOrderId && !shipment.providerCancelled && <button className="admin-btn admin-btn-danger" disabled={busy || !!shipment.error} onClick={() => run('cancel')}>Cancel Shiprocket shipment</button>}
+      <button className="admin-btn admin-btn-ghost" disabled={busy || !shipment.shipmentId} onClick={() => run('track')}>Refresh tracking</button></div>
+      <div className="admin-row-actions">{shipment.labelUrl && <a href={shipment.labelUrl} target="_blank" rel="noreferrer">Open shipping label ↗</a>}{shipment.manifestUrl && <a href={shipment.manifestUrl} target="_blank" rel="noreferrer">Open manifest ↗</a>}</div>
+      {shipment.tracking && <><p>Carrier status: {shipment.tracking.status} · Updated {new Date(shipment.tracking.updatedAt).toLocaleString()}</p><ol>{shipment.tracking.activities.map((item, i) => <li key={i}>{item.date} · {item.activity} · {item.location}</li>)}</ol></>}
+      <p className="admin-hint">AWB details populate the customer tracking link. Use Dispatch shipment when handing the parcel over; provider updates do not mark an order paid or change stock.</p>
+    </>}
+  </section>;
+}
