@@ -59,7 +59,17 @@ export class ProductsService {
       const ids = new Set(categories.filter(c => c.name === query.category).map(c => String(c._id)));
       let changed = true;
       while (changed) { changed = false; for (const c of categories) if (c.parentId && ids.has(String(c.parentId)) && !ids.has(String(c._id))) { ids.add(String(c._id)); names.add(c.name); changed = true; } }
-      clauses.push({ $or: [{ category: { $in: [...names] } }, { subCategory: { $in: [...names] } }] });
+      const categoryClause: FilterQuery<ProductDocument>[] = [{ category: { $in: [...names] } }, { subCategory: { $in: [...names] } }];
+      // Older catalogue records may have their parent category but no
+      // subCategory saved. Let a selected leaf category still find those
+      // products through its title, while preserving exact category matching
+      // for properly classified records.
+      const selectedCategory = categories.find(c => c.name === query.category);
+      if (selectedCategory?.parentId) {
+        const needle = query.category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        categoryClause.push({ title: { $regex: needle, $options: 'i' } });
+      }
+      clauses.push({ $or: categoryClause });
     }
     if (clauses.length) filter.$and = clauses;
     const sort: Record<string, 1 | -1> = query.sort === 'price_asc' ? { pricePaise: 1, _id: 1 } : query.sort === 'price_desc' ? { pricePaise: -1, _id: 1 } : { isFeatured: -1, _id: 1 };

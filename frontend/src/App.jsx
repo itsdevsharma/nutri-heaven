@@ -22,6 +22,17 @@ const homeShopImages = [
   ['cinnamon_ze0A.jpg', 'Whole Spices'],
 ];
 
+function categoryFamily(name, categories) {
+  const byId = new Map(categories.map(category => [String(category._id), category]));
+  let current = categories.find(category => category.name === name);
+  const seen = new Set();
+  while (current?.parentId && !seen.has(String(current._id))) {
+    seen.add(String(current._id));
+    current = byId.get(String(current.parentId));
+  }
+  return current?.name ?? name;
+}
+
 function Header({ count, cart }) {
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
@@ -84,6 +95,43 @@ function ProductModal({ product, close, add, whatsappNumber = '90172-25722' }) {
   return <div className="product-modal-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget) close();}}><section className="product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title"><button className="product-modal-close" onClick={close} aria-label="Close product details">×</button><div className="product-modal-media"><img className="product-modal-image" src={image(selectedImage)} alt={product.title}/>{gallery.length>1&&<div className="product-gallery" aria-label="Product images">{gallery.map(photo=><button className={photo===selectedImage?'active':''} key={photo} onClick={()=>setSelectedImage(photo)} aria-label={`Show product image ${gallery.indexOf(photo)+1}`}><img src={image(photo)} alt="" /></button>)}</div>}</div><div className="product-modal-info"><WishlistButton slug={product.slug} /><p className="product-category">{product.category}{product.brand ? ` · ${product.brand}` : ''}</p><h2 id="product-modal-title">{product.title}</h2><ProductDescription>{product.fullDescription || product.description}</ProductDescription>{product.sku && <p className="product-meta"><b>SKU</b> {product.sku}</p>}{product.tags?.length>0&&<p className="product-meta"><b>Details</b> {product.tags.join(' · ')}</p>}<div className="product-purchase"><label className="pack-select">Pack size<select value={size} onChange={e=>setSize(e.target.value)}>{variants.map(v=><option key={v.size} value={v.size}>{v.size} · {money(v.pricePaise)} · {v.stockQuantity>0?`${v.stockQuantity} available`:'Out of stock'}</option>)}</select></label><div className="product-price-row"><div className="product-modal-price"><b>{money(selected?.pricePaise ?? product.pricePaise)}</b>{selected?.mrpPaise>selected?.pricePaise&&<s>{money(selected.mrpPaise)}</s>}</div><span className={selected?.stockQuantity > 0 ? 'product-stock' : 'product-stock sold-out'}>{selected?.stockQuantity > 0 ? `${selected.stockQuantity} in stock` : 'Out of stock'}</span></div><div className="product-modal-actions"><button className="checkout-button" disabled={!selected || selected.stockQuantity<1} onClick={()=>{add(product.slug,size);close();}}>Add to bag <span aria-hidden="true">→</span></button><a className="whatsapp-order" href={`https://wa.me/${whatsAppPhone}?text=${encodeURIComponent(whatsAppMessage)}`} target="_blank" rel="noreferrer">WhatsApp</a></div></div><div className="product-policy-links"><a href="/shipping-policy" onClick={close}>Shipping policy</a><a href="/return-policy" onClick={close}>Returns & refunds</a></div><Reviews slug={product.slug} /></div></section></div>;
 }
 
+function RelatedProducts({ category, products, add }) {
+  if (!products.length) return null;
+  return <section className="product-related" aria-labelledby="related-products-title"><div className="product-related-heading"><div><p className="eyebrow">KEEP EXPLORING</p><h2 id="related-products-title">More from {category}</h2></div><a href={`/shop?category=${encodeURIComponent(category)}`}>View all {category} <span aria-hidden="true">&rarr;</span></a></div><div className="product-related-grid">{products.map(item => { const variant = (item.variants ?? []).find(entry => entry.isActive && entry.stockQuantity > 0); return <article key={item.slug}><a className="product-related-image" href={`/products/${encodeURIComponent(item.slug)}`}><img src={image(item.image)} alt={item.title} /></a><p>{item.category}</p><h3><a href={`/products/${encodeURIComponent(item.slug)}`}>{item.title}</a></h3><div><span>{money(variant?.pricePaise ?? item.pricePaise)}{variant?.size && <small> / {variant.size}</small>}</span><button disabled={!variant} onClick={() => add(item.slug, variant.size)}>{variant ? 'Add +' : 'Sold out'}</button></div></article>; })}</div></section>;
+}
+
+function OtherCategories({ categories, currentCategory }) {
+  const topLevel = categories.filter(category => !category.parentId && category.isActive !== false && category.name !== currentCategory);
+  if (!topLevel.length) return null;
+  return <section className="product-other-categories" aria-labelledby="other-categories-title"><div><p className="eyebrow">SHOP THE PANTRY</p><h2 id="other-categories-title">Explore other categories</h2></div><div>{topLevel.map(category => <a href={`/shop?category=${encodeURIComponent(category.name)}`} key={category._id || category.name}><span>{category.image ? <img src={image(category.image)} alt="" /> : <b aria-hidden="true">+</b>}</span><strong>{category.name}</strong><i aria-hidden="true">&rarr;</i></a>)}</div></section>;
+}
+
+function ProductLoadingState({ failed = false }) {
+  if (failed) return <main className="product-page"><section className="product-load-failed"><p className="eyebrow">PRODUCT UNAVAILABLE</p><h1>We could not load this product.</h1><p>Please check your connection and try again, or return to the full collection.</p><a href="/shop">Browse all products</a></section></main>;
+  return <main className="product-page" aria-busy="true" aria-label="Loading product"><div className="product-loading"><div className="product-loading-image" /><div className="product-loading-copy"><span /><span /><span /><span /></div></div></main>;
+}
+
+function ProductDetail({ product, add, buyNow, relatedProducts, familyCategory, categories }) {
+  const variants = (product.variants ?? []).filter(variant => variant.isActive);
+  const [size, setSize] = useState(variants.find(variant => variant.stockQuantity > 0)?.size ?? variants[0]?.size ?? '');
+  const [selectedImage, setSelectedImage] = useState(product.image);
+  const [quantity, setQuantity] = useState(1);
+  useEffect(() => {
+    setSize(variants.find(variant => variant.stockQuantity > 0)?.size ?? variants[0]?.size ?? '');
+    setSelectedImage(product.image);
+    setQuantity(1);
+  }, [product]);
+  const selected = variants.find(variant => variant.size === size);
+  const gallery = [...new Set([product.image, ...(product.images ?? []).map(entry => typeof entry === 'string' ? entry : entry?.url)].filter(Boolean))];
+  const available = Boolean(selected && selected.stockQuantity > 0);
+  const discount = selected?.mrpPaise > selected?.pricePaise ? Math.round((1 - selected.pricePaise / selected.mrpPaise) * 100) : 0;
+  const submit = async action => {
+    if (!available) return;
+    for (let index = 0; index < quantity; index += 1) await action(product.slug, size);
+  };
+  return <main className="product-page"><nav className="product-breadcrumbs" aria-label="Breadcrumb"><a href="/shop">Shop</a><span>/</span><a href={`/shop?category=${encodeURIComponent(familyCategory)}`}>{familyCategory}</a><span>/</span><b>{product.title}</b></nav><section className="product-commerce"><div className="product-media"><div className="product-thumbnails" aria-label="Product images">{gallery.map((photo, index) => <button type="button" className={photo === selectedImage ? 'active' : ''} key={photo} onClick={() => setSelectedImage(photo)} aria-label={`Show image ${index + 1}`}><img src={image(photo)} alt="" /></button>)}</div><div className="product-main-image"><img src={image(selectedImage)} alt={product.title} /></div></div><div className="product-summary"><div className="product-summary-top"><p className="product-brand">{product.brand || product.category}</p><WishlistButton slug={product.slug} /></div><h1>{product.title}</h1><a className="product-review-link" href="#product-reviews">Customer reviews <span aria-hidden="true">&darr;</span></a><ProductDescription>{product.fullDescription || product.description}</ProductDescription>{product.tags?.length > 0 && <p className="product-tags">{product.tags.join(' · ')}</p>}<div className="product-price"><b>{money(selected?.pricePaise ?? product.pricePaise)}</b>{selected?.mrpPaise > selected?.pricePaise && <><s>{money(selected.mrpPaise)}</s><em>Save {discount}%</em></>}</div><div className="product-divider" /><fieldset className="product-packs"><legend>Choose a pack <span>{selected?.stockQuantity > 0 ? `${selected.stockQuantity} available` : 'Out of stock'}</span></legend><div>{variants.map(variant => <button type="button" className={variant.size === size ? 'selected' : ''} disabled={variant.stockQuantity < 1} key={variant.size} onClick={() => setSize(variant.size)}><b>{variant.size}</b><small>{money(variant.pricePaise)}</small></button>)}</div></fieldset><div className="product-purchase-actions"><div className="product-quantity" aria-label="Quantity"><button type="button" disabled={quantity === 1} onClick={() => setQuantity(current => current - 1)} aria-label="Decrease quantity">&minus;</button><span>{quantity}</span><button type="button" disabled={!available} onClick={() => setQuantity(current => Math.min(current + 1, selected?.stockQuantity ?? 1))} aria-label="Increase quantity">+</button></div><button className="product-add-button" disabled={!available} onClick={() => submit(add)}>{available ? 'Add to bag' : 'Out of stock'}</button><button className="product-buy-button" disabled={!available} onClick={() => submit(buyNow)}>Buy now</button></div><div className="product-assurances"><span>Secure checkout</span><span>Free delivery above ₹5,000</span><a href="/return-policy">Easy returns</a></div><details className="product-details"><summary>Product details <span>+</span></summary><p>{product.sku ? `SKU: ${product.sku}` : 'Quality checked and packed to stay fresh. Store in a cool, dry place and reseal after opening.'}</p></details><details className="product-details"><summary>Shipping & returns <span>+</span></summary><p>Delivery options are shown at checkout. See our <a href="/shipping-policy">shipping policy</a> and <a href="/return-policy">returns policy</a>.</p></details><div id="product-reviews"><Reviews slug={product.slug} /></div></div></section><RelatedProducts category={familyCategory} products={relatedProducts} add={add} /><OtherCategories categories={categories} currentCategory={familyCategory} /></main>;
+}
+
 function ProductCard({ product, add, open }) {
   const variants = (product.variants ?? []).filter(v => v.isActive && v.stockQuantity > 0); const [size, setSize] = useState(variants[0]?.size ?? ''); const variant = variants.find(v => v.size === size);
   return <article className="shop-product"><WishlistButton slug={product.slug} /><button className="product-image-button" onClick={() => open(product)} aria-label={`View details for ${product.title}`}><img src={image(product.image)} alt={product.title} /></button><p className="product-category">{product.category}</p><h2><a className="product-title-link" href={"/products/"+encodeURIComponent(product.slug)}>{product.title}</a></h2><p className="product-description">{product.shortDescription || product.description}</p>{variants.length ? <label className="pack-select">Pack size <select value={size} onChange={e => setSize(e.target.value)}>{variants.map(v => <option key={v.size}>{v.size}</option>)}</select></label> : <p className="no-results">Out of stock</p>}<div className="shop-buy"><span>{money(variant?.pricePaise ?? product.pricePaise)}<small>{size && ` / ${size}`}</small></span><button disabled={!variant} onClick={() => add(product.slug, size)}>Add +</button></div></article>;
@@ -114,6 +162,7 @@ function Shop({ products, add, open, categories = [] }) {
   (children.get(null) ?? []).forEach(item => visitCategory(item));
   categoryRows.forEach(item => visitCategory(item));
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [mobileCategoryOpen, setMobileCategoryOpen] = useState(false);
   const categoryAncestors = [];
   const categoryBranches = cats.map((item, index) => {
     categoryAncestors.length = item.depth;
@@ -147,7 +196,7 @@ function Shop({ products, add, open, categories = [] }) {
   const view = result.items;
   const productCount = result.total || products.length;
   return <main className="shop-page"><section className="shop-banner" aria-labelledby="shop-banner-title"><div className="shop-banner-copy"><p className="eyebrow">THE PANTRY EDIT <span>·</span> CURATED FOR EVERYDAY</p><h1 id="shop-banner-title">Find your everyday<br /><em>favourite.</em></h1></div><div className="shop-banner-aside"><p>Live catalogue prices and availability.</p><span>{productCount} carefully chosen {productCount === 1 ? 'item' : 'items'}</span><button type="button" onClick={() => document.querySelector('.catalogue')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Browse collection <b aria-hidden="true">→</b></button></div></section><section className="catalogue"><aside className="shop-filters" aria-label="Browse product categories">
-        <label className="shop-category-mobile">Browse by<select value={category} onChange={event => selectCategory(event.target.value)}><option value="All products">All products</option>{cats.map(c => <option key={c.name} value={c.name}>{`${"— ".repeat(c.depth)}${c.name}`}</option>)}</select></label>
+        <div className="shop-category-mobile"><div className="shop-mobile-category-bar"><span>Browse by</span><button type="button" aria-expanded={mobileCategoryOpen} aria-controls="mobile-category-picker" onClick={() => setMobileCategoryOpen(current => !current)}><strong>{category}</strong><span aria-hidden="true">⌄</span></button></div>{mobileCategoryOpen && <div className="shop-mobile-category-picker" id="mobile-category-picker"><button type="button" className={`shop-mobile-all${category === 'All products' ? ' active' : ''}`} onClick={() => { selectCategory('All products'); setMobileCategoryOpen(false); }}>All products</button>{categoryBranches.filter(item => item.depth === 0).map(root => <section key={root.name} className={`shop-mobile-category-group${category === root.name ? ' active' : ''}`}><div className="shop-mobile-group-heading"><div><b>{root.name}</b><span>Category</span></div><button type="button" onClick={() => { selectCategory(root.name); setMobileCategoryOpen(false); }}>View all <span aria-hidden="true">→</span></button></div>{categoryBranches.some(item => item.depth > 0 && item.ancestors[0] === root.name) && <div className="shop-mobile-subcategories"><span>Choose an item</span><div>{categoryBranches.filter(item => item.depth > 0 && item.ancestors[0] === root.name).map(child => <button type="button" key={child.name} className={category === child.name ? 'active' : ''} onClick={() => { selectCategory(child.name); setMobileCategoryOpen(false); }}>{child.name}</button>)}</div></div>}</section>)}</div>}</div>
         <nav className="shop-category-nav" aria-label="Product categories">
           <p className="eyebrow">BROWSE BY</p>
           <button type="button" className={`shop-category-all${category === 'All products' ? ' active' : ''}`} aria-current={category === 'All products' ? 'true' : undefined} onClick={() => selectCategory('All products')}>All products<span aria-hidden="true">→</span></button>
@@ -240,12 +289,26 @@ function Checkout({ cart, busy, error, back, submit, paymentConfig }) {
 
 
 export default function App() {
-  const [products,setProducts] = useState([]), [cart,setCart] = useState(null), [drawer,setDrawer] = useState(false), [screen,setScreen] = useState(readPendingCheckout()?'checkout':'shop'), [order,setOrder] = useState(null), [detail,setDetail] = useState(null), [loading,setLoading] = useState(true), [busy,setBusy] = useState(false), [error,setError] = useState(''), [selectedProduct,setSelectedProduct] = useState(null), [storeSettings,setStoreSettings] = useState({}), [cms,setCms] = useState({}), [categories,setCategories] = useState([]);
+  const [products,setProducts] = useState([]), [cart,setCart] = useState(null), [drawer,setDrawer] = useState(false), [screen,setScreen] = useState(readPendingCheckout()?'checkout':'shop'), [order,setOrder] = useState(null), [detail,setDetail] = useState(null), [loading,setLoading] = useState(true), [busy,setBusy] = useState(false), [error,setError] = useState(''), [selectedProduct,setSelectedProduct] = useState(null), [productLoading,setProductLoading] = useState(() => /^\/products\//.test(location.pathname)), [storeSettings,setStoreSettings] = useState({}), [cms,setCms] = useState({}), [categories,setCategories] = useState([]);
   const [pendingPayment,setPendingPayment] = useState(readPendingCheckout), [paymentConfig,setPaymentConfig] = useState({enabled:false,loading:true});
   const persistPayment = value => { savePendingCheckout(value); setPendingPayment(value); };
   useEffect(() => { paymentsApi.config().then(config=>setPaymentConfig({...config,loading:false})).catch(()=>setPaymentConfig({enabled:false,loading:false})); }, []);
   const loadCart = async () => { const next = await cartApi.get(); setCart(next); return next; };
-  useEffect(() => { storefrontApi.listProducts().then(setProducts).catch(e => setError(e.message)).finally(() => setLoading(false)); storefrontApi.publicSettings().then(setStoreSettings).catch(()=>{}); storefrontApi.publicCms().then(setCms).catch(()=>{}); storefrontApi.listCategories().then(setCategories).catch(()=>{}); loadCart().catch(e => setError(e.message)); const match = location.pathname.match(/^\/products\/([^/]+)$/); if (match) storefrontApi.getProduct(match[1]).then(product=>setSelectedProduct(product)).catch(e => setError(e.message)); }, []);
+  useEffect(() => {
+    const loadCatalogue = () => storefrontApi.listProducts().then(setProducts).catch(e => setError(e.message)).finally(() => setLoading(false));
+    const loadProductSupport = () => { loadCatalogue(); storefrontApi.publicSettings().then(setStoreSettings).catch(() => {}); storefrontApi.listCategories().then(setCategories).catch(() => {}); loadCart().catch(e => setError(e.message)); };
+    const match = location.pathname.match(/^\/products\/([^/]+)$/);
+    if (match) {
+      setProductLoading(true);
+      storefrontApi.getProduct(match[1]).then(product => setSelectedProduct(product)).catch(e => setError(e.message)).finally(() => { setProductLoading(false); loadProductSupport(); });
+      return;
+    }
+    loadCatalogue();
+    storefrontApi.publicSettings().then(setStoreSettings).catch(() => {});
+    storefrontApi.publicCms().then(setCms).catch(() => {});
+    storefrontApi.listCategories().then(setCategories).catch(() => {});
+    loadCart().catch(e => setError(e.message));
+  }, []);
   useEffect(() => {
     initializeMetaPixel(storeSettings.metaPixel);
     if (selectedProduct && screen === 'shop') trackProductView(selectedProduct);
@@ -327,6 +390,9 @@ export default function App() {
   const policyRoutes = { '/shipping-policy':['Shipping policy','shippingPolicy'], '/return-policy':['Returns and refunds','returnPolicy'], '/privacy-policy':['Privacy policy','privacyPolicy'], '/terms':['Terms and conditions','terms'] };
   if (policyRoutes[location.pathname]) { const [title,key]=policyRoutes[location.pathname]; return <><Header count={count} cart={() => setDrawer(true)} /><main className="policy-page"><p className="eyebrow">NUTRI HEAVEN · CUSTOMER CARE</p><h1>{title}</h1><div>{storeSettings.content?.[key] || 'This information is being updated. Please contact nutriheavenhsr@gmail.com for assistance.'}</div></main><Footer settings={storeSettings} /></>; }
   const productPath = /^\/products\//.test(location.pathname);
+  const productFamily = selectedProduct ? categoryFamily(selectedProduct.category, categories) : '';
+  const productRelated = selectedProduct ? products.filter(item => item.slug !== selectedProduct.slug && categoryFamily(item.category, categories) === productFamily) : [];
+  if (productPath) return <><Header count={count} cart={() => setDrawer(true)} />{selectedProduct ? <><ProductDetail product={selectedProduct} familyCategory={productFamily} relatedProducts={productRelated} categories={categories} add={add} buyNow={async (slug, size) => { await add(slug, size); setDrawer(false); setScreen('checkout'); }} /><Footer settings={storeSettings} /></> : <ProductLoadingState failed={!productLoading && Boolean(error)} />}{drawer && <><button className="scrim" onClick={() => setDrawer(false)} aria-label="Close cart" /><CartDrawer data={cart} products={products} busy={busy} add={add} change={change} close={() => setDrawer(false)} checkout={() => { setDrawer(false); setScreen('checkout'); }} openProduct={slug => { setSelectedProduct(products.find(product => product.slug === slug)); setDrawer(false); }} /></>}</>;
   if (!productPath && !['/', '/shop'].includes(location.pathname)) return <><Header count={count} cart={() => setDrawer(true)} /><main className="policy-page"><h1>Page not found</h1><a href="/shop">Browse the shop</a></main><Footer settings={storeSettings} /></>;
   const shopPath = location.pathname === '/shop';
   return <><Header count={count} cart={() => setDrawer(true)} />{error && <p role="alert" className="no-results">{error}</p>}{productPath ? (selectedProduct ? <><main className="shop-page"><section className="product-detail"><img src={image(selectedProduct.image)} alt={selectedProduct.title} /><div><p className="eyebrow">{selectedProduct.category}</p><h1>{selectedProduct.title}</h1><p>{selectedProduct.fullDescription || selectedProduct.description}</p><ProductCard product={selectedProduct} add={add} open={setSelectedProduct} /></div></section></main><Footer settings={storeSettings} /></> : <><p>Loading product…</p><Footer settings={storeSettings} /></>) : shopPath ? <><Shop products={products} loading={loading} add={add} open={setSelectedProduct} categories={categories} /><Footer settings={storeSettings} /></> : <Home products={products} loading={loading} add={add} open={setSelectedProduct} settings={storeSettings} cms={cms} categories={categories} />}{drawer && <><button className="scrim" onClick={() => setDrawer(false)} aria-label="Close cart" /><CartDrawer data={cart} products={products} busy={busy} add={add} change={change} close={() => setDrawer(false)} checkout={() => { setDrawer(false); setScreen('checkout'); }} openProduct={slug=>{setSelectedProduct(products.find(p=>p.slug===slug));setDrawer(false);}} /></>}{selectedProduct && !productPath && <ProductModal product={selectedProduct} close={()=>setSelectedProduct(null)} add={add} whatsappNumber={storeSettings.whatsappNumber} />}</>;

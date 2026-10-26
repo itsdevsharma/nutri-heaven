@@ -37,7 +37,19 @@ export const cartApi = {
 export const storefrontApi = {
   browse: params => request(`/products/browse?${new URLSearchParams(params)}`),
   listProducts: (limit = 50, offset = 0) => request(`/products?limit=${limit}&offset=${offset}`),
-  getProduct: (slug) => request(`/products/${encodeURIComponent(slug)}`),
+  getProduct: async (slug) => {
+    const key = `nutri-product:${slug}`;
+    try {
+      const cached = sessionStorage.getItem(key);
+      if (cached) {
+        const entry = JSON.parse(cached);
+        if (entry?.expiresAt > Date.now() && entry.product) return entry.product;
+      }
+    } catch { /* A blocked or full browser storage must never block shopping. */ }
+    const product = await request(`/products/${encodeURIComponent(slug)}`);
+    try { sessionStorage.setItem(key, JSON.stringify({ product, expiresAt: Date.now() + 60_000 })); } catch { /* Cache is optional. */ }
+    return product;
+  },
   listCategories: () => request('/categories'),
   quote: (lines) => request('/products/quote', { method: 'POST', body: JSON.stringify({ lines }) }),
   quoteCoupon: (code, lines, email) => request('/coupons/quote', { method: 'POST', body: JSON.stringify({ code, lines, email }) }),

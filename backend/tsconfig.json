@@ -22,6 +22,7 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "verbatimModuleSyntax": false,
+    "rootDir": "src",
     "outDir": "dist",
     "allowJs": false,
     "isolatedModules": true

@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Customer, CustomerDocument } from './customer.schema';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { verifyWithRotatedJwtSecret } from '../auth/jwt-secret';
 
 @Injectable()
 export class CustomerAuthGuard implements CanActivate {
@@ -13,7 +14,7 @@ export class CustomerAuthGuard implements CanActivate {
     const token = request.headers.authorization?.replace(/^Bearer\s+/i, '');
     if (!token) throw new UnauthorizedException('Customer sign-in is required');
     try {
-      const payload = await this.jwt.verifyAsync<{ sub: string; email: string; type: string; version?: number }>(token);
+      const payload = await verifyWithRotatedJwtSecret<{ sub: string; email: string; type: string; version?: number }>(this.jwt, token);
       if (payload.type !== 'customer' || !payload.sub || !payload.email) throw new Error('wrong token type');
       const customer = await this.customers.findById(payload.sub).lean().exec();
       if (!customer || !customer.isActive || (customer.authVersion ?? 0) !== (payload.version ?? 0)) throw new Error('revoked');

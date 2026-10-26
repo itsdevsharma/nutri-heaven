@@ -1,2 +1,8 @@
 allowBuilds:
   mongodb-memory-server: true
+minimumReleaseAgeExclude:
+  - follow-redirects@1.16.2
+overrides:
+  body-parser: 2.4.0
+  follow-redirects: 1.16.2
+  multer: 2.5.0

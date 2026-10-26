@@ -663,3 +663,163 @@
 .admin-guide-locations table { min-width: 0; width: 100%; }
 .admin-guide-locations tbody th { width: 30%; text-align: left; font: 600 13px/1.6 Manrope, Arial, sans-serif; text-transform: none; letter-spacing: normal; background: #f6f2e6; }
 .admin-guide-locations td { font-size: 13px; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
+
+/* --------------------------------------------------------------------------
+   Shared product polish
+   A final, deliberately shared refinement pass.  It keeps each module's
+   existing layout and specialised controls intact, while making the common
+   dashboard language easier to scan and use across catalogue, operations,
+   marketing and CMS screens.
+   ----------------------------------------------------------------------- */
+.admin-shell {
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(9, 41, 31, 0.04), 0 12px 28px -22px rgba(9, 41, 31, 0.36);
+  background: #f3f1eb;
+}
+
+.admin-main { padding-bottom: 52px; }
+.admin-content { gap: 22px; }
+.admin-page-head { padding: 4px 0 2px; }
+.admin-page-description { font-size: 13px; line-height: 1.65; }
+
+.admin-sidebar { padding: 18px 14px; box-shadow: 16px 0 30px -28px rgba(3, 25, 18, 0.85); }
+.admin-brand { padding: 6px 6px 17px; }
+.admin-nav { gap: 20px; }
+.admin-nav-heading { margin-bottom: 7px; }
+.admin-nav-link {
+  min-height: 39px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+.admin-nav-link:hover { background: rgba(255, 255, 255, 0.09); transform: translateX(2px); }
+.admin-nav-link-active {
+  background: #d8e759;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 5px 14px -10px #000;
+}
+.admin-nav-link-active:hover { background: #e2ee78; }
+.admin-nav-icon { width: 18px; opacity: 0.9; }
+
+.admin-topbar {
+  min-height: 58px;
+  background: rgba(255, 253, 247, 0.9);
+  box-shadow: 0 6px 18px -22px rgba(9, 41, 31, 0.5);
+}
+.admin-api-chip { padding: 5px 10px; background: var(--surface); }
+
+.admin-card,
+.admin-fieldset,
+.admin-stat,
+.admin-preview,
+.admin-editor-savebar {
+  border-color: rgba(117, 111, 91, 0.22);
+}
+.admin-card { box-shadow: var(--shadow); }
+.admin-card-head { padding: 17px 20px; background: rgba(255, 253, 247, 0.72); }
+.admin-card-body { padding: 20px; }
+.admin-card-tight > .admin-card-body > .admin-toolbar { padding: 15px 18px; }
+.admin-stat {
+  position: relative;
+  overflow: hidden;
+  padding: 17px;
+}
+.admin-stat::after {
+  content: '';
+  position: absolute;
+  inset: auto -18px -24px auto;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: rgba(21, 63, 47, 0.035);
+}
+.admin-stat-value { letter-spacing: -0.035em; }
+
+.admin-btn {
+  min-height: 36px;
+  border-radius: 9px;
+  padding: 8px 14px;
+  background: var(--surface-alt);
+  border-color: var(--line);
+  color: var(--dark);
+  box-shadow: 0 1px 1px rgba(9, 41, 31, 0.04);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+.admin-btn-primary:hover:not(:disabled) { box-shadow: 0 7px 14px -10px rgba(9, 41, 31, 0.8); transform: translateY(-1px); }
+.admin-btn-ghost { background: var(--surface); }
+.admin-btn-ghost:hover:not(:disabled) { background: #f5f8ed; }
+.admin-btn-small { min-height: 29px; padding: 4px 10px; }
+.admin-icon-btn { transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease; }
+.admin-icon-btn:hover:not(:disabled) { background: #f5f8ed; }
+
+.admin-input,
+.store-content-field textarea,
+.store-content-field input {
+  min-height: 39px;
+  border-color: rgba(117, 111, 91, 0.3);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+.admin-input::placeholder { color: #8b928a; opacity: 1; }
+.admin-input:hover:not(:disabled) { border-color: #afaa99; }
+.admin-input:focus,
+.store-content-field textarea:focus,
+.store-content-field input:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(21, 63, 47, 0.13);
+}
+.admin-field { gap: 7px; }
+.admin-field-label { font-size: 12px; }
+.admin-field-hint { line-height: 1.55; }
+.admin-check { padding: 10px 11px; border: 1px solid transparent; border-radius: var(--radius-sm); }
+.admin-check:hover { background: var(--surface-alt); border-color: rgba(117, 111, 91, 0.16); }
+.admin-fieldset-head { padding: 16px 18px; }
+
+.admin-table th { padding-block: 12px; }
+.admin-table td { padding-block: 14px; }
+.admin-table tbody tr { transition: background-color 140ms ease; }
+.admin-table tbody tr:hover { background: rgba(21, 63, 47, 0.045); }
+.admin-table td.admin-align-right,
+.admin-table th.admin-align-right { font-variant-numeric: tabular-nums; }
+.admin-table-wrap { scrollbar-color: #b6b2a4 transparent; }
+
+.admin-stack-tight > .admin-row-actions {
+  padding: 13px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-stack-tight > .admin-row-actions:last-child { border-bottom: 0; }
+
+.admin-pill { font-weight: 700; }
+.admin-alert,
+.admin-error { box-shadow: 0 5px 14px -16px rgba(9, 41, 31, 0.6); }
+.admin-empty { padding-block: 48px; }
+.admin-empty-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--surface-alt); font-size: 21px; }
+
+.admin-shell :is(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid rgba(216, 231, 89, 0.9);
+  outline-offset: 2px;
+}
+.admin-shell .admin-input:focus-visible,
+.admin-shell .store-content-field :is(input, textarea):focus-visible { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell *, .admin-shell *::before, .admin-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-main { padding-top: 18px; }
+  .admin-content { gap: 18px; }
+  .admin-page-head { align-items: stretch; gap: 14px; }
+  .admin-page-actions { width: 100%; }
+  .admin-page-actions .admin-btn { flex: 1 1 auto; }
+  .admin-card-head, .admin-card-body { padding-left: 16px; padding-right: 16px; }
+  .admin-stat { padding: 15px; }
+  .admin-toolbar > .admin-input,
+  .admin-toolbar > .admin-field { flex: 1 1 100%; }
+}
