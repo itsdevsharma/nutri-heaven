@@ -12,6 +12,8 @@ export const ShippingConfigurationSchema = SchemaFactory.createForClass(Shipping
 @Schema({ timestamps: true, collection: 'shiprocket_shipments' })
 export class ShiprocketShipment {
   @Prop({ required: true, unique: true }) orderId!: string;
+  @Prop() originalOrderId?: string;
+  @Prop() providerReference?: string;
   @Prop() providerOrderId?: number;
   @Prop() shipmentId?: number;
   @Prop() awb?: string;

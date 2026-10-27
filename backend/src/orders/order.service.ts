@@ -219,6 +219,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
       const op = { ...operationsFor(order) };
       const before = { ...op };
       switch (action) {
+        case 'verify': op.fulfillment = 'ready_to_dispatch'; order.status = 'packed'; break;
         case 'accept': op.fulfillment = 'accepted'; order.status = 'confirmed'; break;
         case 'pick': op.fulfillment = 'picking'; break;
         case 'pack': op.fulfillment = 'packed'; order.status = 'packed'; break;

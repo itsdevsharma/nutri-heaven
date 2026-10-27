@@ -7,6 +7,7 @@ import { AdminAuthGuard, type AdminRequest } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from '../admin/admin.schema';
+import { OrderModule } from '../orders/order.module';
 import { Order, OrderSchema } from '../orders/order.schema';
 import { ShiprocketClient } from './shiprocket.client';
 import { ShippingService } from './shipping.service';
@@ -22,7 +23,7 @@ export class ShippingController {
   configure(@Body() dto: ShippingConfigurationDto, @Req() req: AdminRequest) { return this.shipping.configure(dto, req.admin!.sub); }
   @Get('pickup-locations') pickups() { return this.shipping.pickups(); }
   @Get('orders/:id') get(@Param('id') id: string) { return this.shipping.get(id); }
-  @Post('orders/:id/:action') action(@Param('id') id: string, @Param('action') action: string, @Body() dto: ShiprocketActionDto, @Req() req: AdminRequest) { return this.shipping.action(id, action, dto, req.admin!.sub); }
+  @Post('orders/:id/:action') action(@Param('id') id: string, @Param('action') action: string, @Body() dto: ShiprocketActionDto, @Req() req: AdminRequest) { return action === 'verify-and-ship' ? this.shipping.verifyAndShip(id, dto, req.admin!.email, req.admin!.role) : this.shipping.action(id, action, dto, req.admin!.sub); }
 }
-@Module({ imports: [AuthModule, AdminModule, AuditModule, MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }, { name: ShippingConfiguration.name, schema: ShippingConfigurationSchema }, { name: ShiprocketShipment.name, schema: ShiprocketShipmentSchema }])], controllers: [ShippingController], providers: [ShiprocketClient, ShippingService] })
+@Module({ imports: [OrderModule, AuthModule, AdminModule, AuditModule, MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }, { name: ShippingConfiguration.name, schema: ShippingConfigurationSchema }, { name: ShiprocketShipment.name, schema: ShiprocketShipmentSchema }])], controllers: [ShippingController], providers: [ShiprocketClient, ShippingService] })
 export class ShippingModule {}

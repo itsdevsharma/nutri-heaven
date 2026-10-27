@@ -1,6 +1,6 @@
 import type { Order } from './order.schema';
 
-export const ORDER_ACTIONS = ['accept', 'pick', 'pack', 'ready', 'dispatch', 'out_for_delivery', 'deliver', 'approve_return', 'reject_return', 'receive_return', 'inspect_return', 'record_cod_collection', 'record_cod_settlement', 'record_cod_refund'] as const;
+export const ORDER_ACTIONS = ['verify', 'accept', 'pick', 'pack', 'ready', 'dispatch', 'out_for_delivery', 'deliver', 'approve_return', 'reject_return', 'receive_return', 'inspect_return', 'record_cod_collection', 'record_cod_settlement', 'record_cod_refund'] as const;
 export type OrderAction = typeof ORDER_ACTIONS[number];
 export interface OrderOperations {
   fulfillment: 'unaccepted' | 'accepted' | 'picking' | 'packed' | 'ready_to_dispatch' | 'dispatched' | 'completed' | 'cancelled';
@@ -34,6 +34,7 @@ export function allowedOrderActions(order: Order, role: string): OrderAction[] {
     const next = { unaccepted: 'accept', accepted: 'pick', picking: 'pack', packed: 'ready', ready_to_dispatch: 'dispatch' } as const;
     const action = next[op.fulfillment as keyof typeof next];
     if (action) actions.push(action);
+    if (['unaccepted', 'accepted', 'picking', 'packed'].includes(op.fulfillment)) actions.push('verify');
   }
   if (!order.paymentReconciliationRequired && order.status === 'shipped') actions.push('out_for_delivery');
   if (!order.paymentReconciliationRequired && order.status === 'out_for_delivery') actions.push('deliver');

@@ -3,7 +3,7 @@
   "$collection": "@nestjs/cli",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true,
+    "deleteOutDir": false,
     "assets": [],
     "watchAssets": false
   }

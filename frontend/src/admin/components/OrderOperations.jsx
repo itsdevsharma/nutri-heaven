@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FormField, FormGrid } from './FormField.jsx';
 import { formatPaise, formatDateTime } from '../lib/format.js';
-const labels = { accept: 'Accept order', pick: 'Start picking', pack: 'Mark packed', ready: 'Ready to dispatch', dispatch: 'Dispatch shipment', out_for_delivery: 'Out for delivery', deliver: 'Confirm delivery', approve_return: 'Approve return', reject_return: 'Reject return', receive_return: 'Receive return', inspect_return: 'Complete inspection', record_cod_collection: 'Record cash collection', record_cod_refund: 'Record completed COD refund', record_cod_settlement: 'Record courier remittance' };
+const labels = { verify: 'Verify packed order', accept: 'Accept order', pick: 'Start picking', pack: 'Mark packed', ready: 'Ready to dispatch', dispatch: 'Dispatch shipment', out_for_delivery: 'Out for delivery', deliver: 'Confirm delivery', approve_return: 'Approve return', reject_return: 'Reject return', receive_return: 'Receive return', inspect_return: 'Complete inspection', record_cod_collection: 'Record cash collection', record_cod_refund: 'Record completed COD refund', record_cod_settlement: 'Record courier remittance' };
 const display = value => String(value || '—').replaceAll('_', ' ');
 export default function OrderOperations({ order, busy, runAction }) {
   const [action, setAction] = useState('');
