@@ -1,3 +1,4 @@
+import { CheckoutModule } from '../checkout/checkout.module';
 import { OrderOutbox, OrderOutboxSchema } from './order-outbox.schema';
 import { OptionalCustomerAuthGuard } from '../customers/optional-customer-auth.guard';
 import { Customer, CustomerSchema } from '../customers/customer.schema';
@@ -15,7 +16,7 @@ import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
-    EngagementModule,
+    EngagementModule, CheckoutModule,
     AuthModule,
     AdminModule,
     ProductsModule,

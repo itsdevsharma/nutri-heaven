@@ -78,6 +78,23 @@ export class ProductsService {
     return { items, total, limit, offset };
   }
 
+  /** Catalogue callers may submit data fields, never MongoDB paths or operators. */
+  private validateCatalogueInput(input: Partial<Product>) {
+    const fields = new Set('slug title sku barcode description shortDescription fullDescription pricePaise mrpPaise discountBasisPoints image images category subCategory brand variants tags status isFeatured isBestseller isNewArrival seoTitle seoDescription isActive'.split(' '));
+    const variantFields = new Set('_id size pricePaise mrpPaise sku barcode stockQuantity lowStockLimit lengthCm breadthCm heightCm weightGrams taxBasisPoints images isActive'.split(' '));
+    const check = (value: unknown, allowed: Set<string>) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new BadRequestException('Expected a catalogue object');
+      for (const key of Object.keys(value)) {
+        if (!allowed.has(key)) throw new BadRequestException(`Unsupported catalogue field: ${key}`);
+      }
+    };
+    check(input, fields);
+    if (input.variants !== undefined) {
+      if (!Array.isArray(input.variants)) throw new BadRequestException('Variants must be an array');
+      input.variants.forEach(variant => check(variant, variantFields));
+    }
+  }
+
   private async validateCommerce(input: Partial<Product>, exceptSlug?: string) {
     if (input.pricePaise !== undefined && (!Number.isInteger(input.pricePaise) || input.pricePaise <= 0)) throw new BadRequestException('Selling price must be a positive integer amount in paise');
     if (input.mrpPaise !== undefined && input.pricePaise !== undefined && input.mrpPaise < input.pricePaise) throw new BadRequestException('MRP cannot be below selling price');
@@ -201,20 +218,22 @@ export class ProductsService {
    * contract in one place.
    */
   async adminUpdate(slug: string, changes: Partial<Product>, actor?: AuditActor): Promise<Product> {
+    this.validateCatalogueInput(changes);
+    if (changes.slug !== undefined && changes.slug !== slug) throw new BadRequestException('Product slug cannot change because inventory and orders reference it');
+    const current = await this.products.findOne({ slug }).lean().exec();
+    if (!current) throw new NotFoundException(`No product found for slug "${slug}"`);
     if (changes.variants) {
-      const current = await this.products.findOne({ slug }).lean().exec();
-      if (!current) throw new NotFoundException(`No product found for slug "${slug}"`);
-      const existing = new Map(((current.variants ?? []) as Array<{ size: string; stockQuantity?: number }>).map((variant) => [variant.size, variant.stockQuantity]));
+      const existing = new Map(((current.variants ?? []) as Array<{ size: string; stockQuantity?: number }>).map((variant) => [variant.size, variant.stockQuantity ?? 0]));
       const submittedSizes = new Set((changes.variants as Array<Record<string, unknown>>).map((variant) => String(variant.size ?? '')));
       for (const size of existing.keys()) {
         if (!submittedSizes.has(size)) throw new BadRequestException('Existing pack sizes cannot be removed through product editing; deactivate the pack after its stock is adjusted to zero');
       }
       for (const variant of changes.variants as Array<Record<string, unknown>>) {
         const stored = existing.get(String(variant.size ?? ''));
-        if (stored !== undefined && Number(variant.stockQuantity) !== Number(stored)) {
+        if (stored !== undefined && Number(variant.stockQuantity ?? 0) !== Number(stored)) {
           throw new BadRequestException('Variant stock can only be changed through the inventory adjustment API');
         }
-        if (stored === undefined && Number(variant.stockQuantity) !== 0) {
+        if (stored === undefined && Number(variant.stockQuantity ?? 0) !== 0) {
           throw new BadRequestException('New pack sizes must start at zero stock and be filled through the inventory adjustment API');
         }
       }
@@ -222,21 +241,25 @@ export class ProductsService {
     // Lifecycle state is authoritative. Callers cannot create a contradictory
     // `active` product that carries `isActive: false` (or vice versa).
     const normalizedChanges: Partial<Product> = changes.status ? { ...changes, isActive: changes.status === 'active' } : changes;
-    const current = await this.products.findOne({ slug }).lean().exec();
-    if (!current) throw new NotFoundException(`No product found for slug "${slug}"`);
     const merged = { ...current, ...normalizedChanges } as Partial<Product>;
     if (merged.status === 'active') this.assertPublishable(merged);
     await this.validateCommerce(changes, slug);
+    // Replacing packs must not overwrite a stock adjustment made after the read.
+    const filter = changes.variants ? { slug, variants: current.variants ?? [] } : { slug };
     const product = await this.products
-      .findOneAndUpdate({ slug }, { $set: normalizedChanges }, { new: true, runValidators: true })
+      .findOneAndUpdate(filter, { $set: normalizedChanges }, { new: true, runValidators: true })
       .lean()
       .exec();
-    if (!product) throw new NotFoundException(`No product found for slug "${slug}"`);
+    if (!product) throw new ConflictException('Product changed while saving. Reload and try again.');
     await this.audit.record({ action: 'product.updated', entityType: 'product', entityId: String(product._id), actorId: actor?.sub, actorEmail: actor?.email, correlationId: crypto.randomUUID(), before: current as unknown as Record<string, unknown>, after: product as unknown as Record<string, unknown> });
     return this.normalizeImages(product);
   }
 
   async adminCreate(input: Partial<Product>, actor?: AuditActor): Promise<Product> {
+    this.validateCatalogueInput(input);
+    for (const variant of input.variants ?? []) {
+      if (Number(variant.stockQuantity ?? 0) !== 0) throw new BadRequestException('New pack sizes must start at zero stock; use Inventory to add stock');
+    }
     const slug = input.slug?.trim().toLowerCase();
     if (!slug || !input.title || !input.description || !input.image || !input.category || input.pricePaise === undefined) {
       throw new ConflictException('slug, title, description, image, category and pricePaise are required');
@@ -258,7 +281,7 @@ export class ProductsService {
       images: original.images, category: original.category, subCategory: original.subCategory,
       brand: original.brand, tags: original.tags, discountBasisPoints: original.discountBasisPoints,
       seoTitle: original.seoTitle, seoDescription: original.seoDescription, status: 'draft', isActive: false,
-      variants: original.variants.map(variant => ({ ...variant, sku: undefined })),
+      variants: original.variants.map(variant => ({ ...variant, sku: undefined, stockQuantity: 0 })),
     });
   }
 
@@ -305,7 +328,11 @@ export class ProductsService {
 
   async exportCsv(filters: Parameters<ProductsService['adminList']>[0]) {
     const { items } = await this.adminList({ ...filters, limit: 500 });
-    const quote = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const quote = (value: unknown) => {
+      const text = String(value ?? '');
+      const literal = /^[\s\u0000-\u001f]*[=+@-]/.test(text) ? `'${text}` : text;
+      return `"${literal.replace(/"/g, '""')}"`;
+    };
     return ['slug,title,description,category,subCategory,pricePaise,mrpPaise,status,tags,image', ...items.map((p) => [p.slug,p.title,p.description,p.category,p.subCategory,p.pricePaise,p.mrpPaise,p.status,(p.tags ?? []).join('|'),p.image].map(quote).join(','))].join('\n');
   }
 

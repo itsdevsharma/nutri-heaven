@@ -1,5 +1,5 @@
-import { IsString, IsEmail, MinLength, IsNotEmpty, ValidateNested, IsOptional, IsArray, IsIn, Min, IsEnum, Matches, IsInt, ArrayMinSize, MaxLength, IsUUID } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsEmail, MinLength, IsNotEmpty, ValidateNested, IsOptional, IsArray, IsIn, Min, IsEnum, Matches, IsInt, ArrayMinSize, MaxLength, IsUUID, Max, ArrayMaxSize, IsDefined } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import type { OrderStatus } from './order.schema';
 
 export class OrderLineDto {
@@ -11,20 +11,27 @@ export class OrderLineDto {
 
   @IsInt()
   @Min(1)
+  @Max(99)
   quantity!: number;
 }
 
 export class OrderAddressDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @MaxLength(500)
   street!: string;
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @MaxLength(100)
   city!: string;
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @MaxLength(100)
   state!: string;
 
   @IsOptional()
@@ -38,6 +45,8 @@ export class OrderAddressDto {
 }
 
 export class OrderCreateDto {
+  @IsOptional() @IsUUID() shippingQuoteId?: string;
+  @IsOptional() @IsInt() @Min(1) courierId?: number;
   @IsString()
   @IsNotEmpty()
   cartId!: string;
@@ -53,12 +62,14 @@ export class OrderCreateDto {
   @Matches(/^\d{10}$/)
   customerPhone!: string;
 
+  @IsDefined()
   @ValidateNested()
   @Type(() => OrderAddressDto)
   deliveryAddress!: OrderAddressDto;
 
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => OrderLineDto)
   lines!: OrderLineDto[];

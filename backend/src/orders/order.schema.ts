@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import type { ShippingSnapshot } from '../checkout/checkout.schema';
 import type { OrderOperations } from './order-workflow';
 
 export type OrderStatus = 'pending' | 'confirmed' | 'packed' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'return_requested' | 'returned' | 'refunded';
@@ -16,6 +17,13 @@ export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
  */
 @Schema({ collection: 'orders', timestamps: true })
 export class Order {
+  @Prop({ type: Object }) shippingQuote?: ShippingSnapshot;
+  @Prop({ default: 'INR' }) currency!: string;
+  @Prop({ default: 0, min: 0 }) taxPaise!: number;
+  @Prop() paymentCreationStartedAt?: Date;
+  @Prop() nextShippingAttemptAt?: Date;
+  @Prop() shippingReviewReason?: string;
+  @Prop() checkoutFingerprint?: string;
   @Prop({ index: true }) customerId?: string;
 
   @Prop({ required: true, unique: true, trim: true })

@@ -8,6 +8,8 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Admin, AdminRole } from '../src/admin/admin.schema';
 import { Product } from '../src/products/product.schema';
+import { enqueueOrderNotification } from '../src/orders/order-outbox.schema';
+import { OrderService } from '../src/orders/order.service';
 import { Order } from '../src/orders/order.schema';
 import { CustomerNotification } from '../src/engagement/engagement.schema';
 import { NotificationService } from '../src/engagement/notification.service';
@@ -59,6 +61,38 @@ describe('Website completion audit', () => {
     const read = await request(app.getHttpServer()).get('/customer/me/notifications').set(auth(customerToken)).expect(200);
     expect(read.body[0].readAt).toBeDefined(); expect(read.body[0].email).toBeUndefined();
   });
+  it('does not link guest or legacy notifications when an email is claimed at signup', async () => {
+    const notifications = app.get(NotificationService);
+    const model = app.get<Model<CustomerNotification>>(getModelToken(CustomerNotification.name));
+    await notifications.add('guest@example.com', 'Private guest order', 'Order GUEST-123 is paid', 'guest-order-test', true);
+    const guest = await model.findOne({ eventKey: 'guest-order-test' });
+    const signup = await request(app.getHttpServer()).post('/customer/auth/signup').send({ name: 'Unverified claimant', email: 'guest@example.com', password }).expect(201);
+    const session = auth(signup.body.accessToken);
+    const inbox = await request(app.getHttpServer()).get('/customer/me/notifications').set(session).expect(200);
+    expect(inbox.body.map((item: { title: string }) => item.title)).toEqual(['Welcome to Nutri Heaven']);
+    await request(app.getHttpServer()).patch(`/customer/me/notifications/${guest!._id}/read`).set(session).expect(404);
+    expect((await model.findById(guest!._id))?.readAt).toBeUndefined();
+    // Same email with another account ID must also remain inaccessible.
+    await notifications.add('guest@example.com', 'Another account', 'Private', 'other-account-test', false, 'another-customer-id');
+    const again = await request(app.getHttpServer()).get('/customer/me/notifications').set(session).expect(200);
+    expect(again.body).toHaveLength(1);
+    // Avoid changing the reporting fixture's customer count.
+    await app.get<Model<any>>(getModelToken('Customer')).deleteOne({ _id: signup.body.customer.id });
+  });
+
+  it('delivers order inbox entries to the order customer ID only', async () => {
+    const me = await request(app.getHttpServer()).get('/customer/me').set(auth(customerToken)).expect(200);
+    const orders = app.get<Model<Order>>(getModelToken(Order.name));
+    const order = await orders.findOne({ id: 'AUDIT-CONFIRMED' }).lean();
+    await enqueueOrderNotification(app.get(getModelToken('OrderOutbox')), order!, undefined as any);
+    await app.get(OrderService).deliverOutbox();
+    const inbox = await request(app.getHttpServer()).get('/customer/me/notifications').set(auth(customerToken)).expect(200);
+    expect(inbox.body.some((item: { title: string }) => item.title.includes('AUDIT-CONFIRMED'))).toBe(true);
+    const item = await app.get<Model<CustomerNotification>>(getModelToken(CustomerNotification.name)).findOne({ title: /AUDIT-CONFIRMED/ });
+    expect(item?.customerId).toBe(me.body.id);
+    await request(app.getHttpServer()).patch(`/customer/me/notifications/${item!._id}/read`).set(auth(otherToken)).expect(404);
+  });
+
   it('requires newsletter consent, confirmation and token ownership', async () => {
     await request(app.getHttpServer()).post('/newsletter/subscribe').send({ email: 'newsletter@example.com', consent: false }).expect(400);
     const joined = await request(app.getHttpServer()).post('/newsletter/subscribe').send({ email: 'newsletter@example.com', consent: true }).expect(201);

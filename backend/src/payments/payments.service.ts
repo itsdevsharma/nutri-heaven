@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, BadRequestException, ForbiddenException, Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PaymentWebhookEvent, PaymentWebhookEventDocument } from './webhook-event.schema';
@@ -65,11 +65,24 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (order.paymentStatus === 'failed') order = await this.orders.prepareRazorpayRetry(orderId);
     if (order.paymentStatus !== 'pending') throw new BadRequestException('This order can no longer be paid');
     if (!Number.isInteger(order.totalPaise) || order.totalPaise < 100) throw new BadRequestException('Online payments require an order total of at least ₹1. Choose cash on delivery for this order.');
+    await this.orders.validatePaymentCheckout(order);
     if (!order.razorpayOrderId) {
-      let remote;
-      try { remote = await client.orders.create({ amount: order.totalPaise, currency: 'INR', receipt: order.id, notes: { orderId: order.id } }); }
-      catch { throw new ServiceUnavailableException('Could not start online payment. Retry your saved checkout or cancel the unpaid order.'); }
-      order = await this.orders.attachRazorpayOrder(order.id, remote.id);
+      if (!await this.orders.claimPaymentCreation(order.id)) {
+        // A previous request may have reached Razorpay before our process stopped.
+        // Search the receipt; never blindly issue a second provider order.
+        let matches;
+        try { matches = await client.orders.all({ receipt: order.id, count: 2 }); }
+        catch { throw new ServiceUnavailableException('Could not reconcile payment creation. Check payment status before retrying.'); }
+        const found = matches.items.filter(item => item.receipt === order.id);
+        const recovered = found[0];
+        if (found.length !== 1 || !recovered || Number(recovered.amount) !== order.totalPaise || recovered.currency !== 'INR') throw new ConflictException('Payment creation is in progress or needs reconciliation. Check payment status before retrying.');
+        order = await this.orders.attachRazorpayOrder(order.id, recovered.id);
+      } else {
+        let remote;
+        try { remote = await client.orders.create({ amount: order.totalPaise, currency: 'INR', receipt: order.id, notes: { orderId: order.id } }); }
+        catch { throw new ServiceUnavailableException('Could not start online payment. Retry your saved checkout or cancel the unpaid order.'); }
+        order = await this.orders.attachRazorpayOrder(order.id, remote.id);
+      }
     }
     if (!order.razorpayOrderId || order.status !== 'pending' || order.paymentStatus !== 'pending') throw new BadRequestException('This order can no longer be paid');
     return { keyId: process.env.RAZORPAY_KEY_ID, orderId: order.id, razorpayOrderId: order.razorpayOrderId, amount: order.totalPaise, currency: 'INR' };
@@ -179,7 +192,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (!payment?.order_id) return { received: true, ignored: true };
     if (event.event === 'payment.captured') {
       if (!payment.id || !Number.isInteger(payment.amount) || payment.currency !== 'INR') throw new BadRequestException('Captured payment is missing valid payment details');
-      await this.orders.captureRazorpayPayment(payment.order_id, payment.id, payment.amount, payment.currency);
+      await this.orders.captureRazorpayPayment(payment.order_id, payment.id, Number(payment.amount), payment.currency!);
     }
     if (event.event === 'payment.failed') await this.orders.failRazorpayPayment(payment.order_id);
     return { received: true };

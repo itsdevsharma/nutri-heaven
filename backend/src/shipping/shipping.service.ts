@@ -1,3 +1,4 @@
+import { CheckoutService } from '../checkout/checkout.service';
 import { randomUUID } from 'crypto';
 import { Injectable, BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -16,7 +17,7 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof setInterval>;
   private polling = false;
   onModuleInit() {
-    if (process.env.NODE_ENV !== 'test') { this.timer = setInterval(() => { void this.pollTracking(); }, 60000); this.timer.unref(); }
+    if (process.env.NODE_ENV !== 'test') { this.timer = setInterval(() => { void this.pollTracking(); void this.bookPaidOrders(); }, 60000); this.timer.unref(); }
   }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
   private async pollTracking() {
@@ -32,7 +33,28 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
     finally { this.polling = false; }
   }
 
-  constructor(@InjectModel(ShippingConfiguration.name) private readonly config: Model<ShippingConfiguration>, @InjectModel(ShiprocketShipment.name) private readonly shipments: Model<ShiprocketShipment>, @InjectModel(Order.name) private readonly orders: Model<Order>, private readonly client: ShiprocketClient, private readonly audit: AuditService, private readonly orderService: OrderService) {}
+  constructor(@InjectModel(ShippingConfiguration.name) private readonly config: Model<ShippingConfiguration>, @InjectModel(ShiprocketShipment.name) private readonly shipments: Model<ShiprocketShipment>, @InjectModel(Order.name) private readonly orders: Model<Order>, private readonly client: ShiprocketClient, private readonly audit: AuditService, private readonly orderService: OrderService, private readonly checkout: CheckoutService) {}
+  private booking = false;
+  async bookPaidOrders() {
+    if (this.booking || !this.client.configured) return;
+    this.booking = true;
+    try {
+      for (let i = 0; i < 10; i++) {
+        const order = await this.orders.findOneAndUpdate({ shippingQuote: { $exists: true }, paymentMethod: 'razorpay', paymentStatus: 'paid', status: { $in: ['confirmed', 'packed'] }, paymentReconciliationRequired: { $ne: true }, stockReserved: true, $or: [{ nextShippingAttemptAt: { $exists: false } }, { nextShippingAttemptAt: { $lte: new Date() } }] }, { $set: { nextShippingAttemptAt: new Date(Date.now() + 300000) } }, { new: true }).lean();
+        if (!order) break;
+        try {
+          let shipment = await this.get(order.id);
+          if (!shipment) {
+            shipment = await this.action(order.id, 'create', {}, 'system');
+          }
+          if (shipment?.error) continue; // Ambiguous calls require the existing reconciliation workflow.
+          if (shipment?.shipmentId && !shipment.awb) await this.action(order.id, 'awb', {}, 'system');
+          await this.orders.updateOne({ id: order.id }, { $unset: { shippingReviewReason: 1 }, $set: { nextShippingAttemptAt: new Date(Date.now() + 86400000) } });
+        } catch { await this.orders.updateOne({ id: order.id }, { $set: { shippingReviewReason: 'Shipment booking needs retry or review. Inspect Shiprocket operations before retrying an ambiguous booking.' } }); }
+      }
+    } catch { /* Durable order state is retried on the next poll. */ }
+    finally { this.booking = false; }
+  }
   async verifyAndShip(id: string, dto: ShiprocketActionDto, actor: string, role: string) {
     if (!this.client.configured || !await this.config.exists({ key: 'shiprocket' })) throw new BadRequestException('Configure Shiprocket credentials and shipping defaults first');
     const order = await this.orders.findOne({ id }).lean();
@@ -91,13 +113,17 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
     if (!existing && action !== 'create') throw new BadRequestException('Create a shipment first');
     if (action === 'create' && existing && !existing.providerCancelled) return existing;
     if (!['track', 'reconcile'].includes(action) && (['cancelled', 'returned', 'refunded', 'return_requested', 'delivered'].includes(order.status) || order.paymentReconciliationRequired || (order.paymentMethod !== 'cod' && order.paymentStatus !== 'paid'))) throw new BadRequestException('Order is not eligible for shipment operations');
-    if (action === 'create' && (operationsFor(order).fulfillment !== 'ready_to_dispatch' || !order.stockReserved)) throw new BadRequestException('Pack the order and mark it ready to dispatch first');
+    if (action === 'create' && ((!order.shippingQuote && operationsFor(order).fulfillment !== 'ready_to_dispatch') || !order.stockReserved)) throw new BadRequestException('Pack the order and mark it ready to dispatch first');
     let parcel: ShiprocketShipment['parcel'];
     if (action === 'create') {
       if (!this.client.configured) throw new BadRequestException('Configure Shiprocket API credentials first');
       const defaults = await this.config.findOne({ key: 'shiprocket' }).lean();
       if (!defaults) throw new BadRequestException('Save the pickup location and parcel defaults in Shipping settings first');
-      parcel = { pickupLocation: defaults.pickupLocation, weight: dto.weight ?? defaults.weight, length: dto.length ?? defaults.length, breadth: dto.breadth ?? defaults.breadth, height: dto.height ?? defaults.height };
+      parcel = order.shippingQuote?.parcel ?? { pickupLocation: defaults.pickupLocation, weight: dto.weight ?? defaults.weight, length: dto.length ?? defaults.length, breadth: dto.breadth ?? defaults.breadth, height: dto.height ?? defaults.height };
+      if (order.shippingQuote) {
+        const rate = (await this.checkout.rates(order.shippingQuote.parcel, order.deliveryAddress.pin, order.paymentMethod === 'cod', order.subtotalPaise - order.couponDiscountPaise)).find(option => option.courierId === order.shippingQuote!.courierId);
+        if (!rate || (rate.shippingPaise !== order.shippingPaise && process.env.SHIPROCKET_RATE_DIFFERENCE_POLICY !== 'absorb')) throw new ConflictException('Delivery rate changed after checkout. Review the shipment; customer payment remains unchanged.');
+      }
       if (existing?.providerCancelled) {
         const archived = await this.shipments.findOneAndUpdate({ _id: existing._id, orderId: id, providerCancelled: true, $or: [{ lockedUntil: { $exists: false } }, { lockedUntil: { $lt: new Date() } }] }, { $set: { orderId: `${id}:cancelled:${randomUUID()}`, originalOrderId: id } }, { new: true }).lean();
         if (!archived) throw new ConflictException('Another shipment operation is in progress. Refresh the order.');
@@ -105,7 +131,7 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
         await this.orders.updateOne({ id }, { $unset: { trackingNumber: 1, trackingUrl: 1 } });
       }
       const providerReference = await this.shipments.exists({ originalOrderId: id }) ? `${id}-${randomUUID()}` : id;
-      const claimed = await this.orders.findOneAndUpdate({ id, status: order.status, paymentStatus: order.paymentStatus, paymentReconciliationRequired: { $ne: true }, stockReserved: true, 'operations.fulfillment': 'ready_to_dispatch', shiprocketBookingStarted: { $ne: true } }, { $set: { shiprocketBookingStarted: true } });
+      const claimed = await this.orders.findOneAndUpdate({ id, status: order.status, paymentStatus: order.paymentStatus, paymentReconciliationRequired: { $ne: true }, stockReserved: true, ...(order.shippingQuote ? {} : { 'operations.fulfillment': 'ready_to_dispatch' }), shiprocketBookingStarted: { $ne: true } }, { $set: { shiprocketBookingStarted: true } });
       if (!claimed) throw new ConflictException('Order changed or another booking has started. Refresh the order.');
       try { await this.shipments.create({ orderId: id, providerReference, parcel }); } catch (error) { if ((error as { code?: number }).code === 11000) throw new ConflictException('Another booking is already in progress'); throw error; }
     }
@@ -123,7 +149,7 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
             order_id: lock.providerReference ?? order.id, order_date: new Date((order as any).createdAt ?? Date.now()).toISOString().slice(0, 10), pickup_location: parcel!.pickupLocation,
             billing_customer_name: names[0], billing_last_name: names.slice(1).join(' '), billing_address: order.deliveryAddress.street, billing_address_2: order.deliveryAddress.landmark ?? '', billing_city: order.deliveryAddress.city, billing_pincode: order.deliveryAddress.pin, billing_state: order.deliveryAddress.state, billing_country: 'India', billing_email: order.customerEmail, billing_phone: order.customerPhone, shipping_is_billing: true,
             order_items: order.lines.map(line => ({ name: `${line.productName} (${line.packSize})`, sku: `${line.productSlug}-${line.packSize}`, units: line.quantity, selling_price: line.unitPricePaise / 100 })),
-            payment_method: order.paymentMethod === 'cod' ? 'COD' : 'Prepaid', sub_total: order.totalPaise / 100,
+            payment_method: order.paymentMethod === 'cod' ? 'COD' : 'Prepaid', sub_total: order.subtotalPaise / 100,
             shipping_charges: order.shippingPaise / 100, total_discount: (order.couponDiscountPaise ?? 0) / 100,
             weight: parcel!.weight, length: parcel!.length, breadth: parcel!.breadth, height: parcel!.height,
           });
@@ -134,7 +160,7 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
         case 'awb': {
           if (!lock.shipmentId) throw new BadRequestException('Refresh provider details first');
           if (lock.awb) break;
-          const data = await this.client.request('courier/assign/awb', 'POST', { shipment_id: lock.shipmentId, ...(dto.courierId ? { courier_id: dto.courierId } : {}) });
+          const data = await this.client.request('courier/assign/awb', 'POST', { shipment_id: lock.shipmentId, ...((order.shippingQuote?.courierId ?? dto.courierId) ? { courier_id: order.shippingQuote?.courierId ?? dto.courierId } : {}) });
           const details = data.response?.data;
           if (Number(data.awb_assign_status) !== 1 || !details?.awb_code) throw new BadRequestException('Shiprocket did not assign an AWB. Refresh provider details.');
           Object.assign(update, { awb: String(details.awb_code), courier: String(details.courier_name ?? 'Shiprocket') }); break;

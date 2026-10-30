@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException, Controller, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { v2 as cloudinary } from 'cloudinary';
 import { memoryStorage } from 'multer';
@@ -37,6 +37,7 @@ export class MediaController {
     // Cloudinary is optional in local development. Without it, use the API's
     // static uploads directory so creating a product still works end-to-end.
     const saveLocally = async () => {
+      if (process.env.NODE_ENV === 'production') throw new ServiceUnavailableException('Image storage is unavailable. Please try again later.');
       const filename = `${randomUUID()}.webp`;
       const uploads = join(process.cwd(), 'uploads');
       await mkdir(uploads, { recursive: true });

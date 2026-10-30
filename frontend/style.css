@@ -670,3 +670,14 @@ footer{background:#d4c19d}
   .feature-image img{display:block;object-position:center}
   .feature-image .stamp{width:76px;height:76px;right:12px;bottom:12px;font-size:9px;line-height:1.5;letter-spacing:.04em;transform:rotate(8deg);box-shadow:0 4px 12px rgba(24,49,36,.12)}
 }
+
+/* Checkout delivery choices follow the existing form rhythm and brand palette. */
+.delivery-option{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:10px;border-bottom:1px solid #d5cfc0;padding:14px 0;font-size:12px;cursor:pointer}
+.delivery-option input{accent-color:var(--green);width:16px;height:16px}
+.delivery-option small{display:block;margin-top:4px;color:#687169;line-height:1.5}
+.delivery-option b{white-space:nowrap;font:12px 'DM Mono'}
+.delivery-option:focus-within{outline:2px solid var(--green);outline-offset:3px}
+.checkout-button:disabled{opacity:.55;cursor:not-allowed}
+
+.delivery-lookup,.delivery-lookup:hover{color:var(--green);border:1px solid #d5cfc0;padding:12px;min-height:44px;text-align:left}
+.delivery-lookup:disabled{opacity:.55;cursor:not-allowed}

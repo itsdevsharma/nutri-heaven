@@ -1,3 +1,5 @@
+import { storeCache } from '../../store-cache.js';
+
 /**
  * The console's only door to the API.
  *
@@ -117,6 +119,7 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
 
   // Seam for refresh tokens: when `POST /admin/auth/refresh` exists, a 401 can
   // be retried here once before the session is dropped.
+  if (method !== 'GET') storeCache.clear();
   return payload;
 }
 

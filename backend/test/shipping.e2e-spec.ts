@@ -91,7 +91,7 @@ describe('Shiprocket admin shipping', () => {
     const book = await request(app.getHttpServer()).post(`${base}/orders/SHIP-1/create`).set(headers(support)).send({ weight: 0.7 }).expect(201);
     expect(book.body.shipmentId).toBe(200);
     const payload = provider.request.mock.calls.at(-1)?.[2];
-    expect(payload.payment_method).toBe('COD'); expect(payload.sub_total).toBe(291); expect(payload.order_items[0].selling_price).toBe(125.5); expect(payload.weight).toBe(0.7);
+    expect(payload.payment_method).toBe('COD'); expect(payload.sub_total).toBe(251); expect(payload.order_items[0].selling_price).toBe(125.5); expect(payload.weight).toBe(0.7);
     const count = provider.request.mock.calls.length;
     await request(app.getHttpServer()).post(`${base}/orders/SHIP-1/create`).set(headers(support)).send({}).expect(201);
     expect(provider.request).toHaveBeenCalledTimes(count);

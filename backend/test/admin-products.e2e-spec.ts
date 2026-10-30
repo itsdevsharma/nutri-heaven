@@ -6,6 +6,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { hash } from 'bcryptjs';
 import { AppModule } from '../src/app.module';
+import { ProductsService } from '../src/products/products.service';
 import { Product, ProductDocument } from '../src/products/product.schema';
 import { Admin, AdminDocument, AdminRole } from '../src/admin/admin.schema';
 
@@ -219,4 +220,64 @@ describe('Admin catalogue reads (e2e)', () => {
     const product = await request(app.getHttpServer()).get('/products/admin/almonds').set(auth('catalogue_manager')).expect(200);
     expect(product.body.variants[0].stockQuantity).toBe(12);
   });
+  it.each([
+    { 'variants.0.stockQuantity': 999 },
+    { 'variants.$[].stockQuantity': 999 },
+    { $set: { 'variants.0.stockQuantity': 999 } },
+    { variants: { '0': { stockQuantity: 999 } } },
+    { variants: [{ size: '250g', pricePaise: 27500, stockQuantity: 12, 'stockQuantity.value': 999 }] },
+  ])('rejects alternate stock update representations: %j', async payload => {
+    await request(app.getHttpServer()).patch('/products/admin/almonds').set(auth('catalogue_manager')).send(payload).expect(400);
+    const model = app.get<Model<ProductDocument>>(getModelToken(Product.name));
+    expect((await model.findOne({ slug: 'almonds' }))?.variants[0].stockQuantity).toBe(12);
+  });
+
+  it('keeps inventory product identifiers stable while allowing unchanged slugs', async () => {
+    await request(app.getHttpServer()).patch('/products/admin/almonds').set(auth('catalogue_manager')).send({ slug: 'renamed-almonds' }).expect(400);
+    await request(app.getHttpServer()).patch('/products/admin/almonds').set(auth('catalogue_manager')).send({ slug: 'almonds', seoTitle: 'Almonds' }).expect(200);
+  });
+
+  it('rejects opening stock and creates zero-stock drafts', async () => {
+    const categories = app.get<Model<any>>(getModelToken('Category'));
+    await categories.create({ name: 'Security test category', slug: 'security-test', isActive: true });
+    const input = { slug: 'zero-stock', title: 'Zero stock', description: 'New catalogue item', image: 'nuts.jpg', category: 'Security test category', pricePaise: 10000, variants: [{ size: '250g', pricePaise: 10000, stockQuantity: 5 }] };
+    await request(app.getHttpServer()).post('/products/admin').set(auth('catalogue_manager')).send(input).expect(400);
+    const created = await request(app.getHttpServer()).post('/products/admin').set(auth('catalogue_manager')).send({ ...input, variants: [{ size: '250g', pricePaise: 10000 }] }).expect(201);
+    expect(created.body.status).toBe('draft');
+    expect(created.body.variants[0].stockQuantity).toBe(0);
+  });
+
+  it('duplicates catalogue information with zero stock', async () => {
+    const copy = await request(app.getHttpServer()).post('/products/admin/almonds/duplicate').set(auth('catalogue_manager')).expect(201);
+    expect(copy.body.variants[0]).toMatchObject({ size: '250g', pricePaise: 27500, stockQuantity: 0 });
+    expect(copy.body.status).toBe('draft');
+  });
+
+  it('allows ordinary pack edits while preserving the balance', async () => {
+    const saved = await request(app.getHttpServer()).patch('/products/admin/almonds').set(auth('catalogue_manager')).send({ variants: [{ size: '250g', pricePaise: 28000, stockQuantity: 12, isActive: true }] }).expect(200);
+    expect(saved.body.variants[0]).toMatchObject({ pricePaise: 28000, stockQuantity: 12 });
+  });
+
+  it('does not overwrite an inventory change that races a catalogue save', async () => {
+    const model = app.get<Model<ProductDocument>>(getModelToken(Product.name));
+    const service = app.get(ProductsService);
+    const validate = jest.spyOn(service as any, 'validateCommerce').mockImplementationOnce(async () => {
+      await model.updateOne({ slug: 'almonds' }, { $inc: { 'variants.0.stockQuantity': 1 } });
+    });
+    try {
+      await request(app.getHttpServer()).patch('/products/admin/almonds').set(auth('catalogue_manager')).send({ variants: [{ size: '250g', pricePaise: 28000, stockQuantity: 12, isActive: true }] }).expect(409);
+      expect((await model.findOne({ slug: 'almonds' }))?.variants[0].stockQuantity).toBe(13);
+    } finally { validate.mockRestore(); }
+  });
+
+  it('exports spreadsheet formulas as literal cells and retains CSV escaping', async () => {
+    const model = app.get<Model<ProductDocument>>(getModelToken(Product.name));
+    for (const prefix of ['=', '+', '-', '@', ' \t=', '\u0000=']) {
+      await model.updateOne({ slug: 'almonds' }, { $set: { title: prefix + '1+1', description: 'Nuts, "fresh" — भारत\nSecond line' } });
+      const csv = await request(app.getHttpServer()).get('/products/admin/export?q=almonds').set(auth('catalogue_manager')).expect(200);
+      expect(csv.text).toContain(`"'${prefix}1+1"`);
+      expect(csv.text).toContain('"Nuts, ""fresh"" — भारत\nSecond line"');
+    }
+  });
+
 });

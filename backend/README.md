@@ -209,3 +209,13 @@ CI/CD and database backups.
 - `/reviews/:slug` returns approved reviews; delivered purchasers submit through `/customer/me/reviews`. Super admins moderate through `/admin/engagement/reviews` and view reporting at `/admin/insights`.
 - Order receipts are downloadable HTML suitable for Print → Save as PDF. They are not tax invoices. Courier integration is deferred; manual tracking fields remain available.
 - Audit plan and release checklist: `../docs/audits/WEBSITE_COMPLETION.md`. Updated evidence: `../audit-reports/08-test-execution-report.md`.
+
+## Security deployment requirements
+
+- Set `TRUST_PROXY=true` and `TRUST_PROXY_CIDRS` to the actual ingress IPs or CIDRs in production. For a reverse proxy on the same host, `loopback` is suitable. Do not use that example for a remote proxy. The edge must overwrite client-supplied forwarded headers; block direct public access to the API origin. Verify this on the deployed network.
+- Apply shared rate limits at the CDN/WAF across API replicas. The application's in-memory limits are per process and cannot enforce a shared quota.
+- Production image uploads require `CLOUDINARY_URL`. Missing or failed remote storage returns 503; local upload fallback is development-only. Existing local images require a durable volume or migration to remote storage before deployment.
+- Start through the root pnpm scripts (which run in `backend/`) so the API and Compose load `backend/.env`. Hosted environment variables take precedence. Do not place production secrets in the repository root expecting these scripts to load them.
+- Local Compose publishes MongoDB, Redis and MinIO on loopback only. Restart existing containers after configuration changes for bindings to take effect.
+- New and copied products start with zero stock. Save as draft, add stock through Inventory, then publish. Catalogue edits cannot change balances and reject saves racing an inventory adjustment.
+- The inbox uses customer IDs, not email matching. Legacy notifications without a customer ID remain available to the email delivery worker but are hidden from account inboxes. Do not backfill ownership by matching signup email. Guest orders continue receiving email notifications; guest-to-account linking requires a separately verified ownership flow.

@@ -81,6 +81,7 @@ describe('Products (e2e)', () => {
   it('GET /health reports ok', async () => {
     await request(app.getHttpServer()).get('/health').expect(200).expect({
       status: 'ok',
+      database: 'connected',
     });
   });
 

@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 @Schema({ timestamps: true, collection: 'customer_notifications' })
 export class CustomerNotification {
+  @Prop({ index: true }) customerId?: string;
   @Prop({ required: true, index: true }) email!: string;
   @Prop({ required: true }) title!: string;
   @Prop({ required: true }) message!: string;

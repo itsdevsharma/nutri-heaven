@@ -67,6 +67,9 @@ export class Product {
         barcode: { type: String, trim: true },
         stockQuantity: { type: Number, required: true, min: 0, default: 0 },
         lowStockLimit: { type: Number, required: true, min: 0, default: 0 },
+        lengthCm: { type: Number, min: 0.51 },
+        breadthCm: { type: Number, min: 0.51 },
+        heightCm: { type: Number, min: 0.51 },
         weightGrams: { type: Number, min: 0 },
         taxBasisPoints: { type: Number, min: 0, max: 10000, default: 0 },
         images: { type: [String], default: [] },
@@ -75,7 +78,7 @@ export class Product {
     ],
     default: [],
   })
-  variants!: { size: string; pricePaise: number; isActive: boolean }[];
+  variants!: { size: string; pricePaise: number; isActive: boolean; stockQuantity?: number; weightGrams?: number; lengthCm?: number; breadthCm?: number; heightCm?: number }[];
 
   @Prop({ type: [String], default: [] })
   tags!: string[];

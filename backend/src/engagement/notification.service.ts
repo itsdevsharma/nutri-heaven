@@ -12,14 +12,14 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
   constructor(@InjectModel(CustomerNotification.name) private readonly notifications: Model<CustomerNotification>, private readonly mail: MailService) {}
   onModuleInit() { if (process.env.NODE_ENV !== 'test') { this.timer = setInterval(() => { void this.deliver().catch(() => {}); }, 30000); this.timer.unref(); } }
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
-  async add(email: string, title: string, message: string, eventKey: string, emailRequested = false) {
-    try { return await this.notifications.findOneAndUpdate({ eventKey }, { $setOnInsert: { email: email.trim().toLowerCase(), title, message, eventKey, emailRequested, link: '/account' } }, { upsert: true, new: true }).exec(); }
+  async add(email: string, title: string, message: string, eventKey: string, emailRequested = false, customerId?: string) {
+    try { return await this.notifications.findOneAndUpdate({ eventKey }, { $setOnInsert: { customerId, email: email.trim().toLowerCase(), title, message, eventKey, emailRequested, link: '/account' } }, { upsert: true, new: true }).exec(); }
     catch (error) { if ((error as { code?: number }).code !== 11000) throw error; return null; }
   }
-  list(email: string) { return this.notifications.find({ email }).select('_id title message link readAt createdAt').sort({ createdAt: -1 }).limit(100).lean().exec(); }
-  async read(email: string, id: string) {
+  list(customerId: string) { return this.notifications.find({ customerId }).select('_id title message link readAt createdAt').sort({ createdAt: -1 }).limit(100).lean().exec(); }
+  async read(customerId: string, id: string) {
     if (!isValidObjectId(id)) throw new NotFoundException('Notification not found');
-    const item = await this.notifications.findOneAndUpdate({ _id: id, email }, { $set: { readAt: new Date() } }, { new: true }).select('_id readAt').lean().exec();
+    const item = await this.notifications.findOneAndUpdate({ _id: id, customerId }, { $set: { readAt: new Date() } }, { new: true }).select('_id readAt').lean().exec();
     if (!item) throw new NotFoundException('Notification not found'); return item;
   }
   async deliver() {

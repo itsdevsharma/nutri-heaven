@@ -1,4 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { CheckoutService } from '../checkout/checkout.service';
+import { ConflictException, BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, type ClientSession } from 'mongoose';
 import { InjectConnection } from '@nestjs/mongoose';
@@ -34,6 +35,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
     @InjectConnection() private readonly connection: Connection,
     @InjectModel(Order.name) private readonly orders: Model<OrderDocument>,
     private readonly products: ProductsService,
+    private readonly checkout: CheckoutService,
     private readonly inventory: InventoryService,
     private readonly coupons: CouponsService,
     private readonly notifications: NotificationService,
@@ -49,7 +51,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
       const record = await this.outbox.findOneAndUpdate({ status: 'pending', nextAttemptAt: { $lte: new Date() } }, { $set: { nextAttemptAt: new Date(Date.now() + 300000) }, $inc: { attempts: 1 } }, { new: true }).lean().exec();
       if (!record) break;
       try {
-        await this.notifications.add(record.email, record.title, record.message, record.eventKey, true);
+        await this.notifications.add(record.email, record.title, record.message, record.eventKey, true, record.customerId);
         await this.outbox.updateOne({ eventKey: record.eventKey, attempts: record.attempts }, { $set: { status: 'delivered' } });
       } catch {
         await this.outbox.updateOne({ eventKey: record.eventKey, attempts: record.attempts }, { $set: { status: record.attempts >= 8 ? 'dead_letter' : 'pending', nextAttemptAt: new Date(Date.now() + Math.min(3600000, 30000 * 2 ** record.attempts)) } });
@@ -79,11 +81,14 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
 
   async createOrder(dto: OrderCreateDto, customerId?: string): Promise<Order> {
     const idempotencyKey = dto.idempotencyKey ?? `order:${dto.cartId}:${Date.now()}`;
+    const checkoutFingerprint = createHash('sha256').update(JSON.stringify(dto)).digest('hex');
     const existing = await this.orders
       .findOne({ idempotencyKey })
       .lean()
       .exec();
-    if (existing) { if (existing.cartId !== dto.cartId || existing.customerId !== customerId) throw new ForbiddenException('This checkout belongs to another shopping session'); return existing; }
+    if (existing) { if (existing.cartId !== dto.cartId || existing.customerId !== customerId) throw new ForbiddenException('This checkout belongs to another shopping session'); if (existing.checkoutFingerprint && existing.checkoutFingerprint !== checkoutFingerprint) throw new ConflictException('Checkout key was reused with different details'); return existing; }
+
+    const delivery = this.checkout.enabled || dto.shippingQuoteId ? await this.checkout.validate(dto, dto.shippingQuoteId, dto.courierId) : null;
 
     // Re-price from the database — the client's totals are advisory only.
     const quote = await this.products.quote({
@@ -113,23 +118,29 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
     });
 
     const subtotalPaise = quote.subtotalPaise;
-    const shippingPaise = quote.shippingPaise;
+    const shippingPaise = delivery?.selected.shippingPaise ?? quote.shippingPaise;
     const coupon = dto.couponCode ? await this.coupons.quote(dto.couponCode, subtotalPaise, quote.lines) : null;
     const couponDiscountPaise = coupon?.discountPaise ?? 0;
-    const totalPaise = Math.max(0, quote.totalPaise - couponDiscountPaise);
+    const totalPaise = Math.max(0, subtotalPaise - couponDiscountPaise) + shippingPaise;
+    if (delivery && (delivery.quote.subtotalPaise !== subtotalPaise || delivery.quote.discountPaise !== couponDiscountPaise)) throw new ConflictException('Prices changed. Calculate delivery again.');
     const orderId = `NH${Date.now().toString(36)}${randomUUID().slice(0, 6)}`;
 
     const isCod = dto.paymentMethod === 'cod';
     let redeemed: { code: string; discountPaise: number } | null = null;
     try {
       if (dto.couponCode) redeemed = await this.coupons.redeem(dto.couponCode, subtotalPaise, quote.lines, dto.customerEmail, orderId);
+      if (redeemed && redeemed.discountPaise !== couponDiscountPaise) throw new ConflictException('Coupon changed. Confirm checkout again.');
       const session = await this.connection.startSession();
       let order: OrderDocument | undefined;
       try {
         await session.withTransaction(async () => {
+          if (delivery && new Date(delivery.quote.expiresAt).getTime() <= Date.now()) throw new ConflictException('Delivery quote expired. Calculate delivery again.');
           await this.inventory.reserveForOrder(idempotencyKey, lines.map((l) => ({ productSlug: l.productSlug, packSize: l.packSize, quantity: l.quantity })), 'system', session);
           const [created] = await this.orders.create([{
       id: orderId,
+      checkoutFingerprint,
+      currency: 'INR', taxPaise: 0,
+      ...(delivery ? { shippingQuote: { quoteId: delivery.quote.id, courierId: delivery.selected.courierId, name: delivery.selected.name, quotedAt: delivery.quote.quotedAt, expiresAt: delivery.quote.expiresAt, parcel: delivery.quote.parcel, pricingFingerprint: delivery.quote.pricingFingerprint } } : {}),
       cartId: dto.cartId,
       customerId,
       customerName: dto.customerName,
@@ -164,7 +175,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
       if (redeemed) await this.coupons.refundRedemption(orderId);
       if ((error as { code?: number })?.code === 11000) {
         const raced = await this.orders.findOne({ idempotencyKey }).lean().exec();
-        if (raced) { if (raced.cartId !== dto.cartId || raced.customerId !== customerId) throw new ForbiddenException('This checkout belongs to another shopping session'); return raced; }
+        if (raced) { if (raced.cartId !== dto.cartId || raced.customerId !== customerId) throw new ForbiddenException('This checkout belongs to another shopping session'); if (raced.checkoutFingerprint && raced.checkoutFingerprint !== checkoutFingerprint) throw new ConflictException('Checkout key was reused with different details'); return raced; }
       }
       throw error;
     }
@@ -311,6 +322,16 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
+  async validatePaymentCheckout(order: Order) {
+    if (!order.shippingQuote) return;
+    const result = await this.checkout.validate({ cartId: order.cartId, lines: order.lines, deliveryAddress: order.deliveryAddress, paymentMethod: order.paymentMethod, couponCode: order.couponCode }, order.shippingQuote.quoteId, order.shippingQuote.courierId, true);
+    if (result.quote.subtotalPaise - result.quote.discountPaise + result.selected.shippingPaise !== order.totalPaise) throw new ConflictException('Order total changed. Return to checkout.');
+  }
+
+  async claimPaymentCreation(id: string) {
+    return Boolean(await this.orders.findOneAndUpdate({ id, status: 'pending', paymentStatus: 'pending', razorpayOrderId: { $exists: false }, paymentCreationStartedAt: { $exists: false } }, { $set: { paymentCreationStartedAt: new Date() } }));
+  }
+
   async attachRazorpayOrder(id: string, razorpayOrderId: string): Promise<Order> {
     // The first provider order wins; concurrent checkout requests reuse it.
     await this.orders.updateOne({ id, paymentMethod: 'razorpay', paymentStatus: 'pending', status: 'pending', razorpayOrderId: { $exists: false } }, { $set: { razorpayOrderId } }).exec();
@@ -327,7 +348,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
     return order;
   }
 
-  async captureRazorpayPayment(razorpayOrderId: string, paymentId: string, amount?: number, currency?: string): Promise<void> {
+  async captureRazorpayPayment(razorpayOrderId: string, paymentId: string, amount: number, currency: string): Promise<void> {
     const session = await this.connection.startSession();
     try { await session.withTransaction(async () => {
       const order = await this.orders.findOne({ razorpayOrderId }).session(session).exec();
@@ -358,7 +379,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
         order.statusHistory.push({ status: order.status, at: new Date(), actor: 'razorpay-webhook', note: 'Late payment captured after reservation release; refund/reconciliation required' });
         await this.persistOrder(order, session); return;
       }
-      if ((amount !== undefined && amount !== order.totalPaise) || (currency !== undefined && currency !== 'INR')) {
+      if (!Number.isSafeInteger(amount) || amount !== order.totalPaise || currency !== 'INR') {
         order.paymentStatus = 'paid'; order.razorpayPaymentId = paymentId;
         order.paymentReconciliationRequired = true;
         order.activity.push({ action: 'payment_mismatch', actor: 'razorpay', at: new Date(), reason: `Capture ${paymentId} amount/currency mismatch`, after: { amount, currency } });

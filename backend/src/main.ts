@@ -5,6 +5,7 @@ import { static as serveStatic, type NextFunction, type Request, type Response }
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { proxyTrust } from './common/proxy-trust';
 
 type RateBucket = { count: number; resetAt: number };
 
@@ -35,12 +36,9 @@ async function bootstrap(): Promise<void> {
     if (!process.env.CORS_ORIGINS) {
       throw new Error('CORS_ORIGINS must be explicitly configured in production');
     }
-    if (process.env.TRUST_PROXY !== 'true') {
-      throw new Error('TRUST_PROXY=true is required in production behind the HTTPS load balancer');
-    }
   }
+  const trustProxy = proxyTrust();
   const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
-  const trustProxy = process.env.TRUST_PROXY === 'true';
   app.getHttpAdapter().getInstance().set('trust proxy', trustProxy);
   const uploads = join(process.cwd(), 'uploads');
   if (!existsSync(uploads)) mkdirSync(uploads, { recursive: true });
@@ -69,6 +67,9 @@ async function bootstrap(): Promise<void> {
   // These headers protect the API itself. The storefront has its own CSP in
   // Vercel configuration because it intentionally loads analytics/payment SDKs.
   app.use((request: Request, response: Response, next: NextFunction) => {
+    // Public catalogue caching is bounded in the storefront; private API data
+    // (including carts, orders and admin responses) must never enter HTTP caches.
+    response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('X-Frame-Options', 'DENY');
     response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -125,7 +126,10 @@ async function bootstrap(): Promise<void> {
       }
       next();
     },
-    serveStatic(uploads),
+    serveStatic(uploads, {
+      maxAge: '1d',
+      setHeaders: (response) => response.setHeader('Cache-Control', 'public, max-age=86400, must-revalidate'),
+    }),
   );
 
   // Reject unknown properties and coerce query strings (e.g. `?limit=10`

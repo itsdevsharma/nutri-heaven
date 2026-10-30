@@ -16,10 +16,10 @@ const SEED_CATEGORIES = [
 ] as const;
 
 const SEED_SUBCATEGORIES = [
-  ['Almonds', 'almonds', 'premium-nuts'], ['Cashews', 'cashews', 'premium-nuts'], ['Pistachios', 'pistachios', 'premium-nuts'], ['Walnuts', 'walnuts', 'premium-nuts'],
-  ['Dates', 'dates', 'dry-fruits'], ['Raisins', 'raisins', 'dry-fruits'], ['Figs', 'figs', 'dry-fruits'], ['Apricots', 'apricots', 'dry-fruits'],
-  ['Pumpkin Seeds', 'pumpkin-seeds', 'super-seeds'], ['Chia Seeds', 'chia-seeds', 'super-seeds'], ['Flax Seeds', 'flax-seeds', 'super-seeds'], ['Sunflower Seeds', 'sunflower-seeds', 'super-seeds'], ['Sesame Seeds', 'sesame-seeds', 'super-seeds'],
-  ['Whole Spices', 'whole-spices', 'spices'],
+  ['Almonds', 'almonds', 'premium-nuts', 'almonds_ze0A.jpg'], ['Cashews', 'cashews', 'premium-nuts', 'cashews_ze0A.jpg'], ['Pistachios', 'pistachios', 'premium-nuts', 'pistachios_ze0A.jpg'], ['Walnuts', 'walnuts', 'premium-nuts', 'walnuts_ze0A.jpg'],
+  ['Dates', 'dates', 'dry-fruits', 'dates_ze0A.jpg'], ['Raisins', 'raisins', 'dry-fruits', 'black_raisins_ze0A.jpg'], ['Figs', 'figs', 'dry-fruits', 'figs_ze0A.jpg'], ['Apricots', 'apricots', 'dry-fruits', 'apricots_ze0A.jpg'],
+  ['Pumpkin Seeds', 'pumpkin-seeds', 'super-seeds', 'pumpkin_seeds_ze0A.jpg'], ['Chia Seeds', 'chia-seeds', 'super-seeds', 'chia_seeds_ze0A.jpg'], ['Flax Seeds', 'flax-seeds', 'super-seeds', 'flax_seeds_ze0A.jpg'], ['Sunflower Seeds', 'sunflower-seeds', 'super-seeds', 'sunflower_seeds_ze0A.jpg'], ['Sesame Seeds', 'sesame-seeds', 'super-seeds', 'sesame_seeds_ze0A.jpg'],
+  ['Whole Spices', 'whole-spices', 'spices', 'cat-spices_ze0A.png'],
 ] as const;
 
 /**
@@ -60,9 +60,14 @@ async function run(): Promise<void> {
       ).lean().exec();
       parentIds.set(category.slug, saved!._id);
     }
-    for (const [name, slug, parentSlug] of SEED_SUBCATEGORIES) {
+    for (const [name, slug, parentSlug, image] of SEED_SUBCATEGORIES) {
       await categories.updateOne(
         { slug }, { $set: { name, slug, parentId: parentIds.get(parentSlug), position: SEED_SUBCATEGORIES.findIndex((entry) => entry[1] === slug), isActive: true } }, { upsert: true },
+      ).exec();
+      // Fill missing images while preserving images chosen in the admin editor.
+      await categories.updateOne(
+        { slug, $or: [{ image: '' }, { image: null }, { image: { $exists: false } }] },
+        { $set: { image } },
       ).exec();
     }
     for (const seed of SEED_PRODUCTS) {

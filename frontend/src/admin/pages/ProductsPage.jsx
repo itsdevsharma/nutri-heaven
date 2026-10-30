@@ -19,6 +19,7 @@ import { CsvImportExport } from '../components/CsvImportExport.jsx';
 import { Modal } from '../components/Modal.jsx';
 
 const PAGE_SIZE = 25;
+const emptyFilters = () => ({ category: '', stock: '', featured: '', bestseller: '', newArrival: '', minPrice: '', maxPrice: '' });
 
 /** Cheapest-to-dearest sellable price, so a pack matrix reads at a glance. */
 function priceRange(product) {
@@ -51,8 +52,20 @@ export default function ProductsPage() {
   const [busySlug, setBusySlug] = useState('');
   const [selected, setSelected] = useState([]);
   const [importPreview, setImportPreview] = useState(null);
-  const [filters, setFilters] = useState({ category: '', stock: '', featured: '', bestseller: '', newArrival: '', minPricePaise: '', maxPricePaise: '' });
+  const [filters, setFilters] = useState(emptyFilters);
   const query = useDebounced(search, 300);
+  const { minPrice, maxPrice, ...otherFilters } = filters;
+  const priceError = minPrice !== '' && maxPrice !== '' && Number(minPrice) > Number(maxPrice);
+  const apiFilters = { ...otherFilters,
+    minPricePaise: minPrice === '' ? undefined : Math.round(Number(minPrice) * 100),
+    maxPricePaise: maxPrice === '' || priceError ? undefined : Math.round(Number(maxPrice) * 100),
+  };
+  const activeCount = Object.values(filters).filter(Boolean).length + Number(Boolean(status)) + Number(Boolean(search.trim()));
+  const clearFilters = () => { setStatus(''); setSearch(''); setFilters(emptyFilters()); };
+  const changeFilter = (key, value) => {
+    if (['minPrice', 'maxPrice'].includes(key) && value !== '' && Number(value) < 0) return;
+    setFilters(current => ({ ...current, [key]: value }));
+  };
 
   // A new filter invalidates the current page number.
   useEffect(() => { setOffset(0); setSelected([]); }, [status, query, filters]);
@@ -65,7 +78,7 @@ export default function ProductsPage() {
         q: query || undefined,
         limit: PAGE_SIZE,
         offset,
-        ...filters,
+        ...apiFilters,
       }),
     [status, query, offset, filters],
   );
@@ -73,11 +86,11 @@ export default function ProductsPage() {
   const canWrite = can(role, 'catalogue:write');
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
-  const filtered = Boolean(status || query);
+  const filtered = activeCount > 0;
   const toggleSelected = (slug) => setSelected((current) => current.includes(slug) ? current.filter((item) => item !== slug) : [...current, slug]);
   const selectPage = (checked) => setSelected(checked ? items.map((item) => item.slug) : []);
   const bulk = async (action, extras = {}) => { try { await adminApi.products.bulk({ action, slugs: selected, ...extras }); toast.success(`${selected.length} product${selected.length === 1 ? '' : 's'} updated.`); setSelected([]); reload(); } catch (failure) { toast.error(failure.message); } };
-  const exportCsv = async (extra = {}) => { try { const blob = await adminApi.products.exportCsv({ status: status || undefined, q: query || undefined, ...filters, ...extra }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'products.csv'; link.click(); URL.revokeObjectURL(link.href); } catch (failure) { toast.error(failure.message); } };
+  const exportCsv = async (extra = {}) => { try { const blob = await adminApi.products.exportCsv({ status: status || undefined, q: query || undefined, ...apiFilters, ...extra }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'products.csv'; link.click(); URL.revokeObjectURL(link.href); } catch (failure) { toast.error(failure.message); } };
 
   const tabs = useMemo(
     () => [
@@ -217,39 +230,31 @@ export default function ProductsPage() {
       />
 
       <Card className="admin-card-tight">
-        <div className="admin-toolbar">
-          <div className="admin-tabs" role="tablist" aria-label="Filter by status">
-            {tabs.map((tab) => (
-              <button
-                key={tab.value || 'all'}
-                type="button"
-                role="tab"
-                aria-selected={status === tab.value}
-                className={`admin-tab${status === tab.value ? ' admin-tab-active' : ''}`}
-                onClick={() => setStatus(tab.value)}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <section className="product-filters" aria-label="Product filters">
+          <div className="product-filters-heading">
+            <div><h2>Find products</h2><p>Search or combine filters. Results update automatically.</p></div>
+            <CsvImportExport disabled={!canWrite} onExport={exportCsv} onImport={async (file) => { try { setImportPreview(await adminApi.products.importCsv(file, true)); } catch (failure) { toast.error(failure.message); } }} />
           </div>
-          <input
-            className="admin-input admin-search"
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search title, slug, SKU, category…"
-            aria-label="Search products"
-          />
-          <CsvImportExport disabled={!canWrite} onExport={exportCsv} onImport={async (file) => { try { setImportPreview(await adminApi.products.importCsv(file, true)); } catch (failure) { toast.error(failure.message); } }} />
-        </div>
-        <div className="admin-toolbar">
-          <select className="admin-input" value={filters.category} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))}><option value="">All categories</option>{(categories.data ?? []).filter((category) => category.isActive !== false).map((category) => <option key={category._id} value={category.name}>{category.name}</option>)}</select>
-          <select className="admin-input" value={filters.stock} onChange={(event) => setFilters((current) => ({ ...current, stock: event.target.value }))}><option value="">All stock</option><option value="healthy">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
-          {['featured', 'bestseller', 'newArrival'].map((key) => <label className="admin-check" key={key}><input type="checkbox" checked={filters[key] === 'true'} onChange={(event) => setFilters((current) => ({ ...current, [key]: event.target.checked ? 'true' : '' }))} />{key === 'newArrival' ? 'New arrival' : key}</label>)}
-          <input className="admin-input" inputMode="numeric" placeholder="Min price paise" value={filters.minPricePaise} onChange={(event) => setFilters((current) => ({ ...current, minPricePaise: event.target.value }))} />
-          <input className="admin-input" inputMode="numeric" placeholder="Max price paise" value={filters.maxPricePaise} onChange={(event) => setFilters((current) => ({ ...current, maxPricePaise: event.target.value }))} />
-          <button type="button" className="admin-btn admin-btn-ghost" onClick={() => navigate('/admin/inventory?view=low')}>Low stock → Inventory</button><button type="button" className="admin-btn admin-btn-ghost" onClick={() => navigate('/admin/inventory?view=out')}>Out of stock → Inventory</button>
-        </div>
+          <div className="product-status-filter" role="group" aria-label="Product status">
+            <span>Status</span>
+            <div className="admin-tabs">
+              {tabs.map(tab => <button key={tab.value || 'all'} type="button" aria-pressed={status === tab.value} className={`admin-tab${status === tab.value ? ' admin-tab-active' : ''}`} onClick={() => setStatus(tab.value)}>{tab.value ? tab.label : 'All products'}</button>)}
+            </div>
+          </div>
+          <div className="product-filter-grid">
+            <label className="product-filter-field product-filter-search"><span>Search products</span><input className="admin-input" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Name, SKU, category or slug" /></label>
+            <label className="product-filter-field"><span>Category</span><select className="admin-input" aria-label="Category" value={filters.category} onChange={event => changeFilter('category', event.target.value)}><option value="">All categories</option>{(categories.data ?? []).filter(category => category.isActive !== false).map(category => <option key={category._id} value={category.name}>{category.name}</option>)}</select></label>
+            <label className="product-filter-field"><span>Stock availability</span><select className="admin-input" aria-label="Stock availability" value={filters.stock} onChange={event => changeFilter('stock', event.target.value)}><option value="">Any stock level</option><option value="healthy">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option></select></label>
+          </div>
+          <div className="product-filter-details">
+            <fieldset className="product-price-filter"><legend>Price range (₹)</legend><div className="product-price-inputs"><label><span className="admin-visually-hidden">Minimum price in rupees</span><input className="admin-input" type="number" min="0" step="0.01" inputMode="decimal" placeholder="Min ₹" value={minPrice} onChange={event => changeFilter('minPrice', event.target.value)} aria-invalid={priceError} aria-describedby={priceError ? 'product-price-error' : undefined} /></label><span aria-hidden="true">–</span><label><span className="admin-visually-hidden">Maximum price in rupees</span><input className="admin-input" type="number" min="0" step="0.01" inputMode="decimal" placeholder="Max ₹" value={maxPrice} onChange={event => changeFilter('maxPrice', event.target.value)} aria-invalid={priceError} aria-describedby={priceError ? 'product-price-error' : undefined} /></label></div>{priceError && <small id="product-price-error" role="alert">Maximum price must be at least the minimum.</small>}</fieldset>
+            <fieldset className="product-flag-filter"><legend>Show only</legend><div>{[['featured', 'Featured'], ['bestseller', 'Bestsellers'], ['newArrival', 'New arrivals']].map(([key, label]) => <label key={key}><input type="checkbox" checked={filters[key] === 'true'} onChange={event => changeFilter(key, event.target.checked ? 'true' : '')} />{label}</label>)}</div></fieldset>
+          </div>
+          <div className="product-filter-footer">
+            <div className="product-filter-summary"><span role="status">{loading ? 'Finding products…' : `${formatNumber(total)} product${total === 1 ? '' : 's'} found`}{activeCount > 0 && <small> · {activeCount} active filter{activeCount === 1 ? '' : 's'}</small>}</span>{activeCount > 0 && <button type="button" onClick={clearFilters}>Clear filters</button>}</div>
+            {can(role, 'inventory:read') && <div className="product-inventory-links"><span>Manage stock:</span><button type="button" onClick={() => navigate('/admin/inventory?view=low')}>Low stock → Inventory</button><button type="button" onClick={() => navigate('/admin/inventory?view=out')}>Out of stock → Inventory</button></div>}
+          </div>
+        </section>
         {canWrite ? <BulkActionBar selected={selected} categories={categories.data ?? []} onAction={bulk} onClear={() => setSelected([])} onExport={() => exportCsv({ slugs: selected.join(',') })} /> : null}
 
         {error ? (
@@ -267,11 +272,11 @@ export default function ProductsPage() {
                   title={filtered ? 'No products match this filter' : 'The catalogue is empty'}
                   description={
                     filtered
-                      ? 'Try another status tab, or clear the search box.'
+                      ? 'Try a broader search or clear the filters to see all products.'
                       : 'Create the first product, or seed the catalogue with pnpm backend:seed.'
                   }
                   action={
-                    canWrite && !filtered ? (
+                    filtered ? (<button type="button" className="admin-btn admin-btn-ghost" onClick={clearFilters}>Clear filters</button>) : canWrite ? (
                       <Link className="admin-btn admin-btn-primary" to="/admin/products/new">
                         + New product
                       </Link>

@@ -26,8 +26,8 @@ export class EngagementController {
   @Post('newsletter/unsubscribe') unsubscribe(@Body() dto: NewsletterTokenDto) { return this.service.newsletterAction(dto.token, true); }
   @Get('reviews/:slug') reviews(@Param('slug') slug: string) { return this.service.publicReviews(slug); }
   @Post('customer/me/reviews') @UseGuards(CustomerAuthGuard) review(@Req() req: CustomerRequest, @Body() dto: CreateReviewDto) { return this.service.createReview(req.customer.id, dto); }
-  @Get('customer/me/notifications') @UseGuards(CustomerAuthGuard) list(@Req() req: CustomerRequest) { return this.notifications.list(req.customer.email); }
-  @Patch('customer/me/notifications/:id/read') @UseGuards(CustomerAuthGuard) read(@Req() req: CustomerRequest, @Param('id') id: string) { return this.notifications.read(req.customer.email, id); }
+  @Get('customer/me/notifications') @UseGuards(CustomerAuthGuard) list(@Req() req: CustomerRequest) { return this.notifications.list(req.customer.id); }
+  @Patch('customer/me/notifications/:id/read') @UseGuards(CustomerAuthGuard) read(@Req() req: CustomerRequest, @Param('id') id: string) { return this.notifications.read(req.customer.id, id); }
 }
 @Controller('admin/engagement')
 @UseGuards(AdminAuthGuard, RolesGuard)

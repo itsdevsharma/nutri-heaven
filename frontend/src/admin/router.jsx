@@ -14,22 +14,23 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 const RouterContext = createContext(null);
 
 export function RouterProvider({ children }) {
-  const [path, setPath] = useState(() => window.location.pathname);
+  const [location, setLocation] = useState(() => ({ pathname: window.location.pathname, search: window.location.search }));
 
   useEffect(() => {
-    const syncFromHistory = () => setPath(window.location.pathname);
+    const syncFromHistory = () => setLocation({ pathname: window.location.pathname, search: window.location.search });
     window.addEventListener('popstate', syncFromHistory);
     return () => window.removeEventListener('popstate', syncFromHistory);
   }, []);
 
   const navigate = useCallback((to, { replace = false } = {}) => {
-    if (to === window.location.pathname) return;
+    const target = new URL(to, window.location.href);
+    if (target.href === window.location.href) return;
     window.history[replace ? 'replaceState' : 'pushState']({}, '', to);
-    setPath(to);
+    setLocation({ pathname: window.location.pathname, search: window.location.search });
     window.scrollTo(0, 0);
   }, []);
 
-  const value = useMemo(() => ({ path, navigate }), [path, navigate]);
+  const value = useMemo(() => ({ path: location.pathname, search: location.search, navigate }), [location, navigate]);
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
 

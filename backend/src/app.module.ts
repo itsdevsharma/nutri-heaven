@@ -22,9 +22,8 @@ import { CouponsModule } from './coupons/coupons.module';
 
 @Module({
   imports: [
-    // Reads `.env` from the repository root (one level up from `backend`)
-    // so the API shares one file with Compose. Every variable has a fallback
-    // below, which is why the stack boots with no `.env` present at all.
+    // Loads .env from the working directory: backend/.env under the root
+    // pnpm scripts, matching Compose. Host environment variables take precedence.
     ConfigModule.forRoot({ isGlobal: true }),
     // `forRootAsync` (not `forRoot`) on purpose: the factory runs when NestJS
     // instantiates the module, so `MONGODB_URI` is read lazily. With `forRoot`

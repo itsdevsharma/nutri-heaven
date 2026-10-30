@@ -1,3 +1,4 @@
+import { CheckoutModule } from '../checkout/checkout.module';
 import { Module, Controller, Get, Put, Post, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AdminModule } from '../admin/admin.module';
@@ -9,7 +10,6 @@ import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from '../admin/admin.schema';
 import { OrderModule } from '../orders/order.module';
 import { Order, OrderSchema } from '../orders/order.schema';
-import { ShiprocketClient } from './shiprocket.client';
 import { ShippingService } from './shipping.service';
 import { ShippingConfiguration, ShippingConfigurationSchema, ShiprocketShipment, ShiprocketShipmentSchema } from './shipping.schema';
 import { ShippingConfigurationDto, ShiprocketActionDto } from './shipping.dto';
@@ -25,5 +25,5 @@ export class ShippingController {
   @Get('orders/:id') get(@Param('id') id: string) { return this.shipping.get(id); }
   @Post('orders/:id/:action') action(@Param('id') id: string, @Param('action') action: string, @Body() dto: ShiprocketActionDto, @Req() req: AdminRequest) { return action === 'verify-and-ship' ? this.shipping.verifyAndShip(id, dto, req.admin!.email, req.admin!.role) : this.shipping.action(id, action, dto, req.admin!.sub); }
 }
-@Module({ imports: [OrderModule, AuthModule, AdminModule, AuditModule, MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }, { name: ShippingConfiguration.name, schema: ShippingConfigurationSchema }, { name: ShiprocketShipment.name, schema: ShiprocketShipmentSchema }])], controllers: [ShippingController], providers: [ShiprocketClient, ShippingService] })
+@Module({ imports: [CheckoutModule, OrderModule, AuthModule, AdminModule, AuditModule, MongooseModule.forFeature([{ name: Order.name, schema: OrderSchema }, { name: ShippingConfiguration.name, schema: ShippingConfigurationSchema }, { name: ShiprocketShipment.name, schema: ShiprocketShipmentSchema }])], controllers: [ShippingController], providers: [ShippingService] })
 export class ShippingModule {}

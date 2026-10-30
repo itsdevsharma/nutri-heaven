@@ -26,7 +26,7 @@ import { Modal } from '../components/Modal.jsx';
 import { categoryOptions } from '../lib/catalogue.js';
 
 function blankVariant() {
-  return { size: '', price: '', mrp: '', sku: '', barcode: '', taxPercent: '', stock: '0', lowStockLimit: '0', weightGrams: '', images: [], isActive: true };
+  return { size: '', price: '', mrp: '', sku: '', barcode: '', taxPercent: '', stock: '0', lowStockLimit: '0', weightGrams: '', lengthCm: '', breadthCm: '', heightCm: '', images: [], isActive: true };
 }
 
 function blankProduct() {
@@ -95,6 +95,9 @@ function fromProduct(product) {
       taxPercent: basisPointsToPercent(variant.taxBasisPoints),
       stock: String(variant.stockQuantity ?? 0),
       lowStockLimit: String(variant.lowStockLimit ?? 0),
+      lengthCm: variant.lengthCm == null ? '' : String(variant.lengthCm),
+      breadthCm: variant.breadthCm == null ? '' : String(variant.breadthCm),
+      heightCm: variant.heightCm == null ? '' : String(variant.heightCm),
       weightGrams:
         variant.weightGrams === undefined || variant.weightGrams === null ? '' : String(variant.weightGrams),
       images: variant.images ?? [],
@@ -122,8 +125,7 @@ const toNumber = (value) => Math.max(0, Number(String(value ?? '').replace(/[^0-
  *
  * Stock is deliberately not taken from the form on an update: the stored balance
  * is echoed back unchanged, because a balance may only move through an inventory
- * movement (`ADMIN_COMMERCE_PLAN.md`). On create the entered number is the
- * opening balance — the one moment a balance legitimately starts.
+ * movement. New packs start at zero and receive stock through Inventory.
  */
 function buildPayload(form, { isNew, sourceVariants }) {
   const variants = form.variants.map((variant, index) => ({
@@ -134,10 +136,13 @@ function buildPayload(form, { isNew, sourceVariants }) {
     barcode: variant.barcode.trim() || undefined,
     taxBasisPoints: variant.taxPercent === '' ? 0 : percentToBasisPoints(variant.taxPercent),
     lowStockLimit: toNumber(variant.lowStockLimit),
+    lengthCm: variant.lengthCm === '' ? undefined : toNumber(variant.lengthCm),
+    breadthCm: variant.breadthCm === '' ? undefined : toNumber(variant.breadthCm),
+    heightCm: variant.heightCm === '' ? undefined : toNumber(variant.heightCm),
     weightGrams: variant.weightGrams === '' ? undefined : toNumber(variant.weightGrams),
     images: variant.images ?? [],
     isActive: variant.isActive,
-    stockQuantity: isNew ? toNumber(variant.stock) : toNumber(sourceVariants?.[index]?.stockQuantity),
+    stockQuantity: isNew ? 0 : toNumber(sourceVariants?.find((stored) => stored.size === variant.size.trim())?.stockQuantity),
   }));
   // Variants are the pricing source of truth. The legacy product-level amounts
   // remain populated for public-card compatibility, derived from the least
@@ -191,8 +196,7 @@ function validate(form) {
 /**
  * Create and edit share one screen: `/admin/products/new` and
  * `/admin/products/:slug` both resolve here, which is what stops the two flows
- * from drifting apart. `isNew` decides whether stock is an opening balance or a
- * read-only figure.
+ * from drifting apart. Stock is read-only in both flows.
  */
 export default function ProductEditorPage({ params }) {
   const slug = params?.slug ?? null;
@@ -321,7 +325,7 @@ export default function ProductEditorPage({ params }) {
       const activeVariants = form.variants.filter((variant) => variant.isActive);
       const warnings = [!form.seoTitle.trim() && 'SEO title is empty', !form.seoDescription.trim() && 'SEO description is empty'].filter(Boolean);
       if (!form.image || !activeVariants.some((variant) => rupeesToPaise(variant.price) > 0)) { toast.error('Publishing requires a primary image and an active priced variant.'); return; }
-      if (!activeVariants.some((variant, index) => Number(isNew ? variant.stock : sourceVariants.current[index]?.stockQuantity) > 0)) { toast.error('Publishing requires an active variant with stock. Adjust existing stock in Inventory.'); return; }
+      if (!activeVariants.some((variant, index) => Number(isNew ? 0 : sourceVariants.current.find((stored) => stored.size === variant.size.trim())?.stockQuantity) > 0)) { toast.error('Publishing requires an active variant with stock. Adjust existing stock in Inventory.'); return; }
       const accepted = await confirm({ title: 'Publish this product?', message: warnings.length ? `Publishing checks passed. Warning: ${warnings.join('; ')}.` : 'Publishing checks passed: image, price and stock are present.', confirmLabel: 'Publish' });
       if (!accepted) return;
     }
@@ -455,7 +459,7 @@ export default function ProductEditorPage({ params }) {
                   className="admin-input admin-mono"
                   value={form.slug}
                   onChange={(event) => changeSlug(event.target.value)}
-                  disabled={!canWrite}
+                  disabled={!canWrite || !isNew}
                 />
               </FormField>
               <FormField label="SKU" hint="Optional, unique across the catalogue.">
@@ -669,9 +673,9 @@ export default function ProductEditorPage({ params }) {
                 <span>SKU</span>
                 <span>Barcode</span>
                 <span>Tax (%)</span>
-                <span>{isNew ? 'Opening stock' : 'Stock'}</span>
+                <span>Stock</span>
                 <span>Low-stock at</span>
-                <span>Weight (g)</span>
+                <span>Parcel: g / cm</span>
                 <span>Images</span>
                 <span>Live</span>
                 <span aria-hidden="true" />
@@ -703,20 +707,10 @@ export default function ProductEditorPage({ params }) {
                   <input className="admin-input admin-mono" value={variant.sku} placeholder="Optional" onChange={(event) => setVariant(index, 'sku', event.target.value)} disabled={!canWrite} />
                   <input className="admin-input admin-mono" value={variant.barcode} placeholder="Optional" onChange={(event) => setVariant(index, 'barcode', event.target.value)} disabled={!canWrite} />
                   <input className="admin-input admin-mono" inputMode="decimal" value={variant.taxPercent} placeholder="0" onChange={(event) => setVariant(index, 'taxPercent', event.target.value)} disabled={!canWrite} />
-                  {isNew ? (
-                    <input
-                      className="admin-input admin-mono"
-                      inputMode="numeric"
-                      value={variant.stock}
-                      onChange={(event) => setVariant(index, 'stock', event.target.value)}
-                      disabled={!canWrite}
-                    />
-                  ) : (
-                    <span className="admin-variant-static">
-                      <b>{variant.stock}</b>
-                      <small>inventory only</small>
-                    </span>
-                  )}
+                  <span className="admin-variant-static">
+                    <b>{isNew ? '0' : variant.stock}</b>
+                    <small>inventory only</small>
+                  </span>
                   <input
                     className="admin-input admin-mono"
                     inputMode="numeric"
@@ -724,13 +718,16 @@ export default function ProductEditorPage({ params }) {
                     onChange={(event) => setVariant(index, 'lowStockLimit', event.target.value)}
                     disabled={!canWrite}
                   />
-                  <input
+                  <div className="admin-pack-dimensions"><input
                     className="admin-input admin-mono"
+                    aria-label={`${variant.size || 'Pack'} gross weight in grams`}
+                    placeholder="Weight (g)"
                     inputMode="numeric"
                     value={variant.weightGrams}
                     onChange={(event) => setVariant(index, 'weightGrams', event.target.value)}
                     disabled={!canWrite}
                   />
+                  <div>{['lengthCm', 'breadthCm', 'heightCm'].map(field => <input key={field} className="admin-input admin-mono" type="number" min="0.51" step="0.01" aria-label={`${variant.size || 'Pack'} ${field}`} placeholder={`${field.replace('Cm', '')} (cm)`} value={variant[field] ?? ''} onChange={event => setVariant(index, field, event.target.value)} disabled={!canWrite} />)}</div></div>
                   <button type="button" className="admin-btn admin-btn-small admin-btn-ghost" disabled={!canWrite} onClick={() => setVariantImageEditor({ index, selected: variant.images ?? [] })}>Images ({(variant.images ?? []).length})</button>
                   <label className="admin-check admin-check-compact">
                     <input
@@ -756,8 +753,8 @@ export default function ProductEditorPage({ params }) {
 
             <p className="admin-hint">
               {isNew
-                ? 'Opening stock seeds the first balance. Every later change goes through an inventory movement, so this field is read-only once the product exists.'
-                : 'Stock balances are read-only here. The adjustment screen arrives with the inventory module; until then a balance moves only through inventory movements.'}
+                ? 'Save this product as a draft, add stock in Inventory, then publish it.'
+                : 'Stock balances are read-only here. Adjust stock through Inventory to record every movement.'}
             </p>
           </FormSection></div>
         <aside className="admin-editor-aside">

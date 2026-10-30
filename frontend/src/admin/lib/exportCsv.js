@@ -1,7 +1,7 @@
 export function downloadCsv(filename, columns, rows) {
   const cell = value => {
     let text = String(value ?? '');
-    if (/^[\s]*[=+@-]/.test(text)) text = `'${text}`;
+    if (/^[\s\u0000-\u001f]*[=+@-]/.test(text)) text = `'${text}`;
     return `"${text.replaceAll('"', '""')}"`;
   };
   const content = [columns.map(column => cell(column.label)).join(','), ...rows.map(row => columns.map(column => cell(row[column.key])).join(','))].join('\r\n');

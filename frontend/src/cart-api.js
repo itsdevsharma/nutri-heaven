@@ -1,3 +1,5 @@
+import { storeCache } from './store-cache.js';
+
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 const CART_ID_KEY = 'nutri_guest_cart_id';
 
@@ -22,7 +24,9 @@ async function request(path, options = {}) {
     error.status = response.status;
     throw error;
   }
-  return response.json();
+  const payload = await response.json();
+  if (options.method && options.method !== 'GET') storeCache.clear();
+  return payload;
 }
 
 export const cartApi = {
@@ -33,33 +37,26 @@ export const cartApi = {
   clear: () => request('/cart/items', { method: 'DELETE' }),
 };
 
+// Include the backend origin so switching environments cannot reuse another store's data.
+const cachedPublic = (path, ttl) => storeCache.get(`${API_URL}${path}`, ttl, () => request(path));
+
 /** Storefront order placement — idempotent via `idempotencyKey`. */
 export const storefrontApi = {
-  browse: params => request(`/products/browse?${new URLSearchParams(params)}`),
-  listProducts: (limit = 50, offset = 0) => request(`/products?limit=${limit}&offset=${offset}`),
-  getProduct: async (slug) => {
-    const key = `nutri-product:${slug}`;
-    try {
-      const cached = sessionStorage.getItem(key);
-      if (cached) {
-        const entry = JSON.parse(cached);
-        if (entry?.expiresAt > Date.now() && entry.product) return entry.product;
-      }
-    } catch { /* A blocked or full browser storage must never block shopping. */ }
-    const product = await request(`/products/${encodeURIComponent(slug)}`);
-    try { sessionStorage.setItem(key, JSON.stringify({ product, expiresAt: Date.now() + 60_000 })); } catch { /* Cache is optional. */ }
-    return product;
-  },
-  listCategories: () => request('/categories'),
+  checkoutConfig: () => request('/checkout/configuration'),
+  deliveryQuote: payload => request('/checkout/quotes', { method: 'POST', body: JSON.stringify(payload) }),
+  browse: params => cachedPublic(`/products/browse?${new URLSearchParams(params)}`, 60_000),
+  listProducts: (limit = 50, offset = 0) => cachedPublic(`/products?limit=${limit}&offset=${offset}`, 60_000),
+  getProduct: slug => cachedPublic(`/products/${encodeURIComponent(slug)}`, 60_000),
+  listCategories: () => cachedPublic('/categories', 300_000),
   quote: (lines) => request('/products/quote', { method: 'POST', body: JSON.stringify({ lines }) }),
   quoteCoupon: (code, lines, email) => request('/coupons/quote', { method: 'POST', body: JSON.stringify({ code, lines, email }) }),
     placeOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload), headers: localStorage.getItem(CUSTOMER_TOKEN_KEY) ? { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_TOKEN_KEY)}` } : {} }),
   getOrder: (id) => request(`/orders/${encodeURIComponent(id)}`),
-  publicSettings: () => request('/storefront/settings'),
+  publicSettings: () => cachedPublic('/storefront/settings', 300_000),
   subscribe: payload => request('/newsletter/subscribe', { method: 'POST', body: JSON.stringify(payload) }),
   newsletterAction: (action, token) => request(`/newsletter/${action}`, { method: 'POST', body: JSON.stringify({ token }) }),
   reviews: slug => request(`/reviews/${encodeURIComponent(slug)}`),
-  publicCms: () => request('/storefront/cms'),
+  publicCms: () => cachedPublic('/storefront/cms', 300_000),
 };
 
 const CUSTOMER_TOKEN_KEY = 'nutri_customer_access_token';

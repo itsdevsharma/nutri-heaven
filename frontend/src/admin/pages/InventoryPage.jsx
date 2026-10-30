@@ -11,7 +11,7 @@ import { assetUrl } from '../lib/catalogue.js';
 import { formatDateTime, formatNumber, formatPaise } from '../lib/format.js';
 import { can } from '../lib/permissions.js';
 import { useDebounced, useResource } from '../lib/useResource.js';
-import { Link } from '../router.jsx';
+import { Link, useRouter } from '../router.jsx';
 import { useSession } from '../session/session-context.js';
 
 /** The overview DTO caps `limit` at 500 packs per page. */
@@ -49,7 +49,16 @@ export default function InventoryPage() {
   const { role } = useSession();
   const toast = useToast();
 
-  const [view, setView] = useState('all');
+  const { path, search: routeSearch, navigate } = useRouter();
+  const requestedView = new URLSearchParams(routeSearch).get('view');
+  const view = ['low', 'out'].includes(requestedView) ? requestedView : 'all';
+  const setView = (nextView) => {
+    const params = new URLSearchParams(routeSearch);
+    if (nextView === 'all') params.delete('view');
+    else params.set('view', nextView);
+    const queryString = params.toString();
+    navigate(`${path}${queryString ? `?${queryString}` : ''}`);
+  };
   const [search, setSearch] = useState('');
   const query = useDebounced(search, 300);
 
