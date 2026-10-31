@@ -1,3 +1,4 @@
+import { randomId } from '../../random-id.js';
 import { useState } from 'react';
 import { DataTable } from '../components/DataTable.jsx';
 import { EmptyState, ErrorState, LoadingBlock } from '../components/Feedback.jsx';
@@ -127,7 +128,7 @@ export default function InventoryPage() {
         setLowStockLimit: Number(form.lowStockLimit) || 0,
         reason: form.reason.trim(),
         // One key per dialog open: resubmitting the same dialog is a no-op.
-        idempotencyKey: `adjust-${crypto.randomUUID()}`,
+        idempotencyKey: `adjust-${randomId()}`,
       });
       const delta = Number(movement?.quantity ?? 0);
       if (delta === 0) {

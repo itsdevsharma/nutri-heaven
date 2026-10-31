@@ -1,3 +1,4 @@
+import { randomId } from '../../random-id.js';
 import { useState } from 'react';
 import { FormField, FormGrid } from './FormField.jsx';
 import { formatPaise, formatDateTime } from '../lib/format.js';
@@ -9,7 +10,7 @@ export default function OrderOperations({ order, busy, runAction }) {
   const op = order.operations || {};
   const select = next => {
     setAction(next);
-    setDetails({ idempotencyKey: crypto.randomUUID(), reason: '', courier: op.courier || '', trackingNumber: order.trackingNumber || '', trackingUrl: order.trackingUrl || '', reference: '', amount: ((['record_cod_collection', 'record_cod_refund'].includes(next) ? order.totalPaise : (op.codCollectedPaise || 0) - (op.codSettledPaise || 0)) / 100).toFixed(2), inspection: order.lines.map(line => ({ productSlug: line.productSlug, packSize: line.packSize, quantity: line.quantity, disposition: 'write_off', condition: 'opened' })) });
+    setDetails({ idempotencyKey: randomId(), reason: '', courier: op.courier || '', trackingNumber: order.trackingNumber || '', trackingUrl: order.trackingUrl || '', reference: '', amount: ((['record_cod_collection', 'record_cod_refund'].includes(next) ? order.totalPaise : (op.codCollectedPaise || 0) - (op.codSettledPaise || 0)) / 100).toFixed(2), inspection: order.lines.map(line => ({ productSlug: line.productSlug, packSize: line.packSize, quantity: line.quantity, disposition: 'write_off', condition: 'opened' })) });
   };
   const update = (key, value) => setDetails(current => ({ ...current, [key]: value }));
   const submit = async event => {

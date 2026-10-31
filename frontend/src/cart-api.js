@@ -1,3 +1,4 @@
+import { randomId } from './random-id.js';
 import { storeCache } from './store-cache.js';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
@@ -6,7 +7,7 @@ const CART_ID_KEY = 'nutri_guest_cart_id';
 export function cartId() {
   let id = localStorage.getItem(CART_ID_KEY);
   if (!id) {
-    id = crypto.randomUUID().replace(/-/g, '');
+    id = randomId().replace(/-/g, '');
     localStorage.setItem(CART_ID_KEY, id);
   }
   return id;

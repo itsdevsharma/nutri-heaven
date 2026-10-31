@@ -1,3 +1,4 @@
+import { randomId } from './random-id.js';
 import StoreGallery from './store/StoreGallery.jsx';
 import OrderConfirmation from './OrderConfirmation.jsx';
 import { DEFAULT_FAQS } from './defaultFaqs.js';
@@ -431,7 +432,7 @@ export default function App() {
     try {
       if (form.paymentMethod==='razorpay' && !paymentConfig.enabled) throw new Error('Online payments are currently unavailable.');
       const current = await loadCart();
-      const attempt = {cartId:cartId(),paymentMethod:form.paymentMethod,payload:{cartId:cartId(),idempotencyKey:crypto.randomUUID(),customerName:form.name,customerEmail:form.email,customerPhone:form.phone.replace(/\D/g,''),deliveryAddress:{street:form.address,landmark:form.landmark,city:form.city,state:form.state,pin:form.pin},lines:current.items.map(i=>({productSlug:i.productId,packSize:i.packSize,quantity:i.quantity})),couponCode:form.couponCode||undefined,shippingQuoteId:form.shippingQuoteId,courierId:form.courierId,paymentMethod:form.paymentMethod}};
+      const attempt = {cartId:cartId(),paymentMethod:form.paymentMethod,payload:{cartId:cartId(),idempotencyKey:randomId(),customerName:form.name,customerEmail:form.email,customerPhone:form.phone.replace(/\D/g,''),deliveryAddress:{street:form.address,landmark:form.landmark,city:form.city,state:form.state,pin:form.pin},lines:current.items.map(i=>({productSlug:i.productId,packSize:i.packSize,quantity:i.quantity})),couponCode:form.couponCode||undefined,shippingQuoteId:form.shippingQuoteId,courierId:form.courierId,paymentMethod:form.paymentMethod}};
       persistPayment(attempt);
       await resumePayment(false,attempt);
     } catch(e) {setError(e.message);setBusy(false);}
