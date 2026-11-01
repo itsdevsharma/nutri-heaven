@@ -20,7 +20,7 @@ import { storeCache } from '../../store-cache.js';
  * single retry seam is documented on `request()` rather than implemented here.
  */
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = import.meta.env?.VITE_API_URL ?? 'http://localhost:3000';
 const SESSION_KEY = 'nutri_admin_session';
 
 export class ApiError extends Error {
@@ -106,16 +106,18 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
 
   const text = await response.text();
   let payload = null;
+  let validJson = true;
   if (text) {
     try {
       payload = JSON.parse(text);
     } catch {
-      payload = text;
+      validJson = false;
     }
   }
 
   if (response.status === 401 && auth && unauthorizedHandler) unauthorizedHandler();
   if (!response.ok) throw new ApiError(apiMessage(payload, response.status), response.status, payload);
+  if (!validJson) throw new ApiError('The API returned an unexpected response. Check VITE_API_URL and the server API routing, then retry.', response.status);
 
   // Seam for refresh tokens: when `POST /admin/auth/refresh` exists, a 401 can
   // be retried here once before the session is dropped.
@@ -242,7 +244,11 @@ export const adminApi = {
       const payload = await response.json().catch(() => null); if (!response.ok) throw new ApiError(apiMessage(payload,response.status),response.status,payload); return payload;
     },
   },
-  offers: { list: () => request('/admin/offers'), create: (payload) => request('/admin/offers', { method: 'POST', body: payload }), update: (id, payload) => request(`/admin/offers/${id}`, { method: 'PATCH', body: payload }), deactivate: (id) => request(`/admin/offers/${id}/deactivate`, { method: 'PATCH' }) },
+  offers: { list: async () => {
+    const offers = await request('/admin/offers');
+    if (!Array.isArray(offers)) throw new ApiError('The API returned an invalid offers list. Please retry or check the backend deployment.');
+    return offers;
+  }, create: (payload) => request('/admin/offers', { method: 'POST', body: payload }), update: (id, payload) => request(`/admin/offers/${id}`, { method: 'PATCH', body: payload }), deactivate: (id) => request(`/admin/offers/${id}/deactivate`, { method: 'PATCH' }) },
   coupons: { list: () => request('/admin/coupons'), create: (payload) => request('/admin/coupons', { method: 'POST', body: payload }), update: (id, payload) => request(`/admin/coupons/${id}`, { method: 'PATCH', body: payload }), deactivate: (id) => request(`/admin/coupons/${id}/deactivate`, { method: 'PATCH' }), redemptions: (code) => request(`/admin/coupons/${encodeURIComponent(code)}/redemptions`) },
   audit: { list: (params = {}) => request(`/admin/audit${toQuery(params)}`) },
 };
