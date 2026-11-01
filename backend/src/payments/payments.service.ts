@@ -1,4 +1,4 @@
-import { ConflictException, BadRequestException, ForbiddenException, Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PaymentWebhookEvent, PaymentWebhookEventDocument } from './webhook-event.schema';
@@ -51,6 +51,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return { enabled: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET), testMode: process.env.RAZORPAY_KEY_ID?.startsWith('rzp_test_') === true };
   }
 
+  private providerOrderError(error: unknown): never {
+    // Do not return the provider payload: it can contain sensitive details.
+    if ((error as { statusCode?: number } | null)?.statusCode === 401) {
+      throw new UnauthorizedException('Razorpay authentication failed. Please contact support.');
+    }
+    throw new InternalServerErrorException('Could not start online payment. Retry your saved checkout or cancel the unpaid order.');
+  }
+
   private async ownedOrder(orderId: string, cartId?: string) {
     const order = await this.orders.getOrder(orderId);
     if (!cartId || order.cartId !== cartId) throw new ForbiddenException('This payment belongs to another shopping session');
@@ -72,7 +80,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         // Search the receipt; never blindly issue a second provider order.
         let matches;
         try { matches = await client.orders.all({ receipt: order.id, count: 2 }); }
-        catch { throw new ServiceUnavailableException('Could not reconcile payment creation. Check payment status before retrying.'); }
+        catch (error) { this.providerOrderError(error); }
         const found = matches.items.filter(item => item.receipt === order.id);
         const recovered = found[0];
         if (found.length !== 1 || !recovered || Number(recovered.amount) !== order.totalPaise || recovered.currency !== 'INR') throw new ConflictException('Payment creation is in progress or needs reconciliation. Check payment status before retrying.');
@@ -80,7 +88,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       } else {
         let remote;
         try { remote = await client.orders.create({ amount: order.totalPaise, currency: 'INR', receipt: order.id, notes: { orderId: order.id } }); }
-        catch { throw new ServiceUnavailableException('Could not start online payment. Retry your saved checkout or cancel the unpaid order.'); }
+        catch (error) { this.providerOrderError(error); }
         order = await this.orders.attachRazorpayOrder(order.id, remote.id);
       }
     }
