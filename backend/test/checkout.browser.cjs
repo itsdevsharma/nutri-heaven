@@ -2,6 +2,12 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const { mkdir } = require('node:fs/promises');
+const storeMode = process.env.STORE_DELIVERY_FIXTURE === 'true';
+const courierId = storeMode ? 1 : 7;
+const shippingPaise = storeMode ? 15000 : 6525;
+const totalPaise = 10000 + shippingPaise;
+const totalText = (totalPaise / 100).toLocaleString('en-IN');
+const deliveryName = storeMode ? 'Interstate delivery' : 'Standard surface delivery';
 (async () => {
   const browser = await chromium.launch({ headless: true });
   try {
@@ -30,15 +36,15 @@ const { mkdir } = require('node:fs/promises');
           else if (url.pathname === '/categories') body = [{ _id: 'nuts', name: 'Nuts', slug: 'nuts', isActive: true }];
           else if (url.pathname.startsWith('/cart')) body = cart;
           else if (url.pathname === '/payments/razorpay/config') body = { enabled: true, testMode: true };
-          else if (url.pathname === '/checkout/configuration') body = { enabled: true };
+          else if (url.pathname === '/checkout/configuration') body = { enabled: true, mode: storeMode ? 'store' : 'shiprocket' };
           else if (url.pathname === '/checkout/quotes') {
             quoteRequests.push(route.request().postDataJSON());
             if (failNextQuote) {
               failNextQuote = false;
               return route.fulfill({ status: 503, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ message: 'Could not calculate delivery rates. Please retry.' }) });
             }
-            body = { id: '00000000-0000-4000-8000-000000000001', subtotalPaise: 10000, discountPaise: 0, taxPaise: 0, expiresAt: new Date(Date.now() + 600000).toISOString(), options: [{ courierId: 7, name: 'Standard surface delivery', shippingPaise: 6525, estimatedDays: '3–5' }, { courierId: 9, name: 'Express air delivery', shippingPaise: 9500, estimatedDays: '1–2' }], parcel: { weight: 0.28 } }; }
-          else if (url.pathname === '/orders') { submitted = route.request().postDataJSON(); body = savedOrder = { ...submitted, id: 'NH-PREVIEW', subtotalPaise: 10000, shippingPaise: 6525, totalPaise: 16525, status: submitted.paymentMethod === 'cod' ? 'confirmed' : 'pending', paymentStatus: 'pending', lines: [{ productName: 'Almonds', packSize: '250g', quantity: 1, unitPricePaise: 10000, lineTotalPaise: 10000 }] }; }
+            body = { id: '00000000-0000-4000-8000-000000000001', subtotalPaise: 10000, discountPaise: 0, taxPaise: 0, expiresAt: new Date(Date.now() + 600000).toISOString(), options: storeMode ? [{ courierId, name: deliveryName, shippingPaise, estimatedDays: '' }] : [{ courierId, name: deliveryName, shippingPaise, estimatedDays: '3–5' }, { courierId: 9, name: 'Express air delivery', shippingPaise: 9500, estimatedDays: '1–2' }], ...(storeMode ? { source: 'store', storeRate: { zone: 'interstate', weightGrams: 250, slabGrams: 1000, slabs: 1, ratePaise: shippingPaise } } : { parcel: { weight: 0.28 } }) }; }
+          else if (url.pathname === '/orders') { submitted = route.request().postDataJSON(); body = savedOrder = { ...submitted, id: 'NH-PREVIEW', subtotalPaise: 10000, shippingPaise, totalPaise, status: submitted.paymentMethod === 'cod' ? 'confirmed' : 'pending', paymentStatus: 'pending', lines: [{ productName: 'Almonds', packSize: '250g', quantity: 1, unitPricePaise: 10000, lineTotalPaise: 10000 }] }; }
           else if (url.pathname === '/payments/razorpay/orders/NH-PREVIEW/verify') body = { ...savedOrder, status: 'confirmed', paymentStatus: 'paid' };
           else if (url.pathname === '/payments/razorpay/orders/NH-PREVIEW') body = route.request().method() === 'POST' ? { keyId: 'rzp_test_fixture', razorpayOrderId: 'order_preview', amount: savedOrder.totalPaise, currency: 'INR' } : savedOrder;
           else if (url.pathname.startsWith('/reviews')) body = { items: [], count: 0, average: 0 };
@@ -70,15 +76,18 @@ const { mkdir } = require('node:fs/promises');
       await page.getByLabel('City', { exact: true }).fill('Delhi');
       await page.getByLabel('State', { exact: true }).fill('Delhi');
       await page.getByLabel('PIN code', { exact: true }).fill('110001');
-      await page.getByText('Standard surface delivery', { exact: false }).waitFor();
-      assert.match(await page.locator('.summary-total').innerText(), /165\.25/);
-      await page.getByLabel('Express air delivery', { exact: false }).check();
-      assert.match(await page.locator('.summary-total').innerText(), /195/);
+      await page.getByText(deliveryName, { exact: false }).waitFor();
+      assert((await page.locator('.summary-total').innerText()).includes(totalText));
+      if (storeMode) await page.getByText('Shipping weight: 250 g', { exact: false }).waitFor();
+      if (!storeMode) {
+        await page.getByLabel('Express air delivery', { exact: false }).check();
+        assert.match(await page.locator('.summary-total').innerText(), /195/);
+      }
       await page.getByLabel('City', { exact: true }).fill('New Delhi');
       assert.equal(await page.locator('.delivery-option').count(), 0, 'Address change must invalidate delivery');
       await page.locator('.delivery-option').first().waitFor();
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Horizontal overflow at ${width}px`);
-      await page.screenshot({ path: `/tmp/nutri-checkout-preview/${width}.png`, fullPage: true });
+      await page.screenshot({ path: `/tmp/nutri-checkout-preview/${storeMode ? 'store-' : ''}${width}.png`, fullPage: true });
       // Payment type changes require new rates (COD fees may differ).
       await page.getByLabel('Pay online with Razorpay', { exact: false }).check();
       assert.equal(await page.locator('.delivery-option').count(), 0);
@@ -91,15 +100,15 @@ const { mkdir } = require('node:fs/promises');
       assert(await page.locator('button[type="submit"]').isDisabled());
       await page.getByRole('button', { name: 'Refresh delivery', exact: true }).click();
       await page.locator('.delivery-option').first().waitFor();
-      await page.getByLabel('Standard surface delivery', { exact: false }).check();
-      assert.match(await page.locator('button[type="submit"]').innerText(), /165\.25/);
+      await page.getByLabel(deliveryName, { exact: false }).check();
+      assert((await page.locator('button[type="submit"]').innerText()).includes(totalText));
       await page.getByRole('checkbox', { name: 'I agree' }).check();
-      await page.getByRole('button', { name: 'Pay ₹165.25', exact: false }).click();
+      await page.getByRole('button', { name: `Pay ₹${totalText}`, exact: false }).click();
       await page.getByText('Payment received', { exact: true }).waitFor();
-      assert.equal(submitted.shippingQuoteId, '00000000-0000-4000-8000-000000000001'); assert.equal(submitted.courierId, 7);
-      assert.equal(await page.evaluate(() => window.checkoutOptions.amount), 16525);
+      assert.equal(submitted.shippingQuoteId, '00000000-0000-4000-8000-000000000001'); assert.equal(submitted.courierId, courierId);
+      assert.equal(await page.evaluate(() => window.checkoutOptions.amount), totalPaise);
       assert.deepEqual(errors, [], `Browser errors at ${width}px`);
-      console.log(`Checkout passed: ${width}px, checkout refresh/back/forward/return-to-bag, automatic delivery, courier selection, address/payment invalidation, error retry, matching Razorpay amount, no overflow or page errors`);
+      console.log(`Checkout passed: ${storeMode ? 'store' : 'shiprocket'} ${width}px, checkout refresh/back/forward/return-to-bag, automatic delivery, courier selection, address/payment invalidation, error retry, matching Razorpay amount, no overflow or page errors`);
       await page.close();
     }
   } finally { await browser.close(); }

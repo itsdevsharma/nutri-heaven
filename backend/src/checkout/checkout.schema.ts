@@ -1,4 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import type { StoreDeliveryRate } from './delivery-policy';
 export interface Parcel { pickupLocation: string; pickupPostcode: string; weight: number; length: number; breadth: number; height: number }
 export interface DeliveryOption { courierId: number; name: string; shippingPaise: number; estimatedDays: string }
 @Schema({ collection: 'checkout_quotes', timestamps: true })
@@ -7,7 +8,9 @@ export class CheckoutQuote {
   @Prop({ required: true }) cartId!: string;
   @Prop({ required: true }) fingerprint!: string;
   @Prop({ required: true }) pricingFingerprint!: string;
-  @Prop({ type: Object, required: true }) parcel!: Parcel;
+  @Prop({ enum: ['store', 'shiprocket'], default: 'shiprocket' }) source!: 'store' | 'shiprocket';
+  @Prop({ type: Object }) parcel?: Parcel;
+  @Prop({ type: Object }) storeRate?: StoreDeliveryRate;
   @Prop({ type: [Object], required: true }) options!: DeliveryOption[];
   @Prop({ type: [Object], default: [] }) lines!: Array<{ slug: string; packSize: string; quantity: number; unitPricePaise: number; lineTotalPaise: number }>;
   @Prop({ default: () => new Date() }) quotedAt!: Date;
@@ -19,4 +22,4 @@ export class CheckoutQuote {
 }
 export const CheckoutQuoteSchema = SchemaFactory.createForClass(CheckoutQuote);
 CheckoutQuoteSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86400 });
-export interface ShippingSnapshot { quoteId: string; courierId: number; name: string; quotedAt: Date; expiresAt: Date; parcel: Parcel; pricingFingerprint: string }
+export interface ShippingSnapshot { quoteId: string; courierId: number; name: string; quotedAt: Date; expiresAt: Date; source?: 'store' | 'shiprocket'; parcel?: Parcel; storeRate?: StoreDeliveryRate; pricingFingerprint: string }

@@ -6,6 +6,7 @@ import { Product, ProductDocument } from '../products/product.schema';
 import { Cart, CartDocument } from './cart.schema';
 import { AddCartItemDto, UpdateCartItemDto } from './cart.dto';
 import { OffersService } from '../offers/offers.service';
+import { checkoutRatesEnabled } from '../checkout/delivery-policy';
 
 @Injectable()
 export class CartService {
@@ -51,7 +52,7 @@ export class CartService {
       return { productId: item.productId, packSize: item.packSize, quantity: item.quantity, unitPricePaise, productName: item.productName, image: item.image, stock: item.stock, savedForLater: item.savedForLater };
     }));
     const subtotalPaise = items.reduce((sum, item) => sum + item.unitPricePaise * item.quantity, 0);
-    const shippingPending = process.env.SHIPROCKET_CHECKOUT_ENABLED === 'true';
+    const shippingPending = checkoutRatesEnabled();
     const shippingPaise = shippingPending ? null : shippingFeeForPaise(subtotalPaise);
     const gstPaise = Math.round(subtotalPaise * .05 / 1.05);
     return { cartId: cart.cartId, items, savedItems: cart.items.filter(item => item.savedForLater), note: cart.note, subtotalPaise, couponDiscountPaise: 0, gstPaise, cgstPaise: Math.floor(gstPaise / 2), sgstPaise: Math.ceil(gstPaise / 2), shippingPending, shippingPaise, totalPaise: shippingPending ? null : subtotalPaise + (shippingPaise ?? 0) };

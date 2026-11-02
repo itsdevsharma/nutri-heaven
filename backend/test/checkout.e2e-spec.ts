@@ -30,7 +30,7 @@ describe('Authoritative Shiprocket checkout', () => {
   const oldEnv = { ...process.env };
   beforeAll(async () => {
     mongo = await startMemoryReplica();
-    process.env.MONGODB_URI = mongo.uri; process.env.SHIPROCKET_CHECKOUT_ENABLED = 'true';
+    process.env.SHIPPING_RATE_MODE = 'shiprocket'; process.env.MONGODB_URI = mongo.uri; process.env.SHIPROCKET_CHECKOUT_ENABLED = 'true';
     process.env.RAZORPAY_KEY_ID = 'rzp_test_placeholder'; process.env.RAZORPAY_KEY_SECRET = 'test-secret'; process.env.RAZORPAY_WEBHOOK_SECRET = 'webhook-secret';
     const module = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(ShiprocketClient).useValue(provider).compile();
     app = module.createNestApplication({ rawBody: true }); app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })); await app.init();
@@ -38,7 +38,7 @@ describe('Authoritative Shiprocket checkout', () => {
     await app.get<Model<Product>>(getModelToken(Product.name)).create({ slug: 'nuts', title: 'Nuts', description: 'Nuts', image: 'nuts.jpg', category: 'Nuts', pricePaise: 10000, status: 'active', variants: [{ size: '250g', pricePaise: 10000, weightGrams: 280, lengthCm: 10, breadthCm: 8, heightCm: 3, stockQuantity: 100, isActive: true }] });
     await app.get<Model<ShippingConfiguration>>(getModelToken(ShippingConfiguration.name)).create({ key: 'shiprocket', pickupLocation: 'Warehouse', weight: 0.1, length: 15, breadth: 10, height: 5 });
   });
-  afterAll(async () => { await app?.close(); await mongo?.stop(); for (const key of ['SHIPROCKET_CHECKOUT_ENABLED', 'SHIPROCKET_RATE_DIFFERENCE_POLICY', 'RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET', 'MONGODB_URI']) { if (oldEnv[key] === undefined) delete process.env[key]; else process.env[key] = oldEnv[key]; } });
+  afterAll(async () => { await app?.close(); await mongo?.stop(); for (const key of ['SHIPPING_RATE_MODE', 'SHIPROCKET_CHECKOUT_ENABLED', 'SHIPROCKET_RATE_DIFFERENCE_POLICY', 'RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET', 'MONGODB_URI']) { if (oldEnv[key] === undefined) delete process.env[key]; else process.env[key] = oldEnv[key]; } });
   const basket = () => ({ cartId: randomUUID(), deliveryAddress: { street: '12 Main', city: 'Delhi', state: 'Delhi', pin: '110001' }, lines: [{ productSlug: 'nuts', packSize: '250g', quantity: 2 }], paymentMethod: 'razorpay' });
   const quote = async (body: any) => (await request(app.getHttpServer()).post('/checkout/quotes').send(body).expect(201)).body;
   const payload = (body: any, shipping: any) => ({ ...body, customerName: 'Buyer', customerPhone: '9876543210', customerEmail: 'buyer@example.com', idempotencyKey: randomUUID(), shippingQuoteId: shipping.id, courierId: 7 });

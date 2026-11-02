@@ -1,8 +1,9 @@
 // Read-only deployment checks. No account creation, email or payment operations.
 const site = process.env.SMOKE_SITE_URL;
 const api = process.env.SMOKE_API_URL;
-if (!site || !api) throw new Error('Set SMOKE_SITE_URL and SMOKE_API_URL to the deployed HTTPS origins.');
+if (!site || !api) throw new Error('Set SMOKE_SITE_URL and SMOKE_API_URL to the deployed HTTPS site and API base URL (including /api when used).');
 for (const origin of [site, api]) if (new URL(origin).protocol !== 'https:') throw new Error('Deployment origins must use HTTPS.');
+const endpoint = (base, path) => new URL(path.replace(/^\/+/, ''), base.replace(/\/?$/, '/'));
 const checks = [
   [api, '/health', 'application/json', body => JSON.parse(body).status === 'ok'],
   [api, '/products/browse?limit=1', 'application/json', body => Array.isArray(JSON.parse(body).items)],
@@ -20,12 +21,21 @@ const checks = [
 let failed = false;
 for (const [origin, path, type, validate] of checks) {
   try {
-    const response = await fetch(new URL(path, origin), { signal: AbortSignal.timeout(20000) });
+    const response = await fetch(endpoint(origin, path), { signal: AbortSignal.timeout(20000) });
     const body = await response.text();
     if (new URL(response.url).protocol !== 'https:') throw new Error('Redirect downgraded HTTPS');
     if (!response.ok || !response.headers.get('content-type')?.includes(type) || !validate(body)) throw new Error(`Unexpected status/content: ${response.status}`);
     console.log(`PASS ${path}`);
   } catch (error) { failed = true; console.error(`FAIL ${path}: ${error.message}`); }
+}
+// A JSON 401 proves the protected route reached NestJS without exposing data.
+for (const path of ['/inventory/admin', '/admin/settings', '/admin/offers', '/admin/coupons', '/admin/audit', '/admin/users', '/admin/engagement/report', '/admin/cms/faqs', '/admin/shipping/configuration']) {
+  try {
+    const response = await fetch(endpoint(api, path), { signal: AbortSignal.timeout(20000) });
+    const body = await response.json();
+    if (response.status !== 401 || body.statusCode !== 401) throw new Error('Expected a protected JSON API response');
+    console.log(`PASS protected ${path}`);
+  } catch (error) { failed = true; console.error(`FAIL protected ${path}: ${error.message}`); }
 }
 // Browsers require both the actual response and the authorization preflight.
 for (const method of ['GET', 'OPTIONS']) {
@@ -35,7 +45,7 @@ for (const method of ['GET', 'OPTIONS']) {
       headers['Access-Control-Request-Method'] = 'POST';
       headers['Access-Control-Request-Headers'] = 'authorization,content-type';
     }
-    const response = await fetch(new URL('/health', api), {
+    const response = await fetch(endpoint(api, '/health'), {
       method, headers, signal: AbortSignal.timeout(20000),
     });
     if (!response.ok || response.headers.get('access-control-allow-origin') !== new URL(site).origin)

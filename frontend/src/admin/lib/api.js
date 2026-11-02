@@ -1,4 +1,5 @@
 import { storeCache } from '../../store-cache.js';
+import { API_URL } from '../../api-origin.js';
 
 /**
  * The console's only door to the API.
@@ -20,7 +21,6 @@ import { storeCache } from '../../store-cache.js';
  * single retry seam is documented on `request()` rather than implemented here.
  */
 
-const API_URL = import.meta.env?.VITE_API_URL ?? 'http://localhost:3000';
 const SESSION_KEY = 'nutri_admin_session';
 
 export class ApiError extends Error {

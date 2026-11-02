@@ -1,7 +1,7 @@
 import { randomId } from './random-id.js';
 import { storeCache } from './store-cache.js';
+import { API_URL } from './api-origin.js';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 const CART_ID_KEY = 'nutri_guest_cart_id';
 
 export function cartId() {

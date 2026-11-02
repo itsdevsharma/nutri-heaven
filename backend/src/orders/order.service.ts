@@ -140,7 +140,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
       id: orderId,
       checkoutFingerprint,
       currency: 'INR', taxPaise: 0,
-      ...(delivery ? { shippingQuote: { quoteId: delivery.quote.id, courierId: delivery.selected.courierId, name: delivery.selected.name, quotedAt: delivery.quote.quotedAt, expiresAt: delivery.quote.expiresAt, parcel: delivery.quote.parcel, pricingFingerprint: delivery.quote.pricingFingerprint } } : {}),
+      ...(delivery ? { shippingQuote: { quoteId: delivery.quote.id, courierId: delivery.selected.courierId, name: delivery.selected.name, quotedAt: delivery.quote.quotedAt, expiresAt: delivery.quote.expiresAt, source: delivery.quote.source, parcel: delivery.quote.parcel, storeRate: delivery.quote.storeRate, pricingFingerprint: delivery.quote.pricingFingerprint } } : {}),
       cartId: dto.cartId,
       customerId,
       customerName: dto.customerName,

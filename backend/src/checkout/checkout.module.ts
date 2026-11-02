@@ -11,7 +11,7 @@ import { ShippingConfiguration, ShippingConfigurationSchema } from '../shipping/
 @Controller('checkout')
 class CheckoutController {
   constructor(private service: CheckoutService) {}
-  @Get('configuration') configuration() { return { enabled: this.service.enabled }; }
+  @Get('configuration') configuration() { return { enabled: this.service.enabled, mode: this.service.mode }; }
   @Post('quotes') quote(@Body() dto: CheckoutQuoteDto) { return this.service.quote(dto); }
 }
 @Module({ imports: [ProductsModule, CouponsModule, MongooseModule.forFeature([{ name: CheckoutQuote.name, schema: CheckoutQuoteSchema }, { name: Product.name, schema: ProductSchema }, { name: ShippingConfiguration.name, schema: ShippingConfigurationSchema }])], controllers: [CheckoutController], providers: [CheckoutService, ShiprocketClient], exports: [CheckoutService, ShiprocketClient] })
