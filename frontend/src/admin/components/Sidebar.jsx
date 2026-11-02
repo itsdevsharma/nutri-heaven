@@ -1,4 +1,5 @@
 import { Pill } from './StatusPill.jsx';
+import InstallApp from '../../InstallApp.jsx';
 import { API_URL } from '../lib/api.js';
 import { can, roleLabel } from '../lib/permissions.js';
 import { NAV_GROUP_ORDER, navRoutes } from '../routes.jsx';
@@ -57,6 +58,7 @@ export function Sidebar({ open, onNavigate }) {
       </nav>
 
       <div className="admin-sidebar-foot">
+        <InstallApp />
         <div className="admin-who">
           <b>{admin?.name ?? 'Signed in'}</b>
           <small>{admin?.email}</small>

@@ -1,0 +1,16 @@
+.app-install-trigger { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 0; border: 0; background: transparent; color: var(--green); font: 600 13px/1.4 Manrope, Arial, sans-serif; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.app-install-trigger:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.footer-support .app-install-trigger { font-size: 13px; }
+.app-install-dialog { box-sizing: border-box; width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 24px; overflow-y: auto; border: 1px solid #ded7c5; border-radius: 10px; background: #fffdf7; color: #173e2e; font: 14px/1.65 Manrope, Arial, sans-serif; }
+.app-install-dialog::backdrop { background: rgba(9,41,31,.5); }
+.app-install-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.app-install-dialog h2 { margin: 0; font: 600 20px/1.4 Manrope, Arial, sans-serif; font-size: 20px !important; color: #173e2e; }
+.app-install-heading button { display: grid; place-items: center; flex: 0 0 36px; height: 36px; margin-top: -4px; border: 1px solid #ded7c5; border-radius: 6px; background: transparent; color: inherit; font-size: 22px; cursor: pointer; }
+.app-install-dialog p { margin: 14px 0; }
+.app-install-dialog ol { padding-left: 22px; margin: 18px 0; }
+.app-install-dialog li + li { margin-top: 10px; }
+.app-install-dialog .app-install-note { color: #596b60; font-size: 12px; }
+.app-install-done { width: 100%; min-height: 44px; margin-top: 8px; padding: 10px 16px; border: 0; border-radius: 6px; background: #153f2f; color: #fff; font: 600 13px Manrope, Arial, sans-serif; cursor: pointer; }
+.app-install-dialog button:focus-visible { outline: 2px solid #153f2f; outline-offset: 3px; }
+.admin-sidebar-foot .app-install-trigger { color: var(--nav-ink); justify-content: flex-start; }
+@media (display-mode: standalone) { .app-install-trigger { display: none; } }

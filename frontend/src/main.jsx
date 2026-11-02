@@ -7,6 +7,9 @@ import AdminApp from './admin/AdminApp.jsx';
 // (`body`, `h1`, `h2`) without a fight of `!important` declarations.
 import '../style.css';
 import './admin/admin.css';
+import { registerAppWorker } from './pwa.js';
+
+if (import.meta.env.PROD) registerAppWorker();
 
 /**
  * Two surfaces, one bundle.

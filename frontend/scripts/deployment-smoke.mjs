@@ -22,6 +22,18 @@ const checks = [
 ];
 let failed = false;
 const checkedAssets = new Set();
+for (const [path, type, validate] of [
+  ['/manifest.webmanifest', /application\/manifest\+json/, body => { const manifest = JSON.parse(body); return manifest.display === 'standalone' && manifest.scope === '/' && manifest.icons.some(icon => icon.sizes === '512x512'); }],
+  ['/sw.js', /(?:application|text)\/javascript/, body => body.includes('nutri-app-offline-') && !body.includes('__APP_VERSION__')],
+  ['/offline.html', /text\/html/, body => body.includes('You’re offline') && body.includes('noindex')],
+]) {
+  try {
+    const response = await fetch(endpoint(site, path), { signal: AbortSignal.timeout(20000) });
+    if (!response.ok || !type.test(response.headers.get('content-type') || '') || !validate(await response.text())) throw new Error(`Invalid PWA resource: ${response.status}`);
+    if (!/no-cache|no-store|max-age=0/.test(response.headers.get('cache-control') || '')) throw new Error('PWA resource needs revalidation');
+    console.log(`PASS app resource ${path}`);
+  } catch (error) { failed = true; console.error(`FAIL app resource ${path}: ${error.message}`); }
+}
 for (const [origin, path, type, validate] of checks) {
   try {
     const response = await fetch(endpoint(origin, path), { signal: AbortSignal.timeout(20000) });
