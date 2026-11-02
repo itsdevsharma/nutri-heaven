@@ -681,3 +681,5 @@ footer{background:#d4c19d}
 
 .delivery-lookup,.delivery-lookup:hover{color:var(--green);border:1px solid #d5cfc0;padding:12px;min-height:44px;text-align:left}
 .delivery-lookup:disabled{opacity:.55;cursor:not-allowed}
+
+.footer-support .text-link{display:inline-flex;align-items:center;gap:16px;min-height:44px;max-width:100%;padding:10px 0;overflow-wrap:anywhere}.footer-support small{display:block;margin-top:8px;font:12px/1.5 Manrope,Arial,sans-serif}
