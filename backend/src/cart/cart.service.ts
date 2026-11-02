@@ -50,7 +50,10 @@ export class CartService {
       const unitPricePaise = product ? await this.offers.priceFor(product, item.unitPricePaise) : item.unitPricePaise;
       return { productId: item.productId, packSize: item.packSize, quantity: item.quantity, unitPricePaise, productName: item.productName, image: item.image, stock: item.stock, savedForLater: item.savedForLater };
     }));
-    const subtotalPaise = items.reduce((sum, item) => sum + item.unitPricePaise * item.quantity, 0); const shippingPaise = shippingFeeForPaise(subtotalPaise); const gstPaise = Math.round(subtotalPaise * .05 / 1.05);
-    return { cartId: cart.cartId, items, savedItems: cart.items.filter(item => item.savedForLater), note: cart.note, subtotalPaise, couponDiscountPaise: 0, gstPaise, cgstPaise: Math.floor(gstPaise / 2), sgstPaise: Math.ceil(gstPaise / 2), shippingPaise, totalPaise: subtotalPaise + shippingPaise };
+    const subtotalPaise = items.reduce((sum, item) => sum + item.unitPricePaise * item.quantity, 0);
+    const shippingPending = process.env.SHIPROCKET_CHECKOUT_ENABLED === 'true';
+    const shippingPaise = shippingPending ? null : shippingFeeForPaise(subtotalPaise);
+    const gstPaise = Math.round(subtotalPaise * .05 / 1.05);
+    return { cartId: cart.cartId, items, savedItems: cart.items.filter(item => item.savedForLater), note: cart.note, subtotalPaise, couponDiscountPaise: 0, gstPaise, cgstPaise: Math.floor(gstPaise / 2), sgstPaise: Math.ceil(gstPaise / 2), shippingPending, shippingPaise, totalPaise: shippingPending ? null : subtotalPaise + (shippingPaise ?? 0) };
   }
 }

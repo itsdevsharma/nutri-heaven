@@ -44,7 +44,7 @@ const cachedPublic = (path, ttl) => storeCache.get(`${API_URL}${path}`, ttl, () 
 /** Storefront order placement — idempotent via `idempotencyKey`. */
 export const storefrontApi = {
   checkoutConfig: () => request('/checkout/configuration'),
-  deliveryQuote: payload => request('/checkout/quotes', { method: 'POST', body: JSON.stringify(payload) }),
+  deliveryQuote: (payload, signal) => request('/checkout/quotes', { method: 'POST', body: JSON.stringify(payload), signal }),
   browse: params => cachedPublic(`/products/browse?${new URLSearchParams(params)}`, 60_000),
   listProducts: (limit = 50, offset = 0) => cachedPublic(`/products?limit=${limit}&offset=${offset}`, 60_000),
   getProduct: slug => cachedPublic(`/products/${encodeURIComponent(slug)}`, 60_000),

@@ -53,6 +53,11 @@ describe('Authoritative Shiprocket checkout', () => {
     await request(app.getHttpServer()).post('/orders').send({ ...payload(body, shipping), shippingQuoteId: undefined }).expect(409);
     await request(app.getHttpServer()).post('/checkout/quotes').send({ ...body, lines: [...body.lines, ...body.lines] }).expect(400);
   });
+  it('does not present a fixed shipping fee as the final cart total', async () => {
+    const cartId = randomUUID();
+    const cart = (await request(app.getHttpServer()).post('/cart/items').set('x-cart-id', cartId).send({ productId: 'nuts', packSize: '250g', quantity: 2 }).expect(201)).body;
+    expect(cart).toMatchObject({ subtotalPaise: 20000, shippingPending: true, shippingPaise: null, totalPaise: null });
+  });
   it('rejects wrong ownership, changed address, stock, rates and expired quotes', async () => {
     const body = basket(); const shipping = await quote(body);
     await request(app.getHttpServer()).post('/orders').send(payload({ ...body, cartId: randomUUID() }, shipping)).expect(409);
@@ -135,10 +140,25 @@ describe('Authoritative Shiprocket checkout', () => {
     const body = basket(); const shipping = await quote(body); const order = (await request(app.getHttpServer()).post('/orders').send(payload(body, shipping)).expect(201)).body;
     remote.orders.create.mockRejectedValueOnce(new Error('Connection lost'));
     const start = () => request(app.getHttpServer()).post(`/payments/razorpay/orders/${order.id}`).set('x-cart-id', body.cartId);
-    await start().expect(503); const count = remote.orders.create.mock.calls.length;
+    await start().expect(500); const count = remote.orders.create.mock.calls.length;
     remote.orders.all.mockResolvedValueOnce({ items: [{ id: 'recovered_order', receipt: order.id, amount: order.totalPaise, currency: 'INR' }] } as any);
     const recovered = (await start().expect(201)).body; expect(recovered.razorpayOrderId).toBe('recovered_order');
     expect(remote.orders.create).toHaveBeenCalledTimes(count);
   });
 
+  it('quotes mixed pack sizes and quantities, then sends the full total to Razorpay', async () => {
+    const products = app.get<Model<Product>>(getModelToken(Product.name));
+    await products.updateOne({ slug: 'nuts' }, { $push: { variants: { size: '500g', pricePaise: 18000, weightGrams: 540, lengthCm: 12, breadthCm: 9, heightCm: 4, stockQuantity: 20, isActive: true } } });
+    const body = { ...basket(), lines: [{ productSlug: 'nuts', packSize: '250g', quantity: 3 }, { productSlug: 'nuts', packSize: '500g', quantity: 2 }] };
+    const shipping = await quote(body);
+    expect(shipping.parcel).toMatchObject({ weight: 1.92, length: 12, breadth: 9, height: 17 });
+    expect(shipping.subtotalPaise).toBe(66000);
+    const order = (await request(app.getHttpServer()).post('/orders').send(payload(body, shipping)).expect(201)).body;
+    const payment = (await request(app.getHttpServer()).post(`/payments/razorpay/orders/${order.id}`).set('x-cart-id', body.cartId).expect(201)).body;
+    expect(order.shippingPaise).toBe(6525);
+    expect(order.totalPaise).toBe(72525);
+    expect(payment.amount).toBe(order.totalPaise);
+    expect(remote.orders.create).toHaveBeenCalledWith(expect.objectContaining({ receipt: order.id, amount: 72525, currency: 'INR' }));
+    await products.updateOne({ slug: 'nuts' }, { $pull: { variants: { size: '500g' } } });
+  });
 });
