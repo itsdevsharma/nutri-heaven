@@ -8,6 +8,19 @@
     <meta name="apple-mobile-web-app-title" content="Nutri Heaven" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/assets/pwa/icon-180.png" />
+    <style>
+      html { background: #faf7ef; }
+      body { margin: 0; }
+      .store-boot { display: none; }
+      #root[data-booting] > .store-fallback { display: none; }
+      #root[data-booting] > .store-boot { display: flex; }
+      .store-boot { min-height: 100vh; min-height: 100svh; padding: 32px 24px; box-sizing: border-box; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #153f2f; font: 14px/1.5 system-ui, sans-serif; }
+      .store-boot-brand { font: 32px/1.2 Georgia, serif; }
+      .store-fallback, .store-boot-note { max-width: 1080px; margin: 0 auto; padding: 24px; color: #153f2f; font: 16px/1.7 system-ui, sans-serif; }
+      .store-fallback h1 { font: 32px/1.25 Georgia, serif; }
+      .store-fallback a, .store-boot-note a { color: #153f2f; text-underline-offset: 3px; }
+      .store-fallback li { margin-block: 8px; }
+    </style>
     <!-- SEO_START -->
     <title>Nutri Heaven — Premium Dry Fruits, Nuts &amp; Seeds</title>
     <meta name="description" content="Shop premium dry fruits, nuts and seeds at Nutri Heaven. Discover fresh pantry favourites with delivery across India." data-seo />
