@@ -34,6 +34,14 @@ export class EngagementService {
     return { message: unsubscribe ? 'You have been unsubscribed.' : 'Your subscription is confirmed.' };
   }
   listSubscribers() { return this.subscribers.find().select('email status consentAt confirmedAt createdAt').sort({ createdAt: -1 }).limit(1000).lean(); }
+  async reviewState(customerId: string, productSlug: string) {
+    if (!await this.products.exists({ slug: productSlug, isActive: true, status: 'active' })) throw new NotFoundException('Product not found');
+    const [review, purchase] = await Promise.all([
+      this.reviews.findOne({ customerId, productSlug }).select('rating body status createdAt').lean(),
+      this.orders.exists({ customerId, status: 'delivered', 'lines.productSlug': productSlug }),
+    ]);
+    return { review, canReview: !review && Boolean(purchase) };
+  }
   async createReview(id: string, dto: CreateReviewDto) {
     if (!await this.products.exists({ slug: dto.productSlug, isActive: true, status: 'active' })) throw new NotFoundException('Product not found');
     if (!await this.orders.exists({ customerId: id, status: 'delivered', 'lines.productSlug': dto.productSlug })) throw new BadRequestException('Reviews are available after your order is delivered.');

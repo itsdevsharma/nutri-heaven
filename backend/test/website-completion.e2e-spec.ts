@@ -107,12 +107,37 @@ describe('Website completion audit', () => {
   });
   it('allows only delivered purchasers to review and exposes only approved reviews', async () => {
     const payload = { productSlug: 'audit-product-0', rating: 5, body: 'Fresh and delicious product.' };
+    const stateUrl = '/customer/me/reviews/audit-product-0';
+    await request(app.getHttpServer()).get(stateUrl).expect(401);
+    const eligible = await request(app.getHttpServer()).get(stateUrl).set(auth(customerToken)).expect(200);
+    expect(eligible.body).toEqual({ review: null, canReview: true });
+    await request(app.getHttpServer()).post('/customer/me/reviews').send(payload).expect(401);
+    for (const rating of [0, 6, 2.5]) await request(app.getHttpServer()).post('/customer/me/reviews').set(auth(customerToken)).send({ ...payload, rating }).expect(400);
+    await request(app.getHttpServer()).post('/customer/me/reviews').set(auth(customerToken)).send({ ...payload, body: '          ' }).expect(400);
+    await request(app.getHttpServer()).post('/customer/me/reviews').set(auth(customerToken)).send({ ...payload, status: 'approved' }).expect(400);
     await request(app.getHttpServer()).post('/customer/me/reviews').set(auth(otherToken)).send(payload).expect(400);
     const review = await request(app.getHttpServer()).post('/customer/me/reviews').set(auth(customerToken)).send(payload).expect(201);
     const pending = await request(app.getHttpServer()).get('/reviews/audit-product-0').expect(200); expect(pending.body.count).toBe(0);
+    expect(pending.body.items).toEqual([]); expect(pending.body.average).toBe(0);
+    const own = await request(app.getHttpServer()).get(stateUrl).set(auth(customerToken)).expect(200);
+    expect(own.body.canReview).toBe(false); expect(own.body.review.status).toBe('pending');
+    expect(own.body.review.customerId).toBeUndefined();
+    const other = await request(app.getHttpServer()).get(stateUrl).set(auth(otherToken)).expect(200);
+    expect(other.body).toEqual({ review: null, canReview: false });
+    const queue = await request(app.getHttpServer()).get('/admin/engagement/reviews/page?status=pending').set(auth(adminToken)).expect(200);
+    expect(queue.body.items.some((item: { _id: string }) => item._id === review.body._id)).toBe(true);
+    await request(app.getHttpServer()).get('/admin/engagement/reviews/page').set(auth(customerToken)).expect(401);
+    await request(app.getHttpServer()).patch(`/admin/engagement/reviews/${review.body._id}`).set(auth(customerToken)).send({ status: 'approved' }).expect(401);
     await request(app.getHttpServer()).post('/customer/me/reviews').set(auth(customerToken)).send(payload).expect(409);
     await request(app.getHttpServer()).patch(`/admin/engagement/reviews/${review.body._id}`).set(auth(adminToken)).send({ status: 'approved' }).expect(200);
     const approved = await request(app.getHttpServer()).get('/reviews/audit-product-0').expect(200); expect(approved.body.count).toBe(1); expect(approved.body.average).toBe(5); expect(approved.body.items[0].customerId).toBeUndefined();
+    await request(app.getHttpServer()).patch(`/admin/engagement/reviews/${review.body._id}`).set(auth(adminToken)).send({ status: 'rejected' }).expect(200);
+    const hidden = await request(app.getHttpServer()).get('/reviews/audit-product-0').expect(200);
+    expect(hidden.body).toEqual({ items: [], average: 0, count: 0 });
+    const rejected = await request(app.getHttpServer()).get(stateUrl).set(auth(customerToken)).expect(200);
+    expect(rejected.body.review.status).toBe('rejected');
+    // Leave an approved review for the pagination coverage below.
+    await request(app.getHttpServer()).patch(`/admin/engagement/reviews/${review.body._id}`).set(auth(adminToken)).send({ status: 'approved' }).expect(200);
   });
   it('enforces ownership on addresses, orders, cancellation and receipts', async () => {
     const address = { label: 'Home', name: 'Customer', phone: '9876543210', street: '12 Main Street', city: 'Hisar', state: 'Haryana', pin: '125001' };

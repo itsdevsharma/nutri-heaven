@@ -1,5 +1,6 @@
 import ShippingPage from './pages/ShippingPage.jsx';
 import EngagementPage from './pages/EngagementPage.jsx';
+import ReviewsPage from './pages/ReviewsPage.jsx';
 import CustomersPage from './pages/CustomersPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import CategoriesPage from './pages/CategoriesPage.jsx';
@@ -29,6 +30,7 @@ import CouponsPage from './pages/CouponsPage.jsx';
  * the router, the layout or the permission map.
  */
 export const ROUTES = [
+  { id: 'reviews', path: '/admin/reviews', title: 'Customer reviews', label: 'Reviews', group: 'Marketing', icon: '★', capability: 'reports:read', element: ReviewsPage },
   { id: 'shipping', path: '/admin/shipping', title: 'Shipping', label: 'Shipping', group: 'Operations', icon: '▱', capability: 'settings:write', element: ShippingPage },
   { id: 'engagement', path: '/admin/insights', title: 'Sales & engagement', label: 'Sales & engagement', group: 'Overview', icon: '▥', capability: 'reports:read', element: EngagementPage },
   { id: 'customers', path: '/admin/customers', title: 'Customers', label: 'Customers', group: 'Operations', icon: '♧', capability: 'customers:read', element: CustomersPage },

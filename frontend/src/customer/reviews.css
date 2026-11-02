@@ -1,0 +1,12 @@
+.review-compose{margin-top:20px;padding:18px;border:1px solid #d8cfbc;border-radius:8px;background:#fffdf7}
+.review-compose h4{margin:0 0 8px;font-size:16px}
+.review-compose p,.review-compose small{font-size:12px;line-height:1.6}
+.review-compose a{color:var(--green);text-underline-offset:3px}
+.review-stars{color:#90620b;white-space:nowrap}
+.review-rating{display:flex;align-items:center;gap:8px;border:0;padding:0;margin:0}
+.review-rating legend{margin-bottom:8px;font-size:12px}
+.customer-form .review-rating label{position:relative;display:block;cursor:pointer}
+.review-rating input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.review-rating label span{display:block;font-size:30px;line-height:1.4;color:#90620b;border-radius:4px}
+.review-rating input:focus-visible+span{outline:2px solid var(--green);outline-offset:3px}
+.review-compose textarea{resize:vertical;min-height:100px}

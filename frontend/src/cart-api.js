@@ -70,6 +70,7 @@ async function customerRequest(path, options = {}) {
   return body;
 }
 export const customerApi = {
+  reviewState: slug => customerRequest(`/customer/me/reviews/${encodeURIComponent(slug)}`),
   token: () => localStorage.getItem(CUSTOMER_TOKEN_KEY),
   logout: () => localStorage.removeItem(CUSTOMER_TOKEN_KEY),
   signup: async payload => { const result = await customerRequest('/customer/auth/signup', { method: 'POST', body: JSON.stringify(payload) }); localStorage.setItem(CUSTOMER_TOKEN_KEY, result.accessToken); return result; },
