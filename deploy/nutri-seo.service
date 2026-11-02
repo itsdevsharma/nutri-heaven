@@ -1,0 +1,24 @@
+[Unit]
+Description=Nutri Heaven route-aware storefront renderer
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/var/www/apps/nutri-heaven/frontend
+Environment=NODE_ENV=production
+Environment=SITE_URL=https://nutriheaven.co.in
+Environment=API_URL=http://127.0.0.1:3000
+Environment=SEO_PORT=3001
+ExecStart=/usr/bin/node seo/http-server.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

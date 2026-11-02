@@ -6,8 +6,15 @@ import { v2 as cloudinary } from 'cloudinary';
 import { AuthModule } from '../src/auth/auth.module';
 import { MediaController } from '../src/media/media.controller';
 import { proxyTrust } from '../src/common/proxy-trust';
+import { validateProductionAdminPassword } from '../src/auth/admin-password';
 
 describe('Security configuration', () => {
+  it('rejects weak administrator bootstrap/rotation passwords', () => {
+    for (const value of ['short', 'password-that-is-long-enough', 'development-default-long']) {
+      expect(() => validateProductionAdminPassword(value)).toThrow();
+    }
+    expect(() => validateProductionAdminPassword('nH_7GkZ2tE9pQx8rVb3Ls5mW')).not.toThrow();
+  });
   it('trusts only explicit proxy networks', () => {
     expect(proxyTrust({ NODE_ENV: 'development' })).toBe(false);
     expect(() => proxyTrust({ NODE_ENV: 'production' })).toThrow('TRUST_PROXY=true');

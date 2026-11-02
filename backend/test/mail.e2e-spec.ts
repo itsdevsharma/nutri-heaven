@@ -21,6 +21,15 @@ describe('Transactional email adapter', () => {
     process.env.NODE_ENV = 'production'; delete process.env.RESEND_API_KEY;
     await expect(new MailService().send('buyer@example.com', 'Test', 'Text', 'key')).rejects.toThrow('not configured');
   });
+  it('rejects the onboarding sender and insecure recovery URLs in production', () => {
+    process.env.NODE_ENV = 'production'; process.env.RESEND_API_KEY = 'test-provider-key';
+    process.env.MAIL_FROM = 'Nutri <onboarding@resend.dev>'; process.env.STOREFRONT_URL = 'https://shop.example.com';
+    expect(new MailService().configured).toBe(false);
+    process.env.MAIL_FROM = 'Nutri <orders@example.com>';
+    expect(new MailService().configured).toBe(true);
+    process.env.STOREFRONT_URL = 'http://shop.example.com';
+    expect(new MailService().configured).toBe(false);
+  });
   it('hides provider errors and exposes a retryable service failure', async () => {
     process.env.RESEND_API_KEY = 'test-provider-key'; process.env.MAIL_FROM = 'hello@example.com'; process.env.STOREFRONT_URL = 'https://shop.example.com';
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 });

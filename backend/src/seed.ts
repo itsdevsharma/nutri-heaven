@@ -44,6 +44,9 @@ const SEED_PRODUCTS: Array<Pick<Product, 'slug' | 'title' | 'description' | 'ful
  * inserting duplicates, so `pnpm seed` is safe after adding new products.
  */
 async function run(): Promise<void> {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Catalogue seeding is disabled in production: it overwrites stock and prices. Use scripts/rotate-admin.cjs for existing accounts.');
+  }
   const app = await NestFactory.createApplicationContext(AppModule, {
     bufferLogs: true,
   });

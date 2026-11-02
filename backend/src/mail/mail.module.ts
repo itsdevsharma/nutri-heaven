@@ -2,7 +2,17 @@ import { Injectable, Module, ServiceUnavailableException } from '@nestjs/common'
 
 @Injectable()
 export class MailService {
-  get configured() { return Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM && process.env.STOREFRONT_URL); }
+  get configured() {
+    if (!process.env.RESEND_API_KEY || !process.env.MAIL_FROM || !process.env.STOREFRONT_URL) return false;
+    try {
+      const url = new URL(process.env.STOREFRONT_URL);
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return false;
+      // Resend's onboarding sender is restricted to test recipients. Treat it
+      // as unconfigured rather than accepting newsletter/reset requests that
+      // cannot be delivered to real customers.
+      return process.env.NODE_ENV !== 'production' || (url.protocol === 'https:' && !/@resend\.dev(?:>|\s|$)/i.test(process.env.MAIL_FROM));
+    } catch { return false; }
+  }
   url(path: string) {
     const origin = process.env.STOREFRONT_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173');
     if (!origin) throw new ServiceUnavailableException('Email service is not configured');

@@ -155,7 +155,9 @@ async function bootstrap(): Promise<void> {
   // Render and most managed hosts provide PORT; API_PORT remains useful for
   // local development and existing deployments.
   const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3000);
-  await app.listen(port);
+  // Nginx is the only public ingress on the Ubuntu host. Containers may opt in
+  // to 0.0.0.0 explicitly; never lose loopback isolation during a deployment.
+  await app.listen(port, process.env.API_HOST || (production ? '127.0.0.1' : '0.0.0.0'));
   Logger.log(JSON.stringify({ event: 'api_started', port, production, trustProxy, corsOrigins: origins.length, rateLimitEnabled }), 'Bootstrap');
 }
 

@@ -10,6 +10,7 @@ import WishlistButton from './customer/WishlistButton.jsx';
 import Account from './customer/Account.jsx';
 import { openRazorpay, readPendingCheckout, savePendingCheckout } from './razorpay.js';
 import { updateSeo } from './seo.js';
+import { readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from './checkout-storage.js';
 import { initializeMetaPixel, trackMetaEvent, commerceData, trackProductView, trackPurchase } from './meta-pixel.js';
 import { useEffect, useMemo, useState } from 'react';
 import { cartApi, cartId, customerApi, storefrontApi, paymentsApi } from './cart-api.js';
@@ -291,7 +292,8 @@ function Home({ products, loading, add, open, settings, cms, categories }) {
 }
 
 function Checkout({ cart, busy, error, back, submit, paymentConfig }) {
-  const [form, setForm] = useState({ name:'', email:'', phone:'', address:'', landmark:'', city:'', state:'', pin:'', couponCode:'', acceptedTerms:false, paymentMethod:'cod' });
+  const [form, setForm] = useState(() => readCheckoutDraft(cartId()));
+  useEffect(() => { saveCheckoutDraft(cartId(), form); }, [form]);
   const [deliveryConfig, setDeliveryConfig] = useState(null), [courierId, setCourierId] = useState(''), [configError, setConfigError] = useState('');
   useEffect(() => { let active = true; storefrontApi.checkoutConfig().then(config => { if (active) setDeliveryConfig(config); }).catch(() => { if (active) setConfigError('Delivery settings could not be loaded. Please refresh checkout.'); }); return () => { active = false; }; }, []);
   const [couponQuote, setCouponQuote] = useState(null), [couponError, setCouponError] = useState(''), [couponBusy, setCouponBusy] = useState(false);
@@ -307,7 +309,16 @@ function Checkout({ cart, busy, error, back, submit, paymentConfig }) {
   useEffect(() => {
     if (!customerApi.token()) return;
     let active = true;
-    customerApi.me().then(me => { if (!active) return; setSavedCustomer(me); setForm(current => ({ ...current, email: me.email, name: me.name, phone: me.phone ?? '' })); useAddress(me.addresses.find(address => address.isDefault)); }).catch(() => {});
+    customerApi.me().then(me => {
+      if (!active) return;
+      setSavedCustomer(me);
+      setForm(current => {
+        // A delayed account fetch must not overwrite restored or newly typed details.
+        if (current.name || current.email || current.address) return current;
+        const address = me.addresses.find(item => item.isDefault);
+        return { ...current, email: me.email, name: address?.name || me.name, phone: address?.phone || me.phone || '', ...(address ? { address: address.street, landmark: address.landmark || '', city: address.city, state: address.state, pin: address.pin } : {}) };
+      });
+    }).catch(() => {});
     return () => { active = false; };
   }, []);
   const [validationError, setValidationError] = useState('');
@@ -369,6 +380,17 @@ export default function App() {
     return () => window.removeEventListener('popstate', navigate);
   }, []);
   useEffect(() => { paymentsApi.config().then(config=>setPaymentConfig({...config,loading:false})).catch(()=>setPaymentConfig({enabled:false,loading:false})); }, []);
+  useEffect(() => {
+    const match = location.pathname.match(/^\/order-confirmation\/([^/]+)$/);
+    if (!match) return;
+    let active = true;
+    storefrontApi.getOrder(decodeURIComponent(match[1])).then(result => {
+      if (!active) return;
+      if (result.status === 'cancelled' || (result.paymentMethod !== 'cod' && (result.paymentStatus !== 'paid' || result.paymentReconciliationRequired))) throw new Error('This order is not confirmed. Check its status in your account or contact support.');
+      setOrder(result); setScreen('confirmed');
+    }).catch(error => { if (active) setError(error.message); });
+    return () => { active = false; };
+  }, []);
   const loadCart = async () => { const next = await cartApi.get(); setCart(next); return next; };
   useEffect(() => {
     const loadCatalogue = () => storefrontApi.listProducts().then(setProducts).catch(e => setError(e.message)).finally(() => setLoading(false));
@@ -400,7 +422,8 @@ export default function App() {
     if (line) trackMetaEvent('AddToCart', commerceData([{ ...line, quantity: 1 }], line.unitPricePaise)); } catch(e) { setError(e.message); } finally { setBusy(false); } };
   const change = async (index,quantity,packSize) => { setBusy(true); try { setCart(quantity ? await cartApi.update(index,{quantity, ...(packSize ? {packSize} : {})}) : await cartApi.remove(index)); } catch(e) { setError(e.message); } finally { setBusy(false); } };
   const completeCheckout = async result => {
-    history.replaceState(null, '', '/shop');
+    history.replaceState(null, '', '/order-confirmation/' + encodeURIComponent(result.id));
+    clearCheckoutDraft();
     setOrder(result); setScreen('confirmed'); persistPayment(null);
     // A cart cleanup failure must never turn a paid order into a failed checkout.
     try { await cartApi.clear(); await loadCart(); } catch { setError('Your order is confirmed. Refresh your shopping bag before starting another order.'); }
@@ -463,6 +486,7 @@ export default function App() {
   };
   if (screen === 'checkout') return <>{pendingPayment ? <main className="checkout-page"><section className="account-card"><h1>Complete your order</h1><p>{pendingPayment.orderId?'Order #'+pendingPayment.orderId:'Your checkout has been saved.'}</p>{order&&<p>Order total: {money(order.totalPaise)}</p>}<p>Resume this order to avoid creating a second order. If you already paid, check payment status first. Unpaid stock reservations expire after 30 minutes.</p>{error&&<p role="alert">{error}</p>}<button className="checkout-button" disabled={busy} onClick={()=>resumePayment(false)}>{busy?'Processing…':'Resume checkout'}</button><button className="back-button" disabled={busy} onClick={()=>resumePayment(true)}>Check payment status</button><button className="back-button" disabled={busy} onClick={cancelPayment}>Cancel unpaid order</button></section></main> : <Checkout cart={cart} busy={busy} error={error} back={returnToBag} submit={submit} paymentConfig={paymentConfig} />}<Footer settings={storeSettings} /></>;
   if (screen === 'confirmed' && order) return <><OrderConfirmation order={order} products={products} settings={storeSettings} />{error&&<p role="status">{error}</p>}<Footer settings={storeSettings} /></>;
+  if (location.pathname.startsWith('/order-confirmation/')) return <><Header count={count} cart={() => setDrawer(true)} /><main className="policy-page"><h1>Order confirmation</h1>{error ? <><p role="alert">{error}</p><a href="/account">View your orders</a></> : <p role="status">Loading your order…</p>}</main><Footer settings={storeSettings} /></>;
   if (location.pathname === '/account') return <><Header count={count} cart={() => setDrawer(true)} />{new URLSearchParams(location.search).has('newsletter') ? <NewsletterAction /> : <Account />}<Footer settings={storeSettings} />{drawer && <><button className="scrim" onClick={() => setDrawer(false)} aria-label="Close cart" /><CartDrawer data={cart} products={products} busy={busy} add={add} change={change} close={() => setDrawer(false)} checkout={enterCheckout} openProduct={slug=>{setSelectedProduct(products.find(p=>p.slug===slug));setDrawer(false);}} /></>}</>;
   const policyRoutes = { '/shipping-policy':['Shipping policy','shippingPolicy'], '/return-policy':['Returns and refunds','returnPolicy'], '/privacy-policy':['Privacy policy','privacyPolicy'], '/terms':['Terms and conditions','terms'] };
   if (policyRoutes[location.pathname]) { const [title,key]=policyRoutes[location.pathname]; return <><Header count={count} cart={() => setDrawer(true)} /><main className="policy-page"><p className="eyebrow">NUTRI HEAVEN · CUSTOMER CARE</p><h1>{title}</h1><div>{storeSettings.content?.[key] || 'This information is being updated. Please contact nutriheavenhsr@gmail.com for assistance.'}</div></main><Footer settings={storeSettings} /></>; }

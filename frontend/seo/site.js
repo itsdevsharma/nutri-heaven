@@ -1,4 +1,5 @@
-export const DEFAULT_SITE_URL = 'https://nutri-heaven-topaz.vercel.app';
+export const DEFAULT_SITE_URL = 'https://nutriheaven.co.in';
+export const isPrivatePath = path => /^\/(?:account|checkout|order-confirmation|admin)(?:\/|$)/.test(path);
 export const PUBLIC_PAGES = {
   '/': ['Nutri Heaven — Premium Dry Fruits, Nuts & Seeds', 'Shop premium dry fruits, nuts and seeds at Nutri Heaven. Discover fresh pantry favourites with delivery across India.'],
   '/shop': ['Shop Dry Fruits, Nuts & Seeds | Nutri Heaven', 'Explore the Nutri Heaven collection of dry fruits, premium nuts and seeds. Choose your favourite packs and order online.'],
@@ -66,5 +67,5 @@ export function sitemapXml(origin, products = []) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${[...unique.values()].map(entry => `<url><loc>${escapeHtml(origin + entry.path)}</loc>${entry.modified && !Number.isNaN(Date.parse(entry.modified)) ? `<lastmod>${new Date(entry.modified).toISOString()}</lastmod>` : ''}</url>`).join('')}</urlset>`;
 }
 export function robotsTxt(origin) {
-  return `User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\n\nSitemap: ${siteOrigin(origin)}/sitemap.xml\n`;
+  return `User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /account\nDisallow: /checkout\nDisallow: /order-confirmation\n\nSitemap: ${siteOrigin(origin)}/sitemap.xml\n`;
 }

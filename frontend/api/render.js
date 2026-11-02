@@ -1,16 +1,17 @@
 import template from '../seo/generated-template.js';
-import { PUBLIC_PAGES, pageSeo, seoHead, renderContent } from '../seo/site.js';
+import { PUBLIC_PAGES, pageSeo, seoHead, renderContent, isPrivatePath } from '../seo/site.js';
 import { apiGet, getOrigin } from '../seo/server.js';
 export default async function handler(req, res) {
   try {
     const raw = typeof req.query.path === 'string' ? req.query.path : '';
     const path = '/' + raw.replace(/^\/+|\/+$/g, '');
+    const privatePage = isPrivatePath(path);
     const isProduct = /^\/products\/[^/]+$/.test(path);
-    let missing = !PUBLIC_PAGES[path] && !isProduct && path !== '/account';
+    let missing = !PUBLIC_PAGES[path] && !isProduct && !privatePage;
     let product;
     let products = [];
     let settings = {};
-    if (!missing && path !== '/account') {
+    if (!missing && !privatePage) {
       const results = await Promise.all([
         apiGet('/storefront/settings'),
         isProduct ? apiGet(`/products/${encodeURIComponent(decodeURIComponent(path.slice(10)))}`).catch(error => {
@@ -26,8 +27,8 @@ export default async function handler(req, res) {
     const html = template.replace(/<!-- SEO_START -->[\s\S]*?<!-- SEO_END -->/, seoHead(pageSeo(data)))
       .replace('<div id="root"></div>', `<div id="root">${renderContent(data)}</div>`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', path === '/account' ? 'no-store' : 'public, s-maxage=60, stale-while-revalidate=300');
-    if (missing || path === '/account') res.setHeader('X-Robots-Tag', 'noindex, follow');
+    res.setHeader('Cache-Control', privatePage ? 'no-store' : 'public, max-age=0, s-maxage=60, stale-while-revalidate=300');
+    if (missing || privatePage) res.setHeader('X-Robots-Tag', 'noindex, follow');
     return res.status(missing ? 404 : 200).send(html);
   } catch (error) {
     console.error('SEO rendering failed:', error.message);

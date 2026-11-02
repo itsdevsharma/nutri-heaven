@@ -15,6 +15,8 @@ const checks = [
   [site, '/', 'text/html', body => /<title>/.test(body) && /\/assets\/index-/.test(body)],
   [site, '/shop', 'text/html', body => /canonical/.test(body)],
   [site, '/account', 'text/html', body => /noindex/.test(body)],
+  [site, '/checkout', 'text/html', body => /name="robots" content="noindex/.test(body)],
+  [site, '/admin/login', 'text/html', body => /name="robots" content="noindex/.test(body)],
   [site, '/sitemap.xml', 'xml', body => /<urlset/.test(body)],
   [site, '/robots.txt', 'text/plain', body => /Sitemap:/.test(body)],
 ];
@@ -25,9 +27,21 @@ for (const [origin, path, type, validate] of checks) {
     const body = await response.text();
     if (new URL(response.url).protocol !== 'https:') throw new Error('Redirect downgraded HTTPS');
     if (!response.ok || !response.headers.get('content-type')?.includes(type) || !validate(body)) throw new Error(`Unexpected status/content: ${response.status}`);
+    if (origin === site && type === 'text/html') {
+      for (const header of ['content-security-policy', 'strict-transport-security', 'x-frame-options', 'x-content-type-options', 'referrer-policy']) {
+        if (!response.headers.get(header)) throw new Error(`Missing ${header}`);
+      }
+      const canonical = body.match(/rel="canonical" href="([^"]+)"/)?.[1];
+      if (canonical !== new URL(path, site).href) throw new Error('Incorrect initial canonical URL');
+    }
     console.log(`PASS ${path}`);
   } catch (error) { failed = true; console.error(`FAIL ${path}: ${error.message}`); }
 }
+try {
+  const response = await fetch(endpoint(site, '/deployment-check-page-does-not-exist'), { signal: AbortSignal.timeout(20000) });
+  if (response.status !== 404 || !response.headers.get('x-robots-tag')?.includes('noindex')) throw new Error('Missing page must return HTTP 404 and noindex');
+  console.log('PASS missing page HTTP 404');
+} catch (error) { failed = true; console.error(`FAIL missing page: ${error.message}`); }
 // A JSON 401 proves the protected route reached NestJS without exposing data.
 for (const path of ['/inventory/admin', '/admin/settings', '/admin/offers', '/admin/coupons', '/admin/audit', '/admin/users', '/admin/engagement/report', '/admin/cms/faqs', '/admin/shipping/configuration']) {
   try {

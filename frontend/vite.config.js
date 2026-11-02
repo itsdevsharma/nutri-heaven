@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { defineConfig, loadEnv } from 'vite';
-import { pageSeo, seoHead } from './seo/site.js';
+import { DEFAULT_SITE_URL, pageSeo, seoHead, siteOrigin } from './seo/site.js';
+import { isIP } from 'node:net';
 import react from '@vitejs/plugin-react';
 
 // @vitejs/plugin-react was already a dependency but was never wired up, which
@@ -9,6 +10,10 @@ import react from '@vitejs/plugin-react';
 // reference in index.html resolves exactly as it did before the monorepo move.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const origin = siteOrigin(process.env.VITE_SITE_URL || env.VITE_SITE_URL || DEFAULT_SITE_URL);
+  if (mode === 'production' && (new URL(origin).protocol !== 'https:' || isIP(new URL(origin).hostname.replace(/^\[|\]$/g, '')))) {
+    throw new Error('Production VITE_SITE_URL must be the public HTTPS domain, not a server IP');
+  }
   return {
     plugins: [react(), {
       name: 'store-seo',
@@ -23,7 +28,7 @@ export default ${JSON.stringify(String(html.source))};
 `);
       },
       transformIndexHtml(html) {
-        return html.replace(/<!-- SEO_START -->[\s\S]*?<!-- SEO_END -->/, `<!-- SEO_START -->${seoHead(pageSeo({ origin: env.VITE_SITE_URL }))}<!-- SEO_END -->`);
+        return html.replace(/<!-- SEO_START -->[\s\S]*?<!-- SEO_END -->/, `<!-- SEO_START -->${seoHead(pageSeo({ origin }))}<!-- SEO_END -->`);
       },
     }],
     server: {

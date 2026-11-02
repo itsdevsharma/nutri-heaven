@@ -1,0 +1,13 @@
+[Unit]
+Description=Nutri Heaven local application and database backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+WorkingDirectory=/var/www/apps/nutri-heaven
+ExecStart=/usr/bin/node --env-file=backend/.env deploy/backup.mjs
+TimeoutStartSec=1h
+NoNewPrivileges=true
+PrivateTmp=true

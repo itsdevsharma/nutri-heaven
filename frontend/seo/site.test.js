@@ -82,9 +82,14 @@ test('production handlers serve page HTML, sitemap, robots, 404s and retryable A
       assert.equal(missing.statusCode, 404);
       assert.ok(missing.body.includes('noindex, follow'));
     }
-    const account = response();
-    await render({ query: { path: 'account' } }, account);
-    assert.equal(account.headers['X-Robots-Tag'], 'noindex, follow');
+    for (const path of ['account', 'checkout', 'admin/login', 'order-confirmation/NH-test']) {
+      const account = response();
+      await render({ query: { path } }, account);
+      assert.equal(account.statusCode, 200);
+      assert.equal(account.headers['X-Robots-Tag'], 'noindex, follow');
+      assert.equal(account.headers['Cache-Control'], 'no-store');
+      assert.match(account.body, /name="robots" content="noindex, follow"/);
+    }
     const map = response();
     await sitemap({}, map);
     assert.equal(map.statusCode, 200);

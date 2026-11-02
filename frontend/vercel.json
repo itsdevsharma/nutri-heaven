@@ -82,15 +82,15 @@
       "dest": "/api/robots"
     },
     {
-      "src": "^/admin(?:/.*)?$",
-      "dest": "/index.html",
+      "src": "^/admin(?:/(.*))?$",
+      "dest": "/api/render?path=admin/$1",
       "headers": {
         "X-Robots-Tag": "noindex, nofollow"
       }
     },
     {
       "src": "^/checkout$",
-      "dest": "/index.html",
+      "dest": "/api/render?path=checkout",
       "headers": {
         "X-Robots-Tag": "noindex, nofollow"
       }

@@ -24,7 +24,7 @@ import { CouponsModule } from './coupons/coupons.module';
   imports: [
     // Loads .env from the working directory: backend/.env under the root
     // pnpm scripts, matching Compose. Host environment variables take precedence.
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: process.env.NODE_ENV === 'test' }),
     // `forRootAsync` (not `forRoot`) on purpose: the factory runs when NestJS
     // instantiates the module, so `MONGODB_URI` is read lazily. With `forRoot`
     // the URI would be frozen at import time — before tests set
