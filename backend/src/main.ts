@@ -17,7 +17,9 @@ function positiveInteger(value: string | undefined, fallback: number): number {
 function limitFor(request: Request): { key: string; limit: number; windowMs: number } {
   const path = request.path;
   if (path === '/admin/auth/login') return { key: 'login', limit: positiveInteger(process.env.RATE_LIMIT_LOGIN_PER_15_MIN, 8), windowMs: 15 * 60_000 };
-  if (path.startsWith('/payments/razorpay')) return { key: 'payment', limit: positiveInteger(process.env.RATE_LIMIT_PAYMENT_PER_MIN, 30), windowMs: 60_000 };
+  // The storefront reads static availability on every navigation. It makes no
+  // provider calls and must not consume the payment-operation circuit breaker.
+  if (path.startsWith('/payments/razorpay') && path !== '/payments/razorpay/config') return { key: 'payment', limit: positiveInteger(process.env.RATE_LIMIT_PAYMENT_PER_MIN, 30), windowMs: 60_000 };
   if (!['GET', 'HEAD'].includes(request.method)) return { key: 'write', limit: positiveInteger(process.env.RATE_LIMIT_WRITE_PER_MIN, 90), windowMs: 60_000 };
   return { key: 'read', limit: positiveInteger(process.env.RATE_LIMIT_READ_PER_MIN, 300), windowMs: 60_000 };
 }
