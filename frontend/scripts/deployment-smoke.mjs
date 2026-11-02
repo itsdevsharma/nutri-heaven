@@ -21,6 +21,7 @@ const checks = [
   [site, '/robots.txt', 'text/plain', body => /Sitemap:/.test(body)],
 ];
 let failed = false;
+const checkedAssets = new Set();
 for (const [origin, path, type, validate] of checks) {
   try {
     const response = await fetch(endpoint(origin, path), { signal: AbortSignal.timeout(20000) });
@@ -33,6 +34,18 @@ for (const [origin, path, type, validate] of checks) {
       }
       const canonical = body.match(/rel="canonical" href="([^"]+)"/)?.[1];
       if (canonical !== new URL(path, site).href) throw new Error('Incorrect initial canonical URL');
+      const assets = [...body.matchAll(/(?:src|href)="(\/assets\/[^"?#]+\.(?:js|css))"/g)].map(match => match[1]);
+      if (!assets.some(asset => asset.endsWith('.js')) || !assets.some(asset => asset.endsWith('.css'))) throw new Error('Missing built JS or CSS references');
+      for (const asset of assets) {
+        if (checkedAssets.has(asset)) continue;
+        const assetResponse = await fetch(endpoint(site, asset), { signal: AbortSignal.timeout(20000) });
+        const contentType = assetResponse.headers.get('content-type') || '';
+        const content = await assetResponse.text();
+        const validType = asset.endsWith('.css') ? /^text\/css\b/i.test(contentType) : /^(?:application|text)\/(?:javascript|ecmascript)\b/i.test(contentType);
+        if (!assetResponse.ok || !validType || /^\s*(?:<!doctype|<html)/i.test(content)) throw new Error(`Broken build asset ${asset}: ${assetResponse.status} ${contentType}`);
+        checkedAssets.add(asset);
+        console.log(`PASS asset ${asset}`);
+      }
     }
     console.log(`PASS ${path}`);
   } catch (error) { failed = true; console.error(`FAIL ${path}: ${error.message}`); }

@@ -81,3 +81,15 @@
   .account-order-badge{grid-column:2;grid-row:2;justify-self:end}
   .account-order-chevron{grid-column:3;grid-row:1/3}
 }
+.account-password-field { display: grid; gap: 8px; min-width: 0; }
+.account-password-control { position: relative; min-width: 0; }
+.account-auth-main .account-password-control input { padding-right: 54px; }
+.account-password-control .account-password-toggle {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  display: grid; place-items: center; width: 44px; height: 44px;
+  padding: 0; border: 0; background: transparent; color: var(--green);
+  cursor: pointer;
+}
+.account-password-toggle:hover { background: rgba(21, 63, 47, .06); }
+.account-password-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
+.account-auth-links button:disabled { opacity: .6; cursor: wait; }

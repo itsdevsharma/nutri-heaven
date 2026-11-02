@@ -8,6 +8,7 @@ import { hash } from 'bcryptjs';
 import { Admin, AdminDocument, AdminRole } from '../src/admin/admin.schema';
 import { AuditEvent, AuditEventDocument } from '../src/audit/audit-event.schema';
 import { AppModule } from '../src/app.module';
+import { MailService } from '../src/mail/mail.module';
 
 describe('Customer accounts (e2e)', () => {
   let app: INestApplication;
@@ -18,11 +19,16 @@ describe('Customer accounts (e2e)', () => {
   let catalogueToken = '';
   let customerId = '';
   const customer = { name: 'Asha Sharma', email: 'asha@example.com', password: 'safe-password-123' };
+  const mail = {
+    configured: true,
+    url: (path: string) => new URL(path, 'https://shop.example.com').toString(),
+    send: jest.fn().mockResolvedValue(true),
+  };
 
   beforeAll(async () => {
     mongo = await MongoMemoryServer.create();
     process.env.MONGODB_URI = mongo.getUri('nutri_customer_test');
-    const module: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const module: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(MailService).useValue(mail).compile();
     app = module.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
@@ -61,14 +67,28 @@ describe('Customer accounts (e2e)', () => {
   });
 
   it('uses an expiring, one-time password reset token', async () => {
+    mail.send.mockClear();
     const response = await request(app.getHttpServer()).post('/customer/auth/forgot-password').send({ email: customer.email }).expect(201);
     expect(response.body.message).toContain('If an account exists');
-    const resetToken = response.body.resetToken;
-    expect(resetToken).toBeDefined();
+    const resetEmail = mail.send.mock.calls.find(call => call[1] === 'Reset your Nutri Heaven password');
+    expect(resetEmail).toBeDefined();
+    expect(resetEmail![0]).toBe(customer.email);
+    expect(resetEmail![2]).toContain('within 15 minutes');
+    const link = resetEmail![2].match(/https:\/\/shop\.example\.com\/account\?reset=[a-f0-9]+/)?.[0];
+    expect(link).toBeDefined();
+    const resetToken = new URL(link!).searchParams.get('reset');
+    expect(resetToken).toMatch(/^[a-f0-9]{64}$/);
     const reset = await request(app.getHttpServer()).post('/customer/auth/reset-password').send({ token: resetToken, password: 'new-safe-password-123' }).expect(201);
     expect(reset.body.accessToken).toBeDefined();
     await request(app.getHttpServer()).post('/customer/auth/reset-password').send({ token: resetToken, password: 'another-safe-password' }).expect(400);
     await request(app.getHttpServer()).post('/customer/auth/login').send({ email: customer.email, password: 'new-safe-password-123' }).expect(201);
+  });
+  it('keeps unknown accounts private and rate-limits repeat reset emails', async () => {
+    mail.send.mockClear();
+    const response = await request(app.getHttpServer()).post('/customer/auth/forgot-password').send({ email: 'unknown@example.com' }).expect(201);
+    expect(response.body).toEqual({ message: 'If an account exists, reset instructions have been sent.' });
+    expect(mail.send).not.toHaveBeenCalled();
+    await request(app.getHttpServer()).post('/customer/auth/forgot-password').send({ email: customer.email }).expect(429);
   });
   it('lists and edits customers with permission checks and validated filters', async () => {
     const root = { Authorization: `Bearer ${rootToken}` };

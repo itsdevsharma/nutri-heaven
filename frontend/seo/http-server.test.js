@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'node:http';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createSeoServer } from './http-server.js';
 
 test('Ubuntu adapter returns route metadata, private noindex, robots and real HTTP statuses', async () => {
@@ -40,5 +43,41 @@ test('Ubuntu adapter returns route metadata, private noindex, robots and real HT
     await new Promise(resolve => server.close(resolve));
     globalThis.fetch = previousFetch;
     if (previousApi === undefined) delete process.env.API_URL; else process.env.API_URL = previousApi;
+  }
+});
+
+test('running Ubuntu service follows the active build and fails closed if it is unavailable', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nutri-active-build-'));
+  const templatePath = join(directory, 'index.html');
+  const build = hash => `<!doctype html><html><head><!-- SEO_START --><!-- SEO_END --><script type="module" src="/assets/index-${hash}.js"></script><link rel="stylesheet" href="/assets/index-${hash}.css"></head><body><div id="root"></div></body></html>`;
+  await writeFile(templatePath, build('first'));
+  const server = createSeoServer({ templatePath });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const request = () => new Promise((resolve, reject) => {
+    get(`http://127.0.0.1:${server.address().port}/account`, response => {
+      let body = '';
+      response.on('data', part => { body += part; });
+      response.on('end', () => resolve({ status: response.statusCode, headers: response.headers, body }));
+    }).on('error', reject);
+  });
+  try {
+    const first = await request();
+    assert.equal(first.status, 200);
+    assert.match(first.body, /index-first\.js/);
+    await writeFile(templatePath, build('second'));
+    const second = await request();
+    assert.equal(second.status, 200);
+    assert.match(second.body, /index-second\.js/);
+    assert.match(second.body, /index-second\.css/);
+    assert.doesNotMatch(second.body, /index-first/);
+    await rm(templatePath);
+    const unavailable = await request();
+    assert.equal(unavailable.status, 503);
+    assert.equal(unavailable.headers['cache-control'], 'no-store');
+    assert.match(unavailable.headers['content-type'], /text\/plain/);
+    assert.doesNotMatch(unavailable.body, /index-first|index-second/);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
   }
 });

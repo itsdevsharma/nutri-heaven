@@ -1,0 +1,40 @@
+/* The dialog is portalled outside the admin shell; keep its workflow self-contained. */
+.admin-modal-layer .admin-order-section{font:13px/1.65 Manrope,Arial,sans-serif;min-width:0}
+.admin-modal-layer .admin-modal:has(.admin-delivery-step){display:flex;flex-direction:column;overflow:hidden}
+.admin-modal-layer .admin-modal:has(.admin-delivery-step) .admin-modal-body{overflow-y:auto;min-height:0}
+.admin-modal-layer .admin-modal:has(.admin-delivery-step) :is(.admin-modal-head,.admin-modal-foot){flex-shrink:0}
+.admin-modal-layer .admin-order-section h3{font:600 17px/1.4 Manrope,Arial,sans-serif;margin:0 0 12px}
+.admin-modal-layer .admin-order-section h4{font:600 14px/1.5 Manrope,Arial,sans-serif;margin:0}
+.admin-modal-layer .admin-order-section p{margin:8px 0 14px;overflow-wrap:anywhere}
+.admin-modal-layer .admin-order-section .admin-input{min-height:44px;border:1px solid #c9c5b8;border-radius:4px;background:#fffdf7}
+.admin-order-disclosure{margin-top:16px}
+.admin-order-disclosure>summary{min-height:44px;padding:10px 0;cursor:pointer;font:600 13px/1.6 Manrope,Arial,sans-serif;color:var(--green)}
+.admin-order-disclosure>summary:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.admin-next-action{margin:12px 0;padding:16px;background:var(--surface-alt);border-left:3px solid var(--green)}
+.admin-delivery-method{border:0;padding:0;margin:16px 0 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.admin-delivery-method legend{margin-bottom:10px;font-weight:600}
+.admin-delivery-method label{display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:4px;cursor:pointer}
+.admin-delivery-method label:has(input:checked){border-color:var(--green);background:#edf2e8}
+.admin-delivery-method input,.admin-shipping-check input{width:18px;height:18px;flex-shrink:0;margin:2px 0;accent-color:var(--green)}
+.admin-delivery-method b{display:block;font-size:13px}
+.admin-delivery-method small{display:block;font-size:12px;color:#58665c;line-height:1.6;margin-top:4px}
+.admin-shipping-panel{padding:16px;border:1px solid var(--line);border-radius:4px}
+.admin-shipping-help{padding:12px;background:var(--surface-alt);font-size:13px;line-height:1.7}
+.admin-shipping-help a{display:block;color:var(--green);text-underline-offset:3px}
+.admin-shipping-check{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.6}
+.admin-operation-form{margin:16px 0;padding:16px;border:1px solid var(--line);background:var(--surface-alt);border-radius:4px}
+.admin-modal-layer .admin-order-actions{gap:8px;flex-wrap:wrap}
+.admin-modal-layer .admin-btn{min-height:44px;border-radius:4px;white-space:normal}
+.admin-modal-layer .admin-btn-primary{background:var(--green);color:#fffdf7}
+.admin-modal-layer .admin-btn-primary:hover:not(:disabled){background:var(--dark)}
+.admin-modal-layer .admin-order-totals{font-size:13px}
+.admin-modal-layer .admin-order-totals>div{gap:16px}
+@media(max-width:600px){
+  body>.admin-modal-layer{padding:8px}
+  .admin-modal-layer .admin-modal{max-height:calc(100dvh - 16px)}
+  .admin-modal-layer .admin-modal-body{padding:16px}
+  .admin-delivery-method{grid-template-columns:minmax(0,1fr)}
+  .admin-modal-layer .admin-form-grid{grid-template-columns:minmax(0,1fr)}
+  .admin-shipping-panel,.admin-operation-form{padding:12px}
+  .admin-modal-layer .admin-order-totals{max-width:none;margin-left:0}
+}

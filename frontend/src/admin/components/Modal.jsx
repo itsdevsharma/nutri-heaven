@@ -10,7 +10,7 @@ let previousBodyOverflow = '';
  * scroll container, closes on Escape and on backdrop click, locks page scroll
  * while open, and takes focus so keyboard users are not left behind the modal.
  */
-export function Modal({ open, title, description, onClose, children, footer, size = 'md' }) {
+export function Modal({ open, title, description, onClose, children, footer, size = 'md', className = '' }) {
   const layerRef = useRef(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -48,7 +48,7 @@ export function Modal({ open, title, description, onClose, children, footer, siz
   return createPortal(
     <div className="admin-modal-layer" ref={layerRef}>
       <button type="button" className="admin-modal-backdrop" aria-label="Close dialog" onClick={() => onClose?.()} />
-      <div className={`admin-modal admin-modal-${size}`} role="dialog" tabIndex={-1} aria-modal="true" aria-label={title}>
+      <div className={`admin-modal admin-modal-${size} ${className}`.trim()} role="dialog" tabIndex={-1} aria-modal="true" aria-label={title}>
         <header className="admin-modal-head">
           <div>
             <h2>{title}</h2>

@@ -8,7 +8,7 @@
    `--cream`, `--paper`, `--orange`, `--lime`, `--ink`) come from `style.css`.
    ========================================================================== */
 
-.admin-shell {
+.admin-shell,.admin-modal-layer {
   --nav-bg: #0b2b21;
   --nav-ink: #e8efe9;
   --nav-dim: #9db3a7;
@@ -27,7 +27,10 @@
   --radius: 14px;
   --radius-sm: 9px;
   --shadow: 0 1px 2px rgba(9, 41, 31, 0.06), 0 14px 34px -20px rgba(9, 41, 31, 0.4);
-
+  color: var(--ink);
+  font: 14px/1.55 Manrope, Arial, sans-serif;
+}
+.admin-shell {
   display: grid;
   grid-template-columns: 268px minmax(0, 1fr);
   min-height: 100vh;
@@ -38,7 +41,10 @@
 }
 .admin-shell *,
 .admin-shell *::before,
-.admin-shell *::after { box-sizing: border-box; }
+.admin-shell *::after,
+.admin-modal-layer *,
+.admin-modal-layer *::before,
+.admin-modal-layer *::after { box-sizing: border-box; }
 .admin-shell h1,
 .admin-shell h2,
 .admin-shell h3 { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; line-height: 1.12; margin: 0; color: var(--dark); }
@@ -46,6 +52,8 @@
 .admin-shell h2 { font-size: 1.12rem !important; }
 .admin-shell h3 { font-size: 1rem; }
 .admin-shell p { margin: 0; }
+.admin-modal-layer h2 { font: 400 1.12rem/1.25 'DM Serif Display', Georgia, serif; margin: 0; color: var(--dark); }
+.admin-modal-layer p { margin: 0; }
 .admin-shell a { color: inherit; }
 .admin-shell code { font: 12px 'DM Mono', ui-monospace, monospace; background: rgba(9, 41, 31, 0.07); padding: 1px 5px; border-radius: 5px; }
 .admin-mono { font-family: 'DM Mono', ui-monospace, monospace; }

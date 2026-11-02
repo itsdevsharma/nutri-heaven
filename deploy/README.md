@@ -83,7 +83,14 @@ SMOKE_SITE_URL=https://nutriheaven.co.in SMOKE_API_URL=https://nutriheaven.co.in
 ```
 
 For atomic asset deployment, build into a release directory and switch `dist`
-only after the build succeeds. Keep the previous release for rollback.
+only after the build succeeds. The Ubuntu HTML service reads `dist/index.html`
+for each document request so its asset hashes follow the active release without
+a restart. Retain previous hashed assets in the served assets directory for a
+deployment grace period so already-open tabs and in-flight HTML responses can
+still load their bundles. Keep the previous release for rollback. Never run a
+Vite build directly in the active served directory: it empties that directory
+before writing the new build. The deployment smoke check fetches the JS and CSS
+referenced by each page and checks their status and MIME type.
 
 Administrator rotation
 -----------------------

@@ -2,6 +2,8 @@ import template from '../seo/generated-template.js';
 import { PUBLIC_PAGES, pageSeo, seoHead, renderContent, isPrivatePath } from '../seo/site.js';
 import { apiGet, getOrigin } from '../seo/server.js';
 export default async function handler(req, res) {
+  // Ubuntu supplies the active release; Vercel uses its bundled build template.
+  const htmlTemplate = req.htmlTemplate ?? template;
   try {
     const raw = typeof req.query.path === 'string' ? req.query.path : '';
     const path = '/' + raw.replace(/^\/+|\/+$/g, '');
@@ -24,7 +26,7 @@ export default async function handler(req, res) {
       else products = results[1];
     }
     const data = { path, origin: getOrigin(), settings, product, products, missing };
-    const html = template.replace(/<!-- SEO_START -->[\s\S]*?<!-- SEO_END -->/, seoHead(pageSeo(data)))
+    const html = htmlTemplate.replace(/<!-- SEO_START -->[\s\S]*?<!-- SEO_END -->/, seoHead(pageSeo(data)))
       .replace('<div id="root"></div>', `<div id="root">${renderContent(data)}</div>`);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', privatePage ? 'no-store' : 'public, max-age=0, s-maxage=60, stale-while-revalidate=300');
@@ -37,7 +39,7 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Retry-After', '60');
-    const html = template.replace('<div id="root"></div>', '<div id="root"><main><h1>Nutri Heaven</h1><p>The store is temporarily unavailable. Please try again shortly.</p><a href="">Try again</a></main></div>');
+    const html = htmlTemplate.replace('<div id="root"></div>', '<div id="root"><main><h1>Nutri Heaven</h1><p>The store is temporarily unavailable. Please try again shortly.</p><a href="">Try again</a></main></div>');
     return res.status(503).send(html);
   }
 }

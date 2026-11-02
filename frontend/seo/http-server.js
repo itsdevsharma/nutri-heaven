@@ -2,12 +2,13 @@
 // public assets; every HTML request goes through route-aware rendering.
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
+import { readFile } from 'node:fs/promises';
 import render from '../api/render.js';
 import robots from '../api/robots.js';
 import sitemap from '../api/sitemap.js';
 import { getOrigin } from './server.js';
 
-export function createSeoServer() {
+export function createSeoServer({ templatePath = new URL('../dist/index.html', import.meta.url) } = {}) {
   return createServer(async (request, response) => {
     response.status = code => { response.statusCode = code; return response; };
     response.send = body => { response.end(request.method === 'HEAD' ? undefined : body); return response; };
@@ -27,11 +28,16 @@ export function createSeoServer() {
       }
       if (path === '/robots.txt') return robots(request, response);
       if (path === '/sitemap.xml') return await sitemap(request, response);
+      // Read the active release rather than the module imported at startup.
+      // A rebuild changes hashed asset names without restarting this process.
+      request.htmlTemplate = await readFile(templatePath, 'utf8');
       request.query = { path: path === '/index.html' ? '' : path.slice(1) };
       return await render(request, response);
     } catch {
       response.setHeader('Cache-Control', 'no-store');
-      response.status(500).send('Storefront temporarily unavailable');
+      response.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      response.setHeader('Retry-After', '5');
+      response.status(503).send('Storefront temporarily unavailable');
     }
   });
 }

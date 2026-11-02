@@ -1,10 +1,27 @@
 import Notifications from './Notifications.jsx';
 import './account-dashboard.css';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { customerApi } from '../cart-api.js';
 
 const blankAddress = { label: 'Home', name: '', phone: '', street: '', city: '', state: '', pin: '', landmark: '' };
 const money = value => `₹${(value / 100).toLocaleString('en-IN')}`;
+
+function PasswordField({ label = 'Password', ...inputProps }) {
+  const id = useId();
+  const [visible, setVisible] = useState(false);
+  return <div className="account-password-field">
+    <label htmlFor={id}>{label}</label>
+    <div className="account-password-control">
+      <input {...inputProps} id={id} type={visible ? 'text' : 'password'} />
+      <button className="account-password-toggle" type="button" aria-label={`${visible ? 'Hide' : 'Show'} ${label.toLowerCase()}`} aria-pressed={visible} aria-controls={id} onClick={() => setVisible(value => !value)}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
+          {visible && <path d="m3 3 18 18" />}
+        </svg>
+      </button>
+    </div>
+  </div>;
+}
 
 export default function Account() {
   const [resetToken] = useState(() => new URLSearchParams(location.search).get('reset'));
@@ -41,7 +58,6 @@ export default function Account() {
       if (mode === 'forgot') {
         const result = await customerApi.forgotPassword({ email: form.email.trim() });
         setNotice(result.message);
-        if (result.resetToken) setNotice(`${result.message} Development link: ${location.origin}/account?reset=${result.resetToken}`);
         return;
       }
       if (mode === 'reset' && form.password !== form.confirm) throw new Error('Passwords do not match.');
@@ -54,15 +70,19 @@ export default function Account() {
       await load();
     });
   };
-  const feedback = <>{error && <p className="account-message account-error" role="alert">{error}</p>}{notice && <div className="account-notification" role="status"><div><p>{notice}</p></div><button aria-label="Dismiss notification" onClick={() => setNotice('')}>×</button></div>}</>;
+  const feedback = <>{error && <p className="account-message account-error" role="alert">{error}</p>}{notice && <div className="account-notification" role="status"><div><p>{notice}</p></div><button type="button" aria-label="Dismiss notification" onClick={() => setNotice('')}>×</button></div>}</>;
   if (loading) return <main className="account-page"><p role="status">Loading your account…</p></main>;
-  if (!customer) return <main className="account-auth-page"><section className="account-auth-card"><div className="account-auth-aside"><p className="eyebrow">YOUR NUTRI HEAVEN</p><h1>Your everyday favourites.</h1><p>Save your favourites, follow your orders and manage your delivery details.</p></div><div className="account-auth-main"><a href="/" className="account-back">← Back to store</a><h2>{({ login: 'Sign in', signup: 'Create your account', forgot: 'Reset your password', reset: 'Choose a new password' })[mode]}</h2><form onSubmit={submit}>
+  if (!customer) return <main className="account-auth-page"><section className="account-auth-card"><div className="account-auth-aside"><p className="eyebrow">YOUR NUTRI HEAVEN</p><h1>Your everyday favourites.</h1><p>Save your favourites, follow your orders and manage your delivery details.</p></div><div className="account-auth-main"><a href="/" className="account-back">← Back to store</a><h2>{({ login: 'Sign in', signup: 'Create your account', forgot: 'Reset your password', reset: 'Choose a new password' })[mode]}</h2>
+    {mode === 'forgot' && <p className="account-auth-hint">Enter the email address for your account. We’ll email you a link to choose a new password. The link expires in 15 minutes.</p>}
+    {mode === 'reset' && <p className="account-auth-hint">Choose a password with 12–72 characters. After updating it, you’ll be signed in.</p>}
+    {mode === 'forgot' && notice && <p className="account-auth-hint">Check your inbox and spam folder. If the email doesn’t arrive, wait a minute before requesting another link.</p>}
+    <form onSubmit={submit}>
     {mode === 'signup' && <label>Full name<input name="name" required minLength={2} maxLength={100} autoComplete="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label>}
     {mode !== 'reset' && <label>Email address<input name="email" type="email" required autoComplete="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>}
-    {mode !== 'forgot' && <label>Password<input name="password" type="password" required minLength={mode === 'login' ? 1 : 12} maxLength={72} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></label>}
-    {mode === 'reset' && <label>Confirm password<input type="password" required autoComplete="new-password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} /></label>}
+    {mode !== 'forgot' && <PasswordField key={mode} name="password" required disabled={busy} minLength={mode === 'login' ? 1 : 12} maxLength={72} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />}
+    {mode === 'reset' && <PasswordField label="Confirm password" name="confirmPassword" required disabled={busy} minLength={12} maxLength={72} autoComplete="new-password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} />}
     {feedback}<button className="account-submit" disabled={busy}>{busy ? 'Please wait…' : ({ login: 'Sign in', signup: 'Create account', forgot: 'Send reset link', reset: 'Update password' })[mode]}</button>
-  </form><div className="account-auth-links">{mode === 'login' && <button onClick={() => { setMode('forgot'); setError(''); setNotice(''); }}>Forgot password?</button>}<button onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setNotice(''); }}>{mode === 'login' ? 'Create an account' : 'Back to sign in'}</button></div></div></section></main>;
+  </form><div className="account-auth-links">{mode === 'login' && <button disabled={busy} onClick={() => { setForm({ ...form, password: '', confirm: '' }); setMode('forgot'); setError(''); setNotice(''); }}>Forgot password?</button>}<button disabled={busy} onClick={() => { setForm({ ...form, password: '', confirm: '' }); setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setNotice(''); }}>{mode === 'login' ? 'Create an account' : 'Back to sign in'}</button></div></div></section></main>;
   return <main className="account-page account-dashboard"><div className="account-wrap">{feedback}<section className="account-welcome"><div><p className="eyebrow">MY ACCOUNT</p><h1>Hello, {customer.name.split(' ')[0]}</h1><p className="account-subtitle">{customer.email}</p></div><button className="account-signout" onClick={() => { customerApi.logout(); setCustomer(null); setOrders([]); setWishlist([]); setNotice(''); setError(''); setMode('login'); }}>Sign out</button></section>
     <nav className="account-section-nav" aria-label="Account sections"><a href="#account-profile">Profile</a><a href="#account-addresses">Addresses</a><a href="#account-orders">Orders <span>{orders.length}</span></a><a href="#account-notifications">Notifications</a><a href="#account-wishlist">Wishlist</a></nav>
     <div className="account-columns"><div>

@@ -13,6 +13,7 @@ import { can } from '../lib/permissions.js';
 import { formatDateTime, formatPaise } from '../lib/format.js';
 import { useResource, useDebounced } from '../lib/useResource.js';
 import { useSession } from '../session/session-context.js';
+import '../customer-details.css';
 
 function CustomerDetails({ id, onClose, onSaved }) {
   const { role } = useSession();
@@ -35,23 +36,39 @@ function CustomerDetails({ id, onClose, onSaved }) {
     catch (failure) { toast.error(failure.message); }
     finally { setSaving(false); }
   };
-  return <Modal open title={data?.name ?? 'Customer details'} description="Contact details, saved addresses and order history." onClose={() => { if (!saving) onClose(); }} footer={<><button className="admin-btn admin-btn-ghost" disabled={saving} onClick={onClose}>Close</button>{data && <button className="admin-btn admin-btn-primary" type="submit" form="admin-customer-form" disabled={saving}>{saving ? 'Saving…' : 'Save details'}</button>}</>}>
+  return <Modal open size="lg" className="admin-customer-details" title={data?.name ?? 'Customer details'} description="Contact details, saved addresses and order history." onClose={() => { if (!saving) onClose(); }} footer={<><button className="admin-btn admin-btn-ghost" disabled={saving} onClick={onClose}>Close</button>{data && <button className="admin-btn admin-btn-primary" type="submit" form="admin-customer-form" disabled={saving}>{saving ? 'Saving…' : 'Save details'}</button>}</>}>
     {loading ? <LoadingBlock label="Loading customer…" /> : error ? <ErrorState error={error} onRetry={reload} /> : data && <>
-      <p>{data.email} · <Pill tone={data.isActive ? 'ok' : 'muted'}>{data.isActive ? 'Active' : 'Inactive'}</Pill></p>
-      <p className="admin-hint">Joined {formatDateTime(data.createdAt)}</p>
-      <form id="admin-customer-form" onSubmit={save}><FormGrid>
-        <FormField label="Name" required><input className="admin-input" value={form.name} required minLength={2} maxLength={100} disabled={saving} onChange={(event) => setDraft({ ...form, name: event.target.value })} /></FormField>
-        <FormField label="Phone" hint="10 digits, or leave blank."><input className="admin-input" type="tel" pattern="[0-9]{10}" maxLength={10} disabled={saving} value={form.phone} onChange={(event) => setDraft({ ...form, phone: event.target.value })} /></FormField>
-      </FormGrid></form>
-      {can(role, 'customers:status') && <button className="admin-btn admin-btn-quiet" disabled={saving} onClick={toggle}>{data.isActive ? 'Deactivate account' : 'Reactivate account'}</button>}
-      <Card title="Saved addresses">{data.addresses.length ? data.addresses.map((address) => <p key={address.id}><b>{address.label}{address.isDefault ? ' (default)' : ''}</b><br />{address.name} · {address.phone}<br />{address.street}{address.landmark ? `, ${address.landmark}` : ''}, {address.city}, {address.state} {address.pin}</p>) : <p className="admin-hint">No saved addresses.</p>}</Card>
-      <Card title="Order history"><DataTable rows={data.orders} rowKey={(order) => order._id} empty={<EmptyState title="No orders yet" />} columns={[
-        { key: 'id', header: 'Order' },
-        { key: 'createdAt', header: 'Placed', render: (order) => formatDateTime(order.createdAt) },
-        { key: 'status', header: 'Status' },
-        { key: 'paymentStatus', header: 'Payment' },
-        { key: 'totalPaise', header: 'Total', render: (order) => formatPaise(order.totalPaise) },
-      ]} /></Card>
+      <div className="admin-customer-summary">
+        <div className="admin-customer-avatar" aria-hidden="true">{data.name?.trim().charAt(0).toUpperCase() || 'C'}</div>
+        <div className="admin-customer-identity"><span>{data.email}</span><p className="admin-hint">Joined {formatDateTime(data.createdAt)}</p></div>
+        <Pill tone={data.isActive ? 'ok' : 'muted'}>{data.isActive ? 'Active' : 'Inactive'}</Pill>
+      </div>
+      <section className="admin-customer-section" aria-labelledby="customer-contact-heading">
+        <div className="admin-customer-section-head"><h3 id="customer-contact-heading">Contact details</h3><span className="admin-hint">Editable information</span></div>
+        <form id="admin-customer-form" onSubmit={save}><FormGrid>
+          <FormField label="Name" required><input className="admin-input" aria-label="Name" autoComplete="name" value={form.name} required minLength={2} maxLength={100} disabled={saving} onChange={(event) => setDraft({ ...form, name: event.target.value })} /></FormField>
+          <FormField label="Phone" hint="10 digits, or leave blank."><input className="admin-input" aria-label="Phone" aria-describedby="customer-phone-hint" autoComplete="tel-national" inputMode="numeric" type="tel" pattern="[0-9]{10}" maxLength={10} disabled={saving} value={form.phone} onChange={(event) => setDraft({ ...form, phone: event.target.value })} /></FormField>
+        </FormGrid><span id="customer-phone-hint" className="admin-visually-hidden">10 digits, or leave blank.</span></form>
+      </section>
+      <section className="admin-customer-section" aria-labelledby="customer-addresses-heading">
+        <div className="admin-customer-section-head"><h3 id="customer-addresses-heading">Saved addresses <span className="admin-customer-count">{data.addresses.length}</span></h3></div>
+        {data.addresses.length ? <div className="admin-customer-addresses">{data.addresses.map((address) => <article className="admin-customer-address" key={address.id}>
+          <div className="admin-customer-address-label"><strong>{address.label}</strong>{address.isDefault && <Pill>Default</Pill>}</div>
+          <p>{address.name} <span className="admin-muted">· {address.phone}</span></p>
+          <address>{address.street}{address.landmark ? `, ${address.landmark}` : ''}<br />{address.city}, {address.state} {address.pin}</address>
+        </article>)}</div> : <p className="admin-hint">No saved addresses.</p>}
+      </section>
+      <section className="admin-customer-section" aria-labelledby="customer-orders-heading">
+        <div className="admin-customer-section-head"><h3 id="customer-orders-heading">Order history <span className="admin-customer-count">{data.orders.length}</span></h3>{data.orders.length > 0 && <span className="admin-hint admin-customer-scroll-hint">Scroll to view all columns</span>}</div>
+        <div className="admin-customer-orders" role="region" aria-label="Customer order history" tabIndex={data.orders.length ? 0 : undefined}><DataTable caption="Customer order history" rows={data.orders} rowKey={(order) => order._id} empty={<EmptyState title="No orders yet" description="Orders will appear here after the customer checks out." />} columns={[
+          { key: 'id', header: 'Order', render: (order) => <span className="admin-customer-order-id">{order.id}</span> },
+          { key: 'createdAt', header: 'Placed', render: (order) => <span className="admin-customer-order-date">{formatDateTime(order.createdAt)}</span> },
+          { key: 'status', header: 'Status', render: (order) => <Pill tone={({ confirmed: 'info', delivered: 'ok', cancelled: 'muted', shipped: 'info', pending: 'warn' })[order.status] ?? 'muted'}>{order.status}</Pill> },
+          { key: 'paymentStatus', header: 'Payment', render: (order) => <Pill tone={({ paid: 'ok', pending: 'warn', failed: 'danger', refunded: 'muted' })[order.paymentStatus] ?? 'muted'}>{order.paymentStatus}</Pill> },
+          { key: 'totalPaise', header: 'Total', align: 'right', render: (order) => formatPaise(order.totalPaise) },
+        ]} /></div>
+      </section>
+      {can(role, 'customers:status') && <div className="admin-customer-access"><div><strong>Account access</strong><p className="admin-hint">{data.isActive ? 'Deactivating prevents sign-in. Orders and saved details are kept.' : 'Reactivate this account to allow the customer to sign in again.'}</p></div><button className={`admin-btn ${data.isActive ? 'admin-btn-quiet' : 'admin-btn-ghost'}`} disabled={saving} onClick={toggle}>{data.isActive ? 'Deactivate account' : 'Reactivate account'}</button></div>}
     </>}
   </Modal>;
 }
