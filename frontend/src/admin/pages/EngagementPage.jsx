@@ -1,4 +1,5 @@
 import EngagementList from '../components/EngagementList.jsx';
+import EmailDeliveryQueue from '../components/EmailDeliveryQueue.jsx';
 import { downloadCsv } from '../lib/exportCsv.js';
 import { useState } from 'react';
 import { adminApi } from '../lib/api.js';
@@ -24,6 +25,6 @@ export default function EngagementPage() {
     <Card title="Top products" description="Units from paid orders. Product amounts are before order-level coupons and exclude shipping."><DataTable rows={report.topProducts} rowKey={r => r._id} columns={[{ key: '_id', header: 'Product' }, { key: 'units', header: 'Units' }, { key: 'grossPaise', header: 'Gross product value', render: r => formatPaise(r.grossPaise) }]} /></Card>
     <Card title="Catalogue audit" description="Review these flags and update real product content before publishing. Image relevance requires visual review."><DataTable rows={report.catalogueIssues} rowKey={r => r.slug} columns={[{ key: 'title', header: 'Product' }, { key: 'issues', header: 'Issues', render: r => r.issues.join(' · ') }, { key: 'edit', header: 'Action', render: r => <div className="admin-row-actions"><Link to={`/admin/products/${encodeURIComponent(r.slug)}`}>Review product</Link><button className="admin-btn admin-btn-small" disabled={Boolean(busy)} onClick={async () => { if (!await confirm({ title: 'Hide incomplete product?', message: `Remove ${r.title} from the storefront until its content is corrected?`, confirmLabel: 'Hide product' })) return; setBusy(r.slug); try { await adminApi.products.deactivate(r.slug); await reload(); } catch (e) { setFailure(e.message); } finally { setBusy(''); } }}>Hide from storefront</button></div> }]} /></Card>
     <EngagementList kind="reviews" /><EngagementList kind="subscribers" />
-    <Card title="Transactional email"><p>{report.emailConfigured ? 'Resend is configured.' : 'Resend credentials or verified sender are missing.'} {report.pendingEmails} messages have not been sent. Automatic delivery retries run every 30 seconds, up to five attempts.</p></Card>
+    <EmailDeliveryQueue configured={report.emailConfigured} pending={report.pendingEmails} onRetried={reload} />
   </>;
 }

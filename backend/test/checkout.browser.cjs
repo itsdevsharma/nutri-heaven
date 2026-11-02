@@ -9,7 +9,7 @@ const totalPaise = 10000 + shippingPaise;
 const totalText = (totalPaise / 100).toLocaleString('en-IN');
 const deliveryName = storeMode ? 'Interstate delivery' : 'Standard surface delivery';
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
   try {
     await mkdir('/tmp/nutri-checkout-preview', { recursive: true });
     for (const width of [1440, 768, 390]) {

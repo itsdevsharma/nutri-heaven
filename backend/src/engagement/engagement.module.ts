@@ -34,7 +34,9 @@ export class EngagementController {
 @UseGuards(AdminAuthGuard, RolesGuard)
 @Roles(AdminRole.SUPER_ADMIN)
 export class AdminEngagementController {
-  constructor(private readonly service: EngagementService) {}
+  constructor(private readonly service: EngagementService, private readonly notifications: NotificationService) {}
+  @Get('emails/failed') failedEmails() { return this.notifications.failedDeliveries(); }
+  @Post('emails/:id/retry') retryEmail(@Param('id') id: string, @Req() req: AdminRequest) { return this.notifications.retryDelivery(id, req.admin!.sub); }
   @Get('report') report(@Query() query: SalesReportQuery) { return this.service.report(query); }
   @Get('reviews/page') reviewPage(@Query() query: EngagementListQuery) { return this.service.paginated('reviews', query); }
   @Get('subscribers/page') subscriberPage(@Query() query: EngagementListQuery) { return this.service.paginated('subscribers', query); }

@@ -12,6 +12,7 @@ export class CustomerNotification {
   @Prop() sentAt?: Date;
   @Prop() retryAt?: Date;
   @Prop({ default: 0 }) attempts!: number;
+  @Prop({ default: 0 }) deliveryVersion!: number;
   @Prop() deliveryError?: string;
 }
 export const CustomerNotificationSchema = SchemaFactory.createForClass(CustomerNotification);

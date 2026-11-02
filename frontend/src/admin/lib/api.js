@@ -143,6 +143,8 @@ export const adminApi = {
     action: (id, action, payload = {}) => request(`/admin/shipping/orders/${encodeURIComponent(id)}/${encodeURIComponent(action)}`, { method: 'POST', body: payload }),
   },
   engagement: {
+    failedEmails: () => request('/admin/engagement/emails/failed'),
+    retryEmail: id => request(`/admin/engagement/emails/${encodeURIComponent(id)}/retry`, { method: 'POST' }),
     report: (params = {}) => request(`/admin/engagement/report${toQuery(params)}`),
     subscribers: (params = {}) => request(`/admin/engagement/subscribers/page${toQuery(params)}`),
     reviews: (params = {}) => request(`/admin/engagement/reviews/page${toQuery(params)}`),
