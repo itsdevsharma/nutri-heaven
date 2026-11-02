@@ -144,6 +144,13 @@ settings. Future rate/window changes must also update the corresponding policy.
 Outstanding acceptance
 -----------------------
 
+The production Razorpay webhook was registered and read back on 2 November 2026
+at `/api/payments/razorpay/webhook`, with payment captured/failed and refund
+created/processed/failed events enabled. Its signing secret matches the API's
+configured secret. To reconcile this configuration after a domain/key change,
+run `node --env-file=.env scripts/configure-webhook.cjs` from `backend/`.
+The script performs a provider configuration change and prints no secrets.
+
 A live capture → provider webhook → inventory → email → manual fulfilment →
 refund test still needs a controlled real purchase and payment-dashboard webhook
 verification. Do not treat empty production order collections or mocked tests as
