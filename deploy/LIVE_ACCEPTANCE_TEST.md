@@ -8,7 +8,9 @@ create a fake product, change prices or share card details/OTPs.
 
 ## 1. Historical emails and future recovery
 
-The three failed notifications are being retried after recipient review. Emails
+All three historical failed notifications were retried after recipient review
+and accepted by the email provider on their first retry. Verification found zero
+pending and zero exhausted notification emails. Emails
 linked to a corrected account use its current email address; guest orders
 retain their original recipient. Provider acceptance is verified separately from
 inbox receipt. Check the recipient inbox/spam folder and Resend's events for

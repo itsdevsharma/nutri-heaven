@@ -1,9 +1,32 @@
 # Workflow verification — 2 November 2026
 
 The main tested workflows pass, but this is not a blanket certification that
-every production workflow is complete. Three historical notification emails
-remain unsent, live payment/refund acceptance is unverified, and automatic
-courier operations are not configured.
+every production workflow is complete. At the initial audit, three historical notification emails were unsent. The
+follow-up below resolves those messages. Live payment/refund acceptance remains
+unverified, and automatic courier operations are not configured.
+
+## Resolution follow-up
+
+The notification recovery fix was deployed from commit `41456b7`. All three
+historical failures were retried through the super-admin recovery API and
+accepted by the email provider on their first retry. Both pending and exhausted
+notification counts are now zero. Two linked-account recipients were corrected
+using the current account address; the guest recipient was preserved. No
+notification was deleted or falsely marked accepted.
+
+Future linked-account deliveries resolve the current email address, including
+updates generated for older orders. The super-admin reports page now lists
+exhausted messages and offers an audited retry with duplicate protection and
+recipient confirmation. Inactive accounts and active processing leases cannot
+be overridden by retrying.
+
+Validation: 143 backend tests, 27 frontend/SEO tests, both builds, four viewport
+checks of the new controls, live desktop/mobile queue checks and the production
+smoke check passed. Razorpay provider read-back confirmed the live webhook is
+active with its secret and all required payment/refund events. No payment was
+charged or refunded. The read-only order checker and
+[LIVE_ACCEPTANCE_TEST.md](LIVE_ACCEPTANCE_TEST.md) cover the remaining user-run
+purchase, cancellation, refund, bank-credit and inbox checks.
 
 ## Evidence collected
 
@@ -21,12 +44,13 @@ courier operations are not configured.
 
 ## Remaining limitations and findings
 
-1. **Three historical notification emails exhausted five attempts.** Two target
+1. **Resolved in the follow-up: three historical notification emails exhausted five attempts.** Two target
    the old `123gmail.com` domain; one targets a Gmail address. They were created
    before the current password-recovery correction. Two other requested
    notification emails have a recorded send timestamp. The three failed messages
-   need recipient review and a deliberate retry; they were not deleted, marked
-   delivered or automatically resent during this audit.
+   were initially left unchanged during the read-only audit, then reviewed and
+   retried under the subsequent explicit instruction to resolve them. Provider
+   acceptance is verified; individual inbox receipt remains a recipient check.
 2. **Live payment/refund acceptance remains outstanding.** Production had two
    confirmed unpaid orders, one cancelled unpaid order and no refund records.
    Passing provider fixtures do not establish a real charge → webhook → stock →
