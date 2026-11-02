@@ -6,6 +6,11 @@ for (const origin of [site, api]) if (new URL(origin).protocol !== 'https:') thr
 const checks = [
   [api, '/health', 'application/json', body => JSON.parse(body).status === 'ok'],
   [api, '/products/browse?limit=1', 'application/json', body => Array.isArray(JSON.parse(body).items)],
+  [api, '/checkout/configuration', 'application/json', body => JSON.parse(body).enabled === true],
+  [api, '/payments/razorpay/config', 'application/json', body => {
+    const config = JSON.parse(body);
+    return config.enabled === true && config.testMode === false;
+  }],
   [site, '/', 'text/html', body => /<title>/.test(body) && /\/assets\/index-/.test(body)],
   [site, '/shop', 'text/html', body => /canonical/.test(body)],
   [site, '/account', 'text/html', body => /noindex/.test(body)],

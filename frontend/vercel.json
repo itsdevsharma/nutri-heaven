@@ -89,6 +89,13 @@
       }
     },
     {
+      "src": "^/checkout$",
+      "dest": "/index.html",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow"
+      }
+    },
+    {
       "src": "^/account$",
       "dest": "/api/render?path=account",
       "headers": {
