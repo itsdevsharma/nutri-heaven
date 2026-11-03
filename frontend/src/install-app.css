@@ -12,5 +12,4 @@
 .app-install-dialog .app-install-note { color: #596b60; font-size: 12px; }
 .app-install-done { width: 100%; min-height: 44px; margin-top: 8px; padding: 10px 16px; border: 0; border-radius: 6px; background: #153f2f; color: #fff; font: 600 13px Manrope, Arial, sans-serif; cursor: pointer; }
 .app-install-dialog button:focus-visible { outline: 2px solid #153f2f; outline-offset: 3px; }
-.admin-sidebar-foot .app-install-trigger { color: var(--nav-ink); justify-content: flex-start; }
 @media (display-mode: standalone) { .app-install-trigger { display: none; } }

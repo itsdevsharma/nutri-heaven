@@ -73,8 +73,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (order.paymentStatus === 'failed') order = await this.orders.prepareRazorpayRetry(orderId);
     if (order.paymentStatus !== 'pending') throw new BadRequestException('This order can no longer be paid');
     if (!Number.isInteger(order.totalPaise) || order.totalPaise < 100) throw new BadRequestException('Online payments require an order total of at least ₹1. Choose cash on delivery for this order.');
-    await this.orders.validatePaymentCheckout(order);
     if (!order.razorpayOrderId) {
+      // Existing provider orders already fix the amount. Their checkout quote
+      // may expire while the customer retries; stock and payment state above
+      // still determine whether the existing payment can be resumed.
+      await this.orders.validatePaymentCheckout(order);
       if (!await this.orders.claimPaymentCreation(order.id, order.totalPaise)) {
         // A previous request may have reached Razorpay before our process stopped.
         // Search the receipt; never blindly issue a second provider order.

@@ -874,3 +874,9 @@
   .product-flag-filter > div { gap: 16px; }
   .product-inventory-links { gap: 10px; }
 }
+
+.admin-topbar .admin-install-app { margin-left: auto; flex-shrink: 0; color: var(--ink); font-size: 12px; }
+.admin-topbar .admin-install-app + .admin-topbar-meta { margin-left: 0; }
+@media (max-width: 600px) {
+  .admin-topbar:has(.admin-install-app) { flex-wrap: wrap; }
+}

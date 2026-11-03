@@ -8,6 +8,9 @@ import AdminApp from './admin/AdminApp.jsx';
 import '../style.css';
 import './admin/admin.css';
 import { registerAppWorker } from './pwa.js';
+import { configureAppManifest } from './app-manifest.js';
+
+configureAppManifest(document, window.location.pathname);
 
 if (import.meta.env.PROD) registerAppWorker();
 

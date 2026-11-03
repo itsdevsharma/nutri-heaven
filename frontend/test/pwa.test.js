@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { appManifestFor, configureAppManifest } from '../src/app-manifest.js';
 
 const root = new URL('../public/', import.meta.url);
 const worker = await readFile(new URL('sw.js', root), 'utf8');
@@ -48,4 +49,18 @@ test('offline navigations receive only the generic offline screen', async () => 
   const h = harness(async () => { throw new TypeError('Offline'); }); let response;
   h.handlers.fetch({ request: { url: 'https://shop.example.com/admin/orders', method: 'GET', mode: 'navigate' }, respondWith: promise => { response = promise; } });
   assert.equal(await (await response).text(), 'generic offline page'); assert.deepEqual(h.writes, []);
+});
+
+test('admin installation has its own identity, admin launch URL and scoped shortcuts', async () => {
+  const admin = JSON.parse(await readFile(new URL('assets/pwa/admin.webmanifest', root), 'utf8'));
+  assert.notEqual(admin.id, manifest.id);
+  assert.equal(admin.start_url, '/admin'); assert.equal(admin.scope, '/admin');
+  assert.equal(admin.name, 'Nutri Heaven Admin'); assert.equal(admin.display, 'standalone');
+  for (const shortcut of admin.shortcuts) assert(shortcut.url.startsWith('/admin/'));
+  for (const path of ['/admin', '/admin/login', '/admin/orders']) assert.equal(appManifestFor(path).href, '/assets/pwa/admin.webmanifest');
+  for (const path of ['/', '/shop', '/administrator']) assert.equal(appManifestFor(path).href, '/manifest.webmanifest');
+  const attributes = {};
+  configureAppManifest({ querySelector: selector => ({ setAttribute: (key, value) => { attributes[selector + key] = value; } }) }, '/admin/orders');
+  assert.equal(attributes['link[rel="manifest"]href'], '/assets/pwa/admin.webmanifest');
+  assert.equal(attributes['meta[name="apple-mobile-web-app-title"]content'], 'Nutri Heaven Admin');
 });

@@ -171,4 +171,18 @@ describe('Authoritative Shiprocket checkout', () => {
     expect(remote.orders.create).toHaveBeenLastCalledWith(expect.objectContaining({ amount: 24000 }));
   });
 
+  it('resumes an existing provider order after its delivery quote expires without creating another payment', async () => {
+    const body = basket(); const shipping = await quote(body);
+    const order = (await request(app.getHttpServer()).post('/orders').send(payload(body, shipping)).expect(201)).body;
+    const start = () => request(app.getHttpServer()).post(`/payments/razorpay/orders/${order.id}`).set('x-cart-id', body.cartId);
+    const first = await start().expect(201);
+    const calls = remote.orders.create.mock.calls.length;
+    await app.get<Model<CheckoutQuote>>(getModelToken(CheckoutQuote.name)).updateOne({ id: shipping.id }, { $set: { expiresAt: new Date(0) } });
+    const resumed = await start().expect(201);
+    expect(resumed.body).toEqual(first.body);
+    expect(remote.orders.create).toHaveBeenCalledTimes(calls);
+    await app.get<Model<Order>>(getModelToken(Order.name)).updateOne({ id: order.id }, { $set: { status: 'cancelled', stockReserved: false } });
+    await start().expect(400);
+  });
+
 });

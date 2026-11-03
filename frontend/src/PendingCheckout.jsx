@@ -1,6 +1,6 @@
 import './pending-checkout.css';
 
-export default function PendingCheckout({ pendingPayment, order, busy, error, resume, cancel }) {
+export default function PendingCheckout({ pendingPayment, order, busy, error, resume, cancel, back }) {
   const total = order?.totalPaise;
   return (
     <main className="checkout-page pending-checkout">
@@ -9,7 +9,7 @@ export default function PendingCheckout({ pendingPayment, order, busy, error, re
           <img src="/assets/nutri-heaven-logo.jpeg" alt="" width="58" height="58" />
           <span>NUTRI HEAVEN</span>
         </a>
-        <span className="pending-checkout-nav-label">Checkout</span>
+        <button type="button" className="back-button" disabled={busy} onClick={back}>← Return to bag</button>
       </header>
       <div className="pending-checkout-content">
         <section className="pending-checkout-panel" aria-labelledby="pending-checkout-title" aria-busy={busy}>

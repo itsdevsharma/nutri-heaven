@@ -1,3 +1,4 @@
+import InstallApp from '../../InstallApp.jsx';
 import { useState } from 'react';
 import { FormField } from '../components/FormField.jsx';
 import { API_URL } from '../lib/api.js';
@@ -97,6 +98,7 @@ export default function LoginPage() {
         </form>
 
         <footer className="admin-login-foot">
+          <InstallApp admin />
           <p>Access is limited to Nutri Heaven staff.</p>
           <p className="admin-mono">{API_URL}</p>
         </footer>

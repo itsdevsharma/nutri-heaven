@@ -1,5 +1,4 @@
 .pending-checkout{min-height:0;background:var(--paper)}
-.pending-checkout-nav-label{font:13px/1.5 Manrope,Arial,sans-serif;color:#f7edda}
 .pending-checkout-content{padding:56px 24px 64px}
 .pending-checkout-panel{max-width:680px;margin:0 auto;padding:36px 40px;background:#fffdf7;border:1px solid #ded7c8;border-radius:6px}
 .pending-checkout-eyebrow{margin:0 0 14px;color:var(--green);font:11px/1.5 'DM Mono',monospace;letter-spacing:.1em}

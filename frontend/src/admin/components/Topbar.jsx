@@ -1,3 +1,4 @@
+import InstallApp from '../../InstallApp.jsx';
 import { API_URL } from '../lib/api.js';
 import { Link } from '../router.jsx';
 import { ModuleGuide } from './ModuleGuide.jsx';
@@ -21,6 +22,7 @@ export function Topbar({ route, onToggleNav }) {
         <b>{route?.title ?? 'Not found'}</b>
       </nav>
       {route?.id && <ModuleGuide key={route.id} route={route} />}
+      <InstallApp admin className="admin-install-app" />
       <div className="admin-topbar-meta">
         <span className="admin-api-chip admin-mono" title={`API base URL: ${API_URL}`}>
           {API_URL.replace(/^https?:\/\//, '')}

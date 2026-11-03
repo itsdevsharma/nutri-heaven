@@ -1,13 +1,17 @@
 import template from '../seo/generated-template.js';
+import { appManifestFor } from '../src/app-manifest.js';
 import { appShell } from '../seo/app-shell.js';
 import { PUBLIC_PAGES, pageSeo, seoHead, renderContent, isPrivatePath } from '../seo/site.js';
 import { apiGet, getOrigin } from '../seo/server.js';
 export default async function handler(req, res) {
   // Ubuntu supplies the active release; Vercel uses its bundled build template.
-  const htmlTemplate = req.htmlTemplate ?? template;
+  const raw = typeof req.query.path === 'string' ? req.query.path : '';
+  const path = '/' + raw.replace(/^\/+|\/+$/g, '');
+  const app = appManifestFor(path);
+  const htmlTemplate = (req.htmlTemplate ?? template)
+    .replace('href="/manifest.webmanifest"', `href="${app.href}"`)
+    .replace('name="apple-mobile-web-app-title" content="Nutri Heaven"', `name="apple-mobile-web-app-title" content="${app.name}"`);
   try {
-    const raw = typeof req.query.path === 'string' ? req.query.path : '';
-    const path = '/' + raw.replace(/^\/+|\/+$/g, '');
     const privatePage = isPrivatePath(path);
     const isProduct = /^\/products\/[^/]+$/.test(path);
     let missing = !PUBLIC_PAGES[path] && !isProduct && !privatePage;

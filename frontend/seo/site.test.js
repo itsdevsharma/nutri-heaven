@@ -88,6 +88,7 @@ test('production handlers serve page HTML, sitemap, robots, 404s and retryable A
       assert.equal(account.statusCode, 200);
       assert.equal(account.headers['X-Robots-Tag'], 'noindex, follow');
       assert.equal(account.headers['Cache-Control'], 'no-store');
+      assert(account.body.includes(`href="${path.startsWith('admin/') ? '/assets/pwa/admin.webmanifest' : '/manifest.webmanifest'}"`));
       assert.match(account.body, /name="robots" content="noindex, follow"/);
     }
     const map = response();
