@@ -70,6 +70,9 @@ export class Order {
   @Prop({ trim: true, uppercase: true, default: '' }) couponCode!: string;
   @Prop({ min: 0, default: 0 }) couponDiscountPaise!: number;
 
+  @Prop({ default: 0 })
+  amountAdjustmentPaise!: number;
+
   @Prop({ required: true, min: 0 })
   totalPaise!: number;
 

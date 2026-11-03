@@ -14,6 +14,7 @@ import { StockReservation } from '../src/inventory/stock-reservation.schema';
 import { NotificationService } from '../src/engagement/notification.service';
 import { OrderOutbox } from '../src/orders/order-outbox.schema';
 import { Order } from '../src/orders/order.schema';
+import { orderReceipt } from '../src/orders/order-receipt';
 import type { OrderAction } from '../src/orders/order-workflow';
 import { PaymentsService } from '../src/payments/payments.service';
 import { RefundsService } from '../src/payments/refunds.service';
@@ -65,6 +66,67 @@ describe('Order workflow safety with actual MongoDB transactions', () => {
   const action = (id: string, next: OrderAction, details: Record<string, unknown> = {}) => orders.performAction(id, next, { idempotencyKey: randomUUID(), reason: 'Verified by operator', courier: 'Manual courier', trackingNumber: 'TRACK1', reference: randomUUID(), ...details }, 'operator@example.com', 'super_admin');
   async function deliver(order: Order) { for (const step of ['accept', 'pick', 'pack', 'ready', 'dispatch', 'out_for_delivery', 'deliver'] as const) await action(order.id, step); return orders.getOrder(order.id); }
   const stock = async () => (await app.get<Model<Product>>(getModelToken(Product.name)).findOne({ slug: 'nuts' }).lean().exec())!.variants[0]!.stockQuantity;
+
+  it('overrides one order total, keeps its price breakdown and audits retries', async () => {
+    const order = await create(); const other = await create();
+    const payload = { totalPaise: order.totalPaise - 1234, expectedTotalPaise: order.totalPaise, reason: 'Agreed customer discount', idempotencyKey: randomUUID() };
+    const endpoint = `/orders/admin/${order.id}/amount`;
+    await request(app.getHttpServer()).patch(endpoint).send(payload).expect(401);
+    await request(app.getHttpServer()).patch(endpoint).auth(supportToken, { type: 'bearer' }).send(payload).expect(403);
+    for (const invalid of [0, -1, 1.5, '100', Number.MAX_SAFE_INTEGER + 1]) {
+      await request(app.getHttpServer()).patch(endpoint).auth(adminToken, { type: 'bearer' }).send({ ...payload, totalPaise: invalid }).expect(400);
+    }
+    await request(app.getHttpServer()).patch(endpoint).auth(adminToken, { type: 'bearer' }).send({ ...payload, reason: '   ' }).expect(400);
+    const beforeStock = await stock();
+    await request(app.getHttpServer()).patch(endpoint).auth(adminToken, { type: 'bearer' }).send(payload).expect(200);
+    await request(app.getHttpServer()).patch(endpoint).auth(adminToken, { type: 'bearer' }).send(payload).expect(200);
+    const updated = await orders.getOrder(order.id);
+    expect(updated).toMatchObject({ totalPaise: payload.totalPaise, amountAdjustmentPaise: -1234, subtotalPaise: order.subtotalPaise, shippingPaise: order.shippingPaise });
+    expect(updated.lines).toEqual(order.lines);
+    expect(orderReceipt(updated)).toContain('Order adjustment: INR -12.34');
+    expect(orderReceipt(updated)).toContain(`Total: INR ${(payload.totalPaise / 100).toFixed(2)}`);
+    const history = updated.activity.filter(item => item.action === 'override_amount');
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ actor: 'super_admin@example.com', reason: payload.reason, before: { totalPaise: order.totalPaise }, after: { totalPaise: payload.totalPaise } });
+    expect((await orders.getOrder(other.id)).totalPaise).toBe(other.totalPaise);
+    expect(await stock()).toBe(beforeStock);
+    await request(app.getHttpServer()).patch(endpoint).auth(adminToken, { type: 'bearer' }).send({ ...payload, totalPaise: 200 }).expect(409);
+    await request(app.getHttpServer()).patch(endpoint).auth(adminToken, { type: 'bearer' }).send({ ...payload, idempotencyKey: randomUUID(), totalPaise: 200 }).expect(409);
+    const next = await orders.overrideAmount(order.id, { ...payload, idempotencyKey: randomUUID(), expectedTotalPaise: payload.totalPaise, totalPaise: order.totalPaise + 500 }, 'admin');
+    expect(next.amountAdjustmentPaise).toBe(500);
+  });
+  it('allows only one concurrent amount change from the same original total', async () => {
+    const order = await create();
+    const results = await Promise.allSettled([1000, 2000].map(totalPaise => orders.overrideAmount(order.id, { totalPaise, expectedTotalPaise: order.totalPaise, reason: 'Concurrent amount correction', idempotencyKey: randomUUID() }, 'admin')));
+    expect(results.filter(item => item.status === 'fulfilled')).toHaveLength(1);
+    expect((await orders.getOrder(order.id)).activity.filter(item => item.action === 'override_amount')).toHaveLength(1);
+  });
+  it('protects booked, dispatched, paid, cancelled and provider-linked order amounts', async () => {
+    const model = app.get<Model<Order>>(getModelToken(Order.name));
+    for (const update of [
+      { shiprocketBookingStarted: true }, { trackingNumber: 'MANUAL' }, { status: 'shipped' },
+      { paymentStatus: 'paid' }, { status: 'cancelled' }, { paymentReconciliationRequired: true },
+      { razorpayOrderId: 'provider-order' }, { paymentCreationStartedAt: new Date() },
+      { refundReservedPaise: 10 }, { refundedPaise: 10 },
+    ]) {
+      const order = await create(); await model.updateOne({ id: order.id }, { $set: update });
+      await expect(orders.overrideAmount(order.id, { totalPaise: 1000, expectedTotalPaise: order.totalPaise, reason: 'Invalid correction', idempotencyKey: randomUUID() }, 'admin')).rejects.toThrow();
+      expect((await orders.getOrder(order.id)).totalPaise).toBe(order.totalPaise);
+    }
+  });
+  it('uses the overridden total for online payment and COD collection', async () => {
+    const online = await create('razorpay');
+    await orders.overrideAmount(online.id, { totalPaise: 12345, expectedTotalPaise: online.totalPaise, reason: 'Agreed final price', idempotencyKey: randomUUID() }, 'admin');
+    expect(await orders.claimPaymentCreation(online.id, online.totalPaise)).toBe(false);
+    expect(await payments.createRazorpayOrder(online.id, online.cartId)).toMatchObject({ amount: 12345 });
+    expect(remote.orders.create).toHaveBeenLastCalledWith(expect.objectContaining({ amount: 12345 }));
+    const cod = await create();
+    await orders.overrideAmount(cod.id, { totalPaise: 4321, expectedTotalPaise: cod.totalPaise, reason: 'Agreed COD price', idempotencyKey: randomUUID() }, 'admin');
+    await deliver(cod);
+    await expect(action(cod.id, 'record_cod_collection', { amountPaise: cod.totalPaise })).rejects.toThrow(/full collected/);
+    await action(cod.id, 'record_cod_collection', { amountPaise: 4321 });
+    expect((await orders.getOrder(cod.id)).paymentStatus).toBe('paid');
+  });
 
   it('blocks unpaid online fulfilment through legacy and explicit endpoints', async () => {
     const order = await create('razorpay');

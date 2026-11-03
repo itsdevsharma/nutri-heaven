@@ -75,7 +75,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (!Number.isInteger(order.totalPaise) || order.totalPaise < 100) throw new BadRequestException('Online payments require an order total of at least ₹1. Choose cash on delivery for this order.');
     await this.orders.validatePaymentCheckout(order);
     if (!order.razorpayOrderId) {
-      if (!await this.orders.claimPaymentCreation(order.id)) {
+      if (!await this.orders.claimPaymentCreation(order.id, order.totalPaise)) {
         // A previous request may have reached Razorpay before our process stopped.
         // Search the receipt; never blindly issue a second provider order.
         let matches;

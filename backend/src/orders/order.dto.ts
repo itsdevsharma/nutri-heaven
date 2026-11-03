@@ -120,3 +120,18 @@ export class OrderActionDto {
   @IsOptional() @IsInt() @Min(1) amountPaise?: number;
   @IsOptional() @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => ReturnInspectionLineDto) inspection?: ReturnInspectionLineDto[];
 }
+
+export class OverrideOrderAmountDto {
+  @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
+  totalPaise!: number;
+
+  @IsInt() @Min(0) @Max(Number.MAX_SAFE_INTEGER)
+  expectedTotalPaise!: number;
+
+  @IsUUID()
+  idempotencyKey!: string;
+
+  @IsString() @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @MinLength(3) @MaxLength(2000)
+  reason!: string;
+}

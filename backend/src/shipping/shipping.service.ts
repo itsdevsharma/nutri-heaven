@@ -133,7 +133,7 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
         await this.orders.updateOne({ id }, { $unset: { trackingNumber: 1, trackingUrl: 1 } });
       }
       const providerReference = await this.shipments.exists({ originalOrderId: id }) ? `${id}-${randomUUID()}` : id;
-      const claimed = await this.orders.findOneAndUpdate({ id, status: order.status, paymentStatus: order.paymentStatus, paymentReconciliationRequired: { $ne: true }, stockReserved: true, ...(providerQuote ? {} : { 'operations.fulfillment': 'ready_to_dispatch' }), shiprocketBookingStarted: { $ne: true } }, { $set: { shiprocketBookingStarted: true } });
+      const claimed = await this.orders.findOneAndUpdate({ id, totalPaise: order.totalPaise, status: order.status, paymentStatus: order.paymentStatus, paymentReconciliationRequired: { $ne: true }, stockReserved: true, ...(providerQuote ? {} : { 'operations.fulfillment': 'ready_to_dispatch' }), shiprocketBookingStarted: { $ne: true } }, { $set: { shiprocketBookingStarted: true } });
       if (!claimed) throw new ConflictException('Order changed or another booking has started. Refresh the order.');
       try { await this.shipments.create({ orderId: id, providerReference, parcel }); } catch (error) { if ((error as { code?: number }).code === 11000) throw new ConflictException('Another booking is already in progress'); throw error; }
     }
@@ -151,8 +151,8 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
             order_id: lock.providerReference ?? order.id, order_date: new Date((order as any).createdAt ?? Date.now()).toISOString().slice(0, 10), pickup_location: parcel!.pickupLocation,
             billing_customer_name: names[0], billing_last_name: names.slice(1).join(' '), billing_address: order.deliveryAddress.street, billing_address_2: order.deliveryAddress.landmark ?? '', billing_city: order.deliveryAddress.city, billing_pincode: order.deliveryAddress.pin, billing_state: order.deliveryAddress.state, billing_country: 'India', billing_email: order.customerEmail, billing_phone: order.customerPhone, shipping_is_billing: true,
             order_items: order.lines.map(line => ({ name: `${line.productName} (${line.packSize})`, sku: `${line.productSlug}-${line.packSize}`, units: line.quantity, selling_price: line.unitPricePaise / 100 })),
-            payment_method: order.paymentMethod === 'cod' ? 'COD' : 'Prepaid', sub_total: order.subtotalPaise / 100,
-            shipping_charges: order.shippingPaise / 100, total_discount: (order.couponDiscountPaise ?? 0) / 100,
+            payment_method: order.paymentMethod === 'cod' ? 'COD' : 'Prepaid', sub_total: (order.subtotalPaise + Math.max(0, order.amountAdjustmentPaise ?? 0)) / 100,
+            shipping_charges: order.shippingPaise / 100, total_discount: ((order.couponDiscountPaise ?? 0) + Math.max(0, -(order.amountAdjustmentPaise ?? 0))) / 100,
             weight: parcel!.weight, length: parcel!.length, breadth: parcel!.breadth, height: parcel!.height,
           });
           if (!positiveId(data.order_id) || !positiveId(data.shipment_id)) throw new BadRequestException('Shiprocket did not confirm booking. Refresh provider details.');

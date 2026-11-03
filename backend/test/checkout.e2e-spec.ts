@@ -12,6 +12,7 @@ import { ShippingService } from '../src/shipping/shipping.service';
 import { CheckoutQuote } from '../src/checkout/checkout.schema';
 import { Coupon } from '../src/coupons/coupon.schema';
 import { Order } from '../src/orders/order.schema';
+import { OrderService } from '../src/orders/order.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { startMemoryReplica } from './helpers/memory-replica';
 
@@ -161,4 +162,13 @@ describe('Authoritative Shiprocket checkout', () => {
     expect(remote.orders.create).toHaveBeenCalledWith(expect.objectContaining({ receipt: order.id, amount: 72525, currency: 'INR' }));
     await products.updateOne({ slug: 'nuts' }, { $pull: { variants: { size: '500g' } } });
   });
+  it('validates the saved quote while charging an admin-adjusted amount', async () => {
+    const body = basket(); const shipping = await quote(body);
+    const order = (await request(app.getHttpServer()).post('/orders').send(payload(body, shipping)).expect(201)).body;
+    await app.get(OrderService).overrideAmount(order.id, { totalPaise: 24000, expectedTotalPaise: order.totalPaise, reason: 'Agreed final total', idempotencyKey: randomUUID() }, 'admin');
+    const started = await request(app.getHttpServer()).post(`/payments/razorpay/orders/${order.id}`).set('x-cart-id', body.cartId).expect(201);
+    expect(started.body.amount).toBe(24000);
+    expect(remote.orders.create).toHaveBeenLastCalledWith(expect.objectContaining({ amount: 24000 }));
+  });
+
 });

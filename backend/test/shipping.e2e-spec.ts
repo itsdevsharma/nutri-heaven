@@ -7,6 +7,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { Admin, AdminRole } from '../src/admin/admin.schema';
 import { Order } from '../src/orders/order.schema';
+import { randomUUID } from 'crypto';
 import { ShippingService } from '../src/shipping/shipping.service';
 import { ShiprocketClient, ShiprocketRejectedException } from '../src/shipping/shiprocket.client';
 import { ShiprocketShipment } from '../src/shipping/shipping.schema';
@@ -175,6 +176,19 @@ describe('Shiprocket admin shipping', () => {
     expect((await app.get<Model<Order>>(getModelToken(Order.name)).findOne({ id: 'SHIP-4' }))?.shiprocketBookingStarted).toBe(false);
     provider.request.mockResolvedValueOnce({ order_id: 104, shipment_id: 204 });
     await request(app.getHttpServer()).post(`${base}/orders/SHIP-4/create`).set(headers(admin)).send({}).expect(201);
+  });
+
+  it.each([25000, 32000])('books the adjusted COD total of %i paise', async totalPaise => {
+    const orders = app.get<Model<Order>>(getModelToken(Order.name));
+    const { _id, ...fields } = (await orders.findOne({ id: 'SHIP-1' }).lean())!;
+    const id = `SHIP-ADJUST-${totalPaise}`;
+    await orders.create({ ...fields, id, cartId: id, idempotencyKey: id, trackingNumber: '', trackingUrl: '', shiprocketBookingStarted: false });
+    await request(app.getHttpServer()).patch(`/orders/admin/${id}/amount`).set(headers(admin)).send({ totalPaise, expectedTotalPaise: fields.totalPaise, reason: 'Agreed COD amount', idempotencyKey: randomUUID() }).expect(200);
+    provider.request.mockResolvedValueOnce({ order_id: totalPaise, shipment_id: totalPaise + 1 });
+    await request(app.getHttpServer()).post(`${base}/orders/${id}/create`).set(headers(admin)).send({}).expect(201);
+    const payload = provider.request.mock.calls.at(-1)?.[2];
+    expect(Math.round((payload.sub_total + payload.shipping_charges - payload.total_discount) * 100)).toBe(totalPaise);
+    await request(app.getHttpServer()).patch(`/orders/admin/${id}/amount`).set(headers(admin)).send({ totalPaise: totalPaise + 100, expectedTotalPaise: totalPaise, reason: 'Too late for correction', idempotencyKey: randomUUID() }).expect(400);
   });
 
 });

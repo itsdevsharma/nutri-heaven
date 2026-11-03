@@ -218,6 +218,7 @@ export const adminApi = {
   orders: {
     list: () => request('/orders/admin'),
     get: (id) => request(`/orders/admin/${encodeURIComponent(id)}`),
+    overrideAmount: (id, payload) => request(`/orders/admin/${encodeURIComponent(id)}/amount`, { method: 'PATCH', body: payload }),
     updateStatus: (id, status, details = {}) => request(`/orders/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status, ...details } }),
     action: (id, action, payload) => request(`/orders/admin/${encodeURIComponent(id)}/actions/${encodeURIComponent(action)}`, { method: 'POST', body: payload }),
     cancel: (id, reason) => request(`/orders/admin/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: { reason } }),

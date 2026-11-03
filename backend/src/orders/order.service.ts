@@ -6,8 +6,8 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { randomUUID, createHash } from 'crypto';
 import { OrderOutbox, OrderOutboxDocument, enqueueOrderNotification } from './order-outbox.schema';
 import { Order, OrderDocument, OrderStatus } from './order.schema';
-import { OrderCreateDto, OrderActionDto } from './order.dto';
-import { allowedOrderActions, operationsFor, type OrderAction } from './order-workflow';
+import { OrderCreateDto, OrderActionDto, OverrideOrderAmountDto } from './order.dto';
+import { allowedOrderActions, amountOverrideBlockedReason, operationsFor, type OrderAction } from './order-workflow';
 import { NotificationService } from '../engagement/notification.service';
 import { ProductsService } from '../products/products.service';
 import { InventoryService } from '../inventory/inventory.service';
@@ -181,6 +181,36 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async overrideAmount(id: string, dto: OverrideOrderAmountDto, actor: string): Promise<Order> {
+    const session = await this.connection.startSession();
+    let result: Order | undefined;
+    try { await session.withTransaction(async () => {
+      const order = await this.orders.findOne({ id }).session(session).exec();
+      if (!order) throw new NotFoundException('Order not found');
+      const fingerprint = createHash('sha256').update(JSON.stringify({ action: 'override_amount', totalPaise: dto.totalPaise, expectedTotalPaise: dto.expectedTotalPaise, reason: dto.reason.trim(), idempotencyKey: dto.idempotencyKey })).digest('hex');
+      const prior = order.activity.find(item => item.idempotencyKey === dto.idempotencyKey);
+      if (prior) {
+        if (prior.fingerprint !== fingerprint) throw new ConflictException('Action key was reused with different details');
+        result = order.toObject(); return;
+      }
+      const blocked = amountOverrideBlockedReason(order);
+      if (blocked) throw new BadRequestException(blocked);
+      if (!Number.isSafeInteger(dto.totalPaise) || dto.totalPaise < (order.paymentMethod === 'razorpay' ? 100 : 1)) throw new BadRequestException('Enter a valid amount of at least ₹' + (order.paymentMethod === 'razorpay' ? '1' : '0.01'));
+      if (!dto.idempotencyKey || !dto.reason?.trim() || dto.reason.trim().length < 3) throw new BadRequestException('An action key and a reason of at least 3 characters are required');
+      if (order.totalPaise !== dto.expectedTotalPaise) throw new ConflictException('The order amount changed. Refresh the order and try again.');
+      if (order.totalPaise === dto.totalPaise) throw new BadRequestException('Enter an amount different from the current total');
+      const before = { totalPaise: order.totalPaise, amountAdjustmentPaise: order.amountAdjustmentPaise ?? 0 };
+      const baseTotal = Math.max(0, order.subtotalPaise - (order.couponDiscountPaise ?? 0)) + order.shippingPaise;
+      order.totalPaise = dto.totalPaise;
+      order.amountAdjustmentPaise = dto.totalPaise - baseTotal;
+      order.activity.push({ action: 'override_amount', actor, at: new Date(), reason: dto.reason.trim(), idempotencyKey: dto.idempotencyKey, fingerprint, before, after: { totalPaise: order.totalPaise, amountAdjustmentPaise: order.amountAdjustmentPaise } });
+      await this.persistOrder(order, session);
+      result = order.toObject();
+    }); } finally { await session.endSession(); }
+    if (!result) throw new Error('Amount override transaction produced no order');
+    return result;
+  }
+
   async updateStatus(id: string, status: OrderStatus, options: { trackingNumber?: string; trackingUrl?: string; note?: string; refundReference?: string; actor?: string } = {}): Promise<Order> {
     const session = await this.connection.startSession();
     let result: Order | undefined;
@@ -325,11 +355,11 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
   async validatePaymentCheckout(order: Order) {
     if (!order.shippingQuote) return;
     const result = await this.checkout.validate({ cartId: order.cartId, lines: order.lines, deliveryAddress: order.deliveryAddress, paymentMethod: order.paymentMethod, couponCode: order.couponCode }, order.shippingQuote.quoteId, order.shippingQuote.courierId, true);
-    if (result.quote.subtotalPaise - result.quote.discountPaise + result.selected.shippingPaise !== order.totalPaise) throw new ConflictException('Order total changed. Return to checkout.');
+    if (result.quote.subtotalPaise - result.quote.discountPaise + result.selected.shippingPaise !== order.totalPaise - (order.amountAdjustmentPaise ?? 0)) throw new ConflictException('Order total changed. Return to checkout.');
   }
 
-  async claimPaymentCreation(id: string) {
-    return Boolean(await this.orders.findOneAndUpdate({ id, status: 'pending', paymentStatus: 'pending', razorpayOrderId: { $exists: false }, paymentCreationStartedAt: { $exists: false } }, { $set: { paymentCreationStartedAt: new Date() } }));
+  async claimPaymentCreation(id: string, expectedTotalPaise?: number) {
+    return Boolean(await this.orders.findOneAndUpdate({ id, ...(expectedTotalPaise === undefined ? {} : { totalPaise: expectedTotalPaise }), status: 'pending', paymentStatus: 'pending', razorpayOrderId: { $exists: false }, paymentCreationStartedAt: { $exists: false } }, { $set: { paymentCreationStartedAt: new Date() } }));
   }
 
   async attachRazorpayOrder(id: string, razorpayOrderId: string): Promise<Order> {
