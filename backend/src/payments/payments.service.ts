@@ -69,7 +69,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   async createRazorpayOrder(orderId: string, cartId?: string) {
     const client = this.client();
     let order = await this.ownedOrder(orderId, cartId);
-    if (order.status !== 'pending' || !order.stockReserved) throw new BadRequestException('This order can no longer be paid');
+    if (order.status !== 'pending' || !order.stockReserved || order.paymentReconciliationRequired) throw new BadRequestException('This order can no longer be paid');
     if (order.paymentStatus === 'failed') order = await this.orders.prepareRazorpayRetry(orderId);
     if (order.paymentStatus !== 'pending') throw new BadRequestException('This order can no longer be paid');
     if (!Number.isInteger(order.totalPaise) || order.totalPaise < 100) throw new BadRequestException('Online payments require an order total of at least ₹1. Choose cash on delivery for this order.');

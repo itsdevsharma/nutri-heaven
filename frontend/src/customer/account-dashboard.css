@@ -93,3 +93,18 @@
 .account-password-toggle:hover { background: rgba(21, 63, 47, .06); }
 .account-password-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
 .account-auth-links button:disabled { opacity: .6; cursor: wait; }
+
+.account-orders-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.account-orders-heading button { min-height:44px; padding:8px 0; border:0; background:transparent; color:var(--green); font:500 12px/1.5 Manrope,Arial,sans-serif; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.account-dashboard .customer-actions .account-pay-order { background:var(--green); color:#fffdf7; border-color:var(--green); min-height:44px; }
+.account-order-payment { padding:12px; background:#edf1e7; border-left:3px solid var(--green); font-size:13px; line-height:1.7; }
+.account-order-items { margin-block:20px; }
+.account-order-items p { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; font-size:12px; }
+.account-order-items p span { margin-left:auto; white-space:nowrap; }
+.account-dashboard .account-order-history summary { display:block; padding:12px 0; font-size:12px; font-weight:600; cursor:pointer; }
+.account-dashboard .account-order-history ol { margin-top:0; }
+
+.account-order-breakdown { margin:16px 0; max-width:320px; font-size:12px; }
+.account-order-breakdown div { display:flex; justify-content:space-between; gap:16px; padding:4px 0; }
+.account-order-breakdown dd { margin:0; white-space:nowrap; }
+.account-order-breakdown div:last-child { border-top:1px solid #e3dccd; margin-top:6px; padding-top:8px; font-weight:600; }

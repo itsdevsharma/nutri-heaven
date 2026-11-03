@@ -1,3 +1,5 @@
+import { PaymentsService } from '../payments/payments.service';
+import { VerifyRazorpayPaymentDto } from '../payments/payments.dto';
 import { CustomerOrderReasonDto } from './customer-order.dto';
 import { orderReceipt } from '../orders/order-receipt';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
@@ -15,7 +17,7 @@ type CustomerRequest = Request & { customer: { id: string; email: string } };
 
 @Controller('customer')
 export class CustomerController {
-  constructor(private readonly service: CustomerService) {}
+  constructor(private readonly service: CustomerService, private readonly payments: PaymentsService) {}
   @Post('auth/signup') signup(@Body() dto: SignupDto) { return this.service.signup(dto); }
   @Post('auth/login') login(@Body() dto: LoginDto) { return this.service.login(dto.email, dto.password); }
   @Post('auth/forgot-password') forgot(@Body() dto: ForgotPasswordDto) { return this.service.forgotPassword(dto.email); }
@@ -31,6 +33,26 @@ export class CustomerController {
   @Post('me/wishlist') @UseGuards(CustomerAuthGuard) addWishlist(@Req() req: CustomerRequest, @Body() dto: WishlistDto) { return this.service.addWishlist(req.customer.id, dto.productSlug); }
   @Delete('me/wishlist/:slug') @UseGuards(CustomerAuthGuard) removeWishlist(@Req() req: CustomerRequest, @Param('slug') slug: string) { return this.service.removeWishlist(req.customer.id, slug); }
   @Get('me/orders/:id') @UseGuards(CustomerAuthGuard) order(@Req() req: CustomerRequest, @Param('id') id: string) { return this.service.ownedOrder(req.customer.id, id); }
+  @Post('me/orders/:id/payment') @UseGuards(CustomerAuthGuard)
+  async payOrder(@Req() req: CustomerRequest, @Param('id') id: string) {
+    const order = await this.service.ownedOrder(req.customer.id, id);
+    return this.payments.createRazorpayOrder(order.id, order.cartId);
+  }
+  @Get('me/orders/:id/payment') @UseGuards(CustomerAuthGuard)
+  async orderPayment(@Req() req: CustomerRequest, @Param('id') id: string) {
+    const order = await this.service.ownedOrder(req.customer.id, id);
+    return this.payments.paymentStatus(order.id, order.cartId);
+  }
+  @Post('me/orders/:id/payment/verify') @UseGuards(CustomerAuthGuard)
+  async verifyOrderPayment(@Req() req: CustomerRequest, @Param('id') id: string, @Body() dto: VerifyRazorpayPaymentDto) {
+    const order = await this.service.ownedOrder(req.customer.id, id);
+    return this.payments.verifyPayment(order.id, dto, order.cartId);
+  }
+  @Post('me/orders/:id/payment/cancel') @UseGuards(CustomerAuthGuard)
+  async cancelOrderPayment(@Req() req: CustomerRequest, @Param('id') id: string) {
+    const order = await this.service.ownedOrder(req.customer.id, id);
+    return this.payments.cancelPending(order.id, order.cartId);
+  }
   @Post('me/orders/:id/cancel') @UseGuards(CustomerAuthGuard) cancel(@Req() req: CustomerRequest, @Param('id') id: string, @Body() dto: CustomerOrderReasonDto) { return this.service.requestOrderAction(req.customer.id, id, dto.reason, 'cancel'); }
   @Post('me/orders/:id/return') @UseGuards(CustomerAuthGuard) requestReturn(@Req() req: CustomerRequest, @Param('id') id: string, @Body() dto: CustomerOrderReasonDto) { return this.service.requestOrderAction(req.customer.id, id, dto.reason, 'return'); }
   @Get('me/orders/:id/receipt') @UseGuards(CustomerAuthGuard) async receipt(@Req() req: CustomerRequest, @Param('id') id: string, @Res() res: Response) {

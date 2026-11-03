@@ -14,6 +14,7 @@ import { StockReservation } from '../src/inventory/stock-reservation.schema';
 import { NotificationService } from '../src/engagement/notification.service';
 import { OrderOutbox } from '../src/orders/order-outbox.schema';
 import { Order } from '../src/orders/order.schema';
+import { Customer } from '../src/customers/customer.schema';
 import { orderReceipt } from '../src/orders/order-receipt';
 import type { OrderAction } from '../src/orders/order-workflow';
 import { PaymentsService } from '../src/payments/payments.service';
@@ -126,6 +127,36 @@ describe('Order workflow safety with actual MongoDB transactions', () => {
     await expect(action(cod.id, 'record_cod_collection', { amountPaise: cod.totalPaise })).rejects.toThrow(/full collected/);
     await action(cod.id, 'record_cod_collection', { amountPaise: 4321 });
     expect((await orders.getOrder(cod.id)).paymentStatus).toBe('paid');
+  });
+
+  it('resumes customer-owned payments across devices and protects other customers orders', async () => {
+    const customers = app.get<Model<Customer>>(getModelToken(Customer.name));
+    const owner = await customers.create({ name: 'Order Owner', email: 'owner@example.com', passwordHash: 'unused' });
+    const other = await customers.create({ name: 'Other Customer', email: 'other@example.com', passwordHash: 'unused' });
+    const customerToken = (id: string, email: string) => app.get(JwtService).signAsync({ sub: id, email, type: 'customer', version: 0 });
+    const ownerToken = await customerToken(String(owner._id), owner.email);
+    const otherToken = await customerToken(String(other._id), other.email);
+    const order = await create('razorpay');
+    await app.get<Model<Order>>(getModelToken(Order.name)).updateOne({ id: order.id }, { $set: { customerId: String(owner._id) } });
+    const endpoint = `/customer/me/orders/${order.id}/payment`;
+    await request(app.getHttpServer()).post(endpoint).expect(401);
+    for (const [method, path] of [['get', endpoint], ['post', endpoint], ['post', endpoint + '/cancel'], ['post', endpoint + '/verify']]) {
+      await (request(app.getHttpServer()) as any)[method](path).auth(otherToken, { type: 'bearer' }).send(method === 'post' && path.endsWith('/verify') ? { razorpay_order_id: 'order_account123', razorpay_payment_id: 'pay_account123', razorpay_signature: 'a'.repeat(64) } : undefined).expect(404);
+    }
+    remote.orders.create.mockResolvedValueOnce({ id: 'order_account123' });
+    const started = await request(app.getHttpServer()).post(endpoint).auth(ownerToken, { type: 'bearer' }).set('x-cart-id', 'different-device-cart').expect(201);
+    expect(started.body.amount).toBe(order.totalPaise);
+    await request(app.getHttpServer()).get(endpoint).auth(ownerToken, { type: 'bearer' }).expect(200);
+    remotePayments.set('pay_account123', { id: 'pay_account123', order_id: 'order_account123', amount: order.totalPaise, currency: 'INR', status: 'captured' });
+    const signature = createHmac('sha256', 'test-secret').update('order_account123|pay_account123').digest('hex');
+    const verified = await request(app.getHttpServer()).post(endpoint + '/verify').auth(ownerToken, { type: 'bearer' }).send({ razorpay_order_id: 'order_account123', razorpay_payment_id: 'pay_account123', razorpay_signature: signature }).expect(201);
+    expect(verified.body).toMatchObject({ id: order.id, paymentStatus: 'paid', status: 'confirmed' });
+    await request(app.getHttpServer()).post(endpoint).auth(ownerToken, { type: 'bearer' }).expect(400);
+    const cancelled = await create('razorpay');
+    await app.get<Model<Order>>(getModelToken(Order.name)).updateOne({ id: cancelled.id }, { $set: { customerId: String(owner._id) } });
+    await request(app.getHttpServer()).post(`/customer/me/orders/${cancelled.id}/payment/cancel`).auth(ownerToken, { type: 'bearer' }).expect(201);
+    expect((await orders.getOrder(cancelled.id)).status).toBe('cancelled');
+    await request(app.getHttpServer()).post(`/customer/me/orders/${cancelled.id}/payment`).auth(ownerToken, { type: 'bearer' }).expect(400);
   });
 
   it('blocks unpaid online fulfilment through legacy and explicit endpoints', async () => {

@@ -97,6 +97,7 @@ export const customerApi = {
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement('a'); link.href = url; link.download = `receipt-${id}.html`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
+  order: id => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}`),
   orders: () => customerRequest('/customer/me/orders'),
 };
 
@@ -106,4 +107,12 @@ export const paymentsApi = {
   status: id => request(`/payments/razorpay/orders/${encodeURIComponent(id)}`),
   verify: (id, payment) => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/verify`, { method: 'POST', body: JSON.stringify(payment) }),
   cancel: id => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+};
+
+/** Account payments use customer authentication, including from a different device. */
+export const customerPaymentsApi = {
+  create: id => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/payment`, { method: 'POST' }),
+  status: id => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/payment`),
+  verify: (id, payment) => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/payment/verify`, { method: 'POST', body: JSON.stringify(payment) }),
+  cancel: id => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/payment/cancel`, { method: 'POST' }),
 };

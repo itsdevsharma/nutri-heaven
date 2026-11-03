@@ -29,6 +29,7 @@ export default function PendingCheckout({ pendingPayment, order, busy, error, re
             <button type="button" className="pending-checkout-primary" disabled={busy} onClick={() => resume(false)}>{busy ? 'Processing…' : 'Resume checkout'}<span aria-hidden="true">→</span></button>
             <button type="button" className="pending-checkout-secondary" disabled={busy} onClick={() => resume(true)}>Check payment status</button>
           </div>
+          {pendingPayment.source === 'account' && <p className="pending-checkout-intro"><a href="/account#account-orders">Back to My orders</a>. Sign in to the account that placed this order to complete payment.</p>}
           <div className="pending-checkout-cancel-row">
             <button type="button" className="pending-checkout-cancel" disabled={busy} onClick={cancel}>Cancel unpaid order</button>
           </div>

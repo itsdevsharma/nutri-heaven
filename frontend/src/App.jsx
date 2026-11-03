@@ -15,7 +15,7 @@ import { updateSeo } from './seo.js';
 import { readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from './checkout-storage.js';
 import { initializeMetaPixel, trackMetaEvent, commerceData, trackProductView, trackPurchase } from './meta-pixel.js';
 import { useEffect, useMemo, useState } from 'react';
-import { cartApi, cartId, customerApi, storefrontApi, paymentsApi } from './cart-api.js';
+import { cartApi, cartId, customerApi, storefrontApi, paymentsApi, customerPaymentsApi } from './cart-api.js';
 
 const asset = '/assets/';
 const money = (paise = 0) => `₹${(paise / 100).toLocaleString('en-IN')}`;
@@ -386,7 +386,8 @@ export default function App() {
     const match = location.pathname.match(/^\/order-confirmation\/([^/]+)$/);
     if (!match) return;
     let active = true;
-    storefrontApi.getOrder(decodeURIComponent(match[1])).then(result => {
+    const getOrder = new URLSearchParams(location.search).get('source') === 'account' ? customerApi.order : storefrontApi.getOrder;
+    getOrder(decodeURIComponent(match[1])).then(result => {
       if (!active) return;
       if (result.status === 'cancelled' || (result.paymentMethod !== 'cod' && (result.paymentStatus !== 'paid' || result.paymentReconciliationRequired))) throw new Error('This order is not confirmed. Check its status in your account or contact support.');
       setOrder(result); setScreen('confirmed');
@@ -423,10 +424,11 @@ export default function App() {
     const line = next.items.find(item => item.productId === slug && item.packSize === size);
     if (line) trackMetaEvent('AddToCart', commerceData([{ ...line, quantity: 1 }], line.unitPricePaise)); } catch(e) { setError(e.message); } finally { setBusy(false); } };
   const change = async (index,quantity,packSize) => { setBusy(true); try { setCart(quantity ? await cartApi.update(index,{quantity, ...(packSize ? {packSize} : {})}) : await cartApi.remove(index)); } catch(e) { setError(e.message); } finally { setBusy(false); } };
-  const completeCheckout = async result => {
-    history.replaceState(null, '', '/order-confirmation/' + encodeURIComponent(result.id));
-    clearCheckoutDraft();
+  const completeCheckout = async (result, clearCart = true) => {
+    history.replaceState(null, '', '/order-confirmation/' + encodeURIComponent(result.id) + (clearCart ? '' : '?source=account'));
+    if (clearCart) clearCheckoutDraft();
     setOrder(result); setScreen('confirmed'); persistPayment(null);
+    if (!clearCart) return;
     // A cart cleanup failure must never turn a paid order into a failed checkout.
     try { await cartApi.clear(); await loadCart(); } catch { setError('Your order is confirmed. Refresh your shopping bag before starting another order.'); }
   };
@@ -434,7 +436,8 @@ export default function App() {
   const resumePayment = async (checkOnly = false, attempt = pendingPayment) => {
     setBusy(true); setError('');
     try {
-      if (!attempt || attempt.cartId !== cartId()) throw new Error('This checkout belongs to another shopping session.');
+      if (!attempt || (attempt.source !== 'account' && attempt.cartId !== cartId())) throw new Error('This checkout belongs to another shopping session.');
+      const paymentApi = attempt.source === 'account' ? customerPaymentsApi : paymentsApi;
       let currentOrder;
       if (!attempt.orderId) {
         currentOrder = await storefrontApi.placeOrder(attempt.payload);
@@ -443,36 +446,37 @@ export default function App() {
       }
       if (attempt.paymentMethod==='cod') { await completeCheckout(currentOrder || await storefrontApi.getOrder(attempt.orderId)); return; }
       currentOrder = attempt.paymentResponse
-        ? await paymentsApi.verify(attempt.orderId, attempt.paymentResponse)
-        : await paymentsApi.status(attempt.orderId);
+        ? await paymentApi.verify(attempt.orderId, attempt.paymentResponse)
+        : await paymentApi.status(attempt.orderId);
       setOrder(currentOrder);
-      if (confirmedPayment(currentOrder)) { await completeCheckout(currentOrder); return; }
+      if (confirmedPayment(currentOrder)) { await completeCheckout(currentOrder, attempt.source !== 'account'); return; }
       if (currentOrder.paymentStatus==='paid' || currentOrder.paymentStatus==='refunded') throw new Error('This payment needs support review. Please contact us with order #'+currentOrder.id+' before paying again.');
       if (currentOrder.status==='cancelled') { persistPayment(null); setError('This order was cancelled. You can start a new checkout.'); return; }
       if (checkOnly) { setError('Payment is not confirmed yet. If you already paid, check again shortly before retrying.'); return; }
-      const payment = await paymentsApi.create(currentOrder.id);
+      const payment = await paymentApi.create(currentOrder.id);
       const paymentResponse = await openRazorpay(payment,currentOrder,setError);
       // Save the signed response before verification so refresh/network failures are recoverable.
       attempt = {...attempt,paymentResponse}; persistPayment(attempt);
-      const verified = await paymentsApi.verify(currentOrder.id,paymentResponse);
+      const verified = await paymentApi.verify(currentOrder.id,paymentResponse);
       if (!confirmedPayment(verified)) throw new Error('Payment received but your order needs support review. Please contact us with order #'+currentOrder.id+'.');
-      await completeCheckout(verified);
+      await completeCheckout(verified, attempt.source !== 'account');
     } catch(e) { if (!attempt?.orderId && [400,403,404,409,422].includes(e.status)) persistPayment(null); setError(e.message); } finally { setBusy(false); }
   };
   const cancelPayment = async () => {
     setBusy(true);setError('');
     try {
       let attempt = pendingPayment;
+      const paymentApi = attempt.source === 'account' ? customerPaymentsApi : paymentsApi;
       if (!attempt.orderId) {
         const created = await storefrontApi.placeOrder(attempt.payload);
         attempt = {...attempt,orderId:created.id};persistPayment(attempt);
       }
       if (attempt.paymentMethod==='cod' || attempt.payload?.paymentMethod==='cod') throw new Error('A COD order was already submitted. Resume to view its confirmation.');
       if (attempt.paymentResponse) {
-        const verified = await paymentsApi.verify(attempt.orderId,attempt.paymentResponse);
-        if (confirmedPayment(verified)) { await completeCheckout(verified);return; }
+        const verified = await paymentApi.verify(attempt.orderId,attempt.paymentResponse);
+        if (confirmedPayment(verified)) { await completeCheckout(verified, attempt.source !== 'account');return; }
       }
-      await paymentsApi.cancel(attempt.orderId);
+      await paymentApi.cancel(attempt.orderId);
       persistPayment(null);setOrder(null);await loadCart();
     } catch(e) {setError(e.message);} finally {setBusy(false);}
   };
@@ -486,10 +490,16 @@ export default function App() {
       await resumePayment(false,attempt);
     } catch(e) {setError(e.message);setBusy(false);}
   };
+  const payAccountOrder = async selectedOrder => {
+    const attempt = pendingPayment?.source === 'account' && pendingPayment.orderId === selectedOrder.id
+      ? pendingPayment : { source: 'account', orderId: selectedOrder.id, paymentMethod: 'razorpay' };
+    persistPayment(attempt); setOrder(selectedOrder); enterCheckout();
+    await resumePayment(false, attempt);
+  };
   if (screen === 'checkout') return <>{pendingPayment ? <PendingCheckout pendingPayment={pendingPayment} order={order} busy={busy} error={error} resume={resumePayment} cancel={cancelPayment} back={returnToBag} /> : <Checkout cart={cart} busy={busy} error={error} back={returnToBag} submit={submit} paymentConfig={paymentConfig} />}<Footer settings={storeSettings} /></>;
   if (screen === 'confirmed' && order) return <><OrderConfirmation order={order} products={products} settings={storeSettings} />{error&&<p role="status">{error}</p>}<Footer settings={storeSettings} /></>;
   if (location.pathname.startsWith('/order-confirmation/')) return <><Header count={count} cart={() => setDrawer(true)} /><main className="policy-page"><h1>Order confirmation</h1>{error ? <><p role="alert">{error}</p><a href="/account">View your orders</a></> : <p role="status">Loading your order…</p>}</main><Footer settings={storeSettings} /></>;
-  if (location.pathname === '/account') return <><Header count={count} cart={() => setDrawer(true)} />{new URLSearchParams(location.search).has('newsletter') ? <NewsletterAction /> : <Account />}<Footer settings={storeSettings} />{drawer && <><button className="scrim" onClick={() => setDrawer(false)} aria-label="Close cart" /><CartDrawer data={cart} products={products} busy={busy} add={add} change={change} close={() => setDrawer(false)} checkout={enterCheckout} openProduct={slug=>{setSelectedProduct(products.find(p=>p.slug===slug));setDrawer(false);}} /></>}</>;
+  if (location.pathname === '/account') return <><Header count={count} cart={() => setDrawer(true)} />{new URLSearchParams(location.search).has('newsletter') ? <NewsletterAction /> : <Account onPayOrder={payAccountOrder} />}<Footer settings={storeSettings} />{drawer && <><button className="scrim" onClick={() => setDrawer(false)} aria-label="Close cart" /><CartDrawer data={cart} products={products} busy={busy} add={add} change={change} close={() => setDrawer(false)} checkout={enterCheckout} openProduct={slug=>{setSelectedProduct(products.find(p=>p.slug===slug));setDrawer(false);}} /></>}</>;
   const policyRoutes = { '/shipping-policy':['Shipping policy','shippingPolicy'], '/return-policy':['Returns and refunds','returnPolicy'], '/privacy-policy':['Privacy policy','privacyPolicy'], '/terms':['Terms and conditions','terms'] };
   if (policyRoutes[location.pathname]) { const [title,key]=policyRoutes[location.pathname]; return <><Header count={count} cart={() => setDrawer(true)} /><main className="policy-page"><p className="eyebrow">NUTRI HEAVEN · CUSTOMER CARE</p><h1>{title}</h1><div>{storeSettings.content?.[key] || 'This information is being updated. Please contact nutriheavenhsr@gmail.com for assistance.'}</div></main><Footer settings={storeSettings} /></>; }
   const productPath = /^\/products\//.test(location.pathname);

@@ -9,5 +9,5 @@ import { PaymentsService } from './payments.service';
 import { AuthModule } from '../auth/auth.module';
 import { AdminModule } from '../admin/admin.module';
 
-@Module({ imports: [MongooseModule.forFeature([{ name: OrderRefund.name, schema: OrderRefundSchema }, { name: PaymentWebhookEvent.name, schema: PaymentWebhookEventSchema }]), OrderModule, AuthModule, AdminModule], controllers: [PaymentsController], providers: [PaymentsService, RefundsService] })
+@Module({ imports: [MongooseModule.forFeature([{ name: OrderRefund.name, schema: OrderRefundSchema }, { name: PaymentWebhookEvent.name, schema: PaymentWebhookEventSchema }]), OrderModule, AuthModule, AdminModule], controllers: [PaymentsController], providers: [PaymentsService, RefundsService], exports: [PaymentsService] })
 export class PaymentsModule {}
