@@ -33,20 +33,6 @@
 .account-dashboard .customer-actions button,.account-dashboard .customer-wishlist button{min-height:40px;padding:8px 12px;border:1px solid #cfc8b9;background:transparent;color:var(--green);font:500 12px/1.5 Manrope,Arial,sans-serif}
 .account-dashboard .customer-actions .account-action-danger{color:#884530;border-color:transparent}
 .account-dashboard .account-card>button{font:500 13px/1.5 Manrope,Arial,sans-serif}
-.account-dashboard .customer-order{padding:0;border-bottom:1px solid #e3dccd}
-.account-dashboard .customer-order summary{display:grid;grid-template-columns:minmax(0,1fr) auto auto 12px;gap:14px;align-items:center;padding:18px 0;list-style:none;font-size:13px}
-.account-dashboard .customer-order summary::-webkit-details-marker{display:none}
-.account-order-reference{display:grid;gap:4px;min-width:0}
-.account-order-reference small{font-size:11px;color:#647065}
-.account-order-reference b{font-size:12px;font-weight:500;overflow-wrap:anywhere}
-.account-order-amount{font-weight:600;white-space:nowrap}
-.account-order-badge{width:fit-content;padding:4px 7px;border-radius:3px;background:#eaf0e4;color:#345434;font:11px/1.5 Manrope,Arial,sans-serif;text-transform:capitalize}
-.account-order-badge.status-cancelled,.account-order-badge.status-refunded{background:#f5e8e0;color:#85452e}
-.account-order-badge.status-pending{background:#f6edda;color:#755721}
-.account-order-chevron{font-size:18px;color:#647065}
-.customer-order[open] .account-order-chevron{transform:rotate(180deg)}
-.account-dashboard .customer-order[open]{padding-bottom:16px}
-.account-dashboard .customer-order ol{padding-left:20px;font-size:12px;line-height:1.8;color:#59665c}
 .account-notifications-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
 .account-unread-count{font:11px/1.5 Manrope,Arial,sans-serif;color:#526055}
 .account-notification-item{padding:18px 0;border-top:1px solid #e3dccd}
@@ -57,7 +43,7 @@
 .account-notification-meta button{min-height:44px;padding:6px 0;border:0;background:transparent;color:var(--green);font:500 12px/1.5 Manrope,Arial,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .account-dashboard .account-notifications>.account-notifications-toggle{width:100%;min-height:44px;background:transparent;color:var(--green);border:1px solid #cfc8b9;border-radius:4px}
 .account-dashboard .account-browse-link{display:inline-flex;gap:24px;align-items:center;min-height:44px;color:var(--green);font:500 13px/1.5 Manrope,Arial,sans-serif;text-underline-offset:4px}
-.account-dashboard :is(button,a,input):focus-visible{outline:2px solid #9b7531;outline-offset:3px}
+.account-dashboard :is(button,a,input,summary):focus-visible{outline:2px solid #9b7531;outline-offset:3px}
 @media(max-width:900px){
   .account-dashboard .account-columns{grid-template-columns:minmax(0,1fr)}
   .account-dashboard .account-side{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:start}
@@ -75,11 +61,6 @@
   .account-dashboard .account-columns>div>.account-card:last-child,.account-dashboard .account-side>.account-card{margin-bottom:0}
   .account-dashboard .account-columns,.account-dashboard .account-side{grid-template-columns:minmax(0,1fr);gap:16px}
   .account-dashboard .account-profile .customer-form{grid-template-columns:minmax(0,1fr)}
-  .account-dashboard .customer-order summary{grid-template-columns:minmax(0,1fr) auto 12px;gap:8px 12px}
-  .account-order-reference{grid-column:1;grid-row:1/3}
-  .account-order-amount{grid-column:2;grid-row:1}
-  .account-order-badge{grid-column:2;grid-row:2;justify-self:end}
-  .account-order-chevron{grid-column:3;grid-row:1/3}
 }
 .account-password-field { display: grid; gap: 8px; min-width: 0; }
 .account-password-control { position: relative; min-width: 0; }
@@ -94,17 +75,93 @@
 .account-password-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
 .account-auth-links button:disabled { opacity: .6; cursor: wait; }
 
-.account-orders-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-.account-orders-heading button { min-height:44px; padding:8px 0; border:0; background:transparent; color:var(--green); font:500 12px/1.5 Manrope,Arial,sans-serif; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
-.account-dashboard .customer-actions .account-pay-order { background:var(--green); color:#fffdf7; border-color:var(--green); min-height:44px; }
-.account-order-payment { padding:12px; background:#edf1e7; border-left:3px solid var(--green); font-size:13px; line-height:1.7; }
-.account-order-items { margin-block:20px; }
-.account-order-items p { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; font-size:12px; }
-.account-order-items p span { margin-left:auto; white-space:nowrap; }
-.account-dashboard .account-order-history summary { display:block; padding:12px 0; font-size:12px; font-weight:600; cursor:pointer; }
-.account-dashboard .account-order-history ol { margin-top:0; }
 
-.account-order-breakdown { margin:16px 0; max-width:320px; font-size:12px; }
-.account-order-breakdown div { display:flex; justify-content:space-between; gap:16px; padding:4px 0; }
+/* Order management uses the full account width so progress and money stay legible. */
+.account-dashboard .account-orders { margin-bottom:24px; }
+.account-orders-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.account-orders-heading .account-section-description { margin-bottom:0; }
+.account-orders-heading button { min-height:44px; padding:8px 0; border:0; background:transparent; color:var(--green); font:500 13px/1.5 Manrope,Arial,sans-serif; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.account-dashboard .account-orders-sync { margin:10px 0 20px; font-size:11px; color:#647065; }
+.account-dashboard .customer-order { padding:0; border-bottom:1px solid #e0dacb; }
+.account-dashboard .customer-order:last-child { border-bottom:0; }
+.account-dashboard .customer-order>summary { display:grid; grid-template-columns:minmax(0,1fr) auto auto 16px; align-items:center; gap:20px; padding:22px 0; list-style:none; }
+.account-dashboard .customer-order>summary::-webkit-details-marker { display:none; }
+.account-order-reference { display:grid; gap:5px; min-width:0; }
+.account-order-reference b { color:var(--green); font-size:14px; overflow-wrap:anywhere; }
+.account-order-reference small { color:#647065; font-size:12px; }
+.account-order-amount { font-size:16px; font-weight:600; white-space:nowrap; }
+.account-order-badge { padding:4px 8px; background:#eaf0e4; color:#345434; border-radius:3px; font-size:12px; }
+.account-order-badge.is-exception { color:#85452e; background:#f5e8e0; }
+.account-order-chevron { font-size:18px; color:#647065; }
+.customer-order[open]>.account-order-chevron,.customer-order[open]>summary .account-order-chevron { transform:rotate(180deg); }
+.account-order-content { padding-bottom:24px; }
+.account-dashboard .account-orders h3 { margin:0 0 10px; font:600 14px/1.5 Manrope,Arial,sans-serif; color:var(--green); }
+.order-journey { padding:22px 24px; background:#f3f4ec; }
+.account-dashboard .order-journey-heading h3 { margin:0 0 5px; font-size:18px; }
+.account-dashboard .order-journey-heading p { margin:0; color:#526055; }
+.account-dashboard .order-progress { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); list-style:none; margin:24px 0 8px; padding:0; gap:0; }
+.order-progress li { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding-right:12px; min-width:0; }
+.order-progress li:before { content:''; position:absolute; top:13px; left:28px; right:0; height:1px; background:#cbcfc2; }
+.order-progress li:last-child:before { display:none; }
+.order-progress-marker { position:relative; z-index:1; display:grid; place-items:center; width:28px; height:28px; border:1px solid #a8b29e; border-radius:50%; background:#f3f4ec; color:#65735d; font-size:12px; flex-shrink:0; }
+.order-progress .is-complete .order-progress-marker { border-color:var(--green); background:var(--green); color:#fffdf7; }
+.order-progress .is-current .order-progress-marker { border:2px solid var(--green); color:var(--green); font-weight:700; }
+.order-progress li>span:last-child { display:grid; gap:2px; }
+.order-progress strong { font:500 12px/1.5 Manrope,Arial,sans-serif; color:#53604f; }
+.order-progress .is-current strong { color:var(--green); font-weight:700; }
+.order-progress time,.order-progress small { font-size:10px; color:#65735d; line-height:1.6; }
+.order-courier { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:20px; padding-top:18px; border-top:1px solid #d8dece; }
+.order-courier>div { min-width:0; }
+.order-section-label { display:block; margin-bottom:6px; font-size:11px; font-weight:600; color:#61705b; }
+.order-courier strong { font-size:13px; }
+.account-dashboard .order-courier p { margin:5px 0 0; font-size:12px; }
+.order-courier small { display:block; margin-top:3px; color:#647065; }
+.order-track-link { display:inline-flex; align-items:center; justify-content:center; gap:16px; flex-shrink:0; min-height:44px; padding:9px 15px; background:var(--green); color:#fffdf7; text-decoration:none; font-size:13px; border-radius:3px; }
+.account-dashboard .order-tracking-pending { margin:20px 0 0; padding-top:14px; border-top:1px solid #d8dece; font-size:12px; color:#61705b; }
+.account-dashboard .order-courier-history>summary,.account-dashboard .account-order-history>summary { display:block; min-height:44px; padding:12px 0; font-size:12px; font-weight:600; }
+.account-dashboard .order-courier-history ol,.account-dashboard .account-order-history ol { margin:0; padding-left:20px; font-size:12px; }
+.order-courier-history li,.account-order-history li { padding:5px 0; }
+.order-courier-history li>*,.account-order-history li>* { display:block; }
+.account-order-history time,.order-courier-history time { color:#647065; font-size:11px; }
+.order-payment-row { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:22px 0; border-bottom:1px solid #e0dacb; }
+.order-payment-row>div { min-width:0; }
+.account-dashboard .order-payment-row p { margin:0; }
+.order-payment-row small { display:block; margin-top:5px; font-size:12px; color:#647065; }
+.account-dashboard .customer-actions .account-pay-order { background:var(--green); color:#fffdf7; border-color:var(--green); min-height:44px; }
+.order-details-grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:40px; padding:22px 0; border-bottom:1px solid #e0dacb; }
+.order-details-grid section { min-width:0; }
+.account-order-items { margin:0; padding:0; list-style:none; }
+.account-order-items li { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:8px 0; font-size:13px; }
+.account-order-items li>div { display:grid; gap:3px; min-width:0; }
+.account-order-items li>span { white-space:nowrap; }
+.account-order-items small { color:#647065; font-size:12px; }
+.account-order-items a { font-size:12px; color:var(--green); text-underline-offset:3px; }
+.account-order-breakdown { margin:0; font-size:13px; }
+.account-order-breakdown div { display:flex; justify-content:space-between; gap:16px; padding:5px 0; }
 .account-order-breakdown dd { margin:0; white-space:nowrap; }
-.account-order-breakdown div:last-child { border-top:1px solid #e3dccd; margin-top:6px; padding-top:8px; font-weight:600; }
+.account-order-breakdown div:last-child { border-top:1px solid #e0dacb; margin-top:8px; padding-top:10px; font-weight:600; }
+.order-bottom-row { display:flex; align-items:flex-start; justify-content:space-between; gap:32px; padding:22px 0 8px; }
+.order-bottom-row address { font-style:normal; font-size:13px; line-height:1.8; }
+.order-secondary-actions { justify-content:flex-end; align-items:center; }
+.order-secondary-actions a { display:inline-flex; align-items:center; min-height:44px; color:var(--green); font-size:12px; text-underline-offset:3px; }
+.account-dashboard .order-secondary-actions button { border-color:transparent; color:#85452e; }
+.account-orders-empty { padding:24px 0; }
+.account-orders-empty a { color:var(--green); }
+@media(max-width:700px) {
+  .account-dashboard .customer-order>summary { grid-template-columns:minmax(0,1fr) auto 12px; gap:6px 12px; }
+  .account-order-reference { grid-column:1/3; grid-row:1; }
+  .account-order-reference b { font-size:13px; }
+  .account-order-amount { grid-column:2; grid-row:2; font-size:14px; }
+  .account-order-badge { grid-column:1; grid-row:2; justify-self:start; font-size:11px; }
+  .account-order-chevron { grid-column:3; grid-row:1/3; }
+  .order-journey { padding:18px 16px; }
+  .account-dashboard .order-progress { grid-template-columns:minmax(0,1fr); gap:0; margin:20px 0 0; }
+  .order-progress li { flex-direction:row; padding:0 0 18px; gap:12px; }
+  .order-progress li:before { left:13px; top:28px; bottom:0; width:1px; height:auto; }
+  .order-progress li:last-child { padding-bottom:0; }
+  .order-progress time { display:block; }
+  .order-progress small { display:none; }
+  .order-payment-row,.order-courier,.order-bottom-row { flex-direction:column; align-items:flex-start; gap:14px; }
+  .order-details-grid { grid-template-columns:minmax(0,1fr); gap:24px; }
+  .order-secondary-actions { justify-content:flex-start; }
+}

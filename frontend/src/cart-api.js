@@ -93,7 +93,7 @@ export const customerApi = {
   orderAction: (id, action, reason) => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({ reason }) }),
   downloadReceipt: async id => {
     const response = await fetch(`${API_URL}/customer/me/orders/${encodeURIComponent(id)}/receipt`, { headers: { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_TOKEN_KEY)}` } });
-    if (!response.ok) throw new Error('Could not download this receipt. Please sign in and try again.');
+    if (!response.ok) { const error = await response.json().catch(() => null); throw new Error(error?.message || 'Could not download this receipt. Please sign in and try again.'); }
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement('a'); link.href = url; link.download = `receipt-${id}.html`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   },

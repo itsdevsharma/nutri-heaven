@@ -84,8 +84,10 @@ describe('Order workflow safety with actual MongoDB transactions', () => {
     const updated = await orders.getOrder(order.id);
     expect(updated).toMatchObject({ totalPaise: payload.totalPaise, amountAdjustmentPaise: -1234, subtotalPaise: order.subtotalPaise, shippingPaise: order.shippingPaise });
     expect(updated.lines).toEqual(order.lines);
-    expect(orderReceipt(updated)).toContain('Order adjustment: INR -12.34');
-    expect(orderReceipt(updated)).toContain(`Total: INR ${(payload.totalPaise / 100).toFixed(2)}`);
+    expect(() => orderReceipt(updated)).toThrow(/only after payment/);
+    const paidReceipt = orderReceipt({ ...updated, paymentStatus: 'paid' });
+    expect(paidReceipt).toContain('Order adjustment: INR -12.34');
+    expect(paidReceipt).toContain(`Total: INR ${(payload.totalPaise / 100).toFixed(2)}`);
     const history = updated.activity.filter(item => item.action === 'override_amount');
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({ actor: 'super_admin@example.com', reason: payload.reason, before: { totalPaise: order.totalPaise }, after: { totalPaise: payload.totalPaise } });

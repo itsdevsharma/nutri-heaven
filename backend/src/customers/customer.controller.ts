@@ -57,9 +57,11 @@ export class CustomerController {
   @Post('me/orders/:id/return') @UseGuards(CustomerAuthGuard) requestReturn(@Req() req: CustomerRequest, @Param('id') id: string, @Body() dto: CustomerOrderReasonDto) { return this.service.requestOrderAction(req.customer.id, id, dto.reason, 'return'); }
   @Get('me/orders/:id/receipt') @UseGuards(CustomerAuthGuard) async receipt(@Req() req: CustomerRequest, @Param('id') id: string, @Res() res: Response) {
     const order = await this.service.ownedOrder(req.customer.id, id);
+    const html = orderReceipt(order);
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Disposition', 'attachment; filename="order-receipt.html"');
-    res.send(orderReceipt(order));
+    res.send(html);
   }
   @Get('me/orders') @UseGuards(CustomerAuthGuard) orders(@Req() req: CustomerRequest) { return this.service.ordersFor(req.customer.id); }
 

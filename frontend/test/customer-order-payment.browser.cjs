@@ -52,7 +52,7 @@ const apiOrigin = process.env.API_ORIGIN || 'http://localhost:3000';
       await section.locator('summary').filter({ hasText: 'NH-COD' }).first().click();
       await section.getByText('Cash on delivery: pay ₹250 when your order arrives.', { exact: true }).waitFor();
       await section.locator('summary').filter({ hasText: 'NH-CANCELLED' }).first().click();
-      await section.getByText('This order was cancelled.', { exact: false }).waitFor();
+      await section.getByText('No payment is due for this cancelled order.', { exact: true }).waitFor();
       await page.screenshot({ path: `/tmp/nutri-customer-orders-${width}.png`, fullPage: true });
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await section.getByRole('button', { name: 'Complete payment · ₹250', exact: true }).click();

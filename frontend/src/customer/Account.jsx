@@ -30,6 +30,8 @@ export default function Account({ onPayOrder }) {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [customer, setCustomer] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [ordersCheckedAt, setOrdersCheckedAt] = useState(null);
+  const [ordersRefreshError, setOrdersRefreshError] = useState('');
   const [wishlist, setWishlist] = useState([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -40,12 +42,33 @@ export default function Account({ onPayOrder }) {
   const load = async () => {
     const me = await customerApi.me(); setCustomer(me); setProfile({ name: me.name, phone: me.phone ?? '' });
     const [history, saved] = await Promise.all([customerApi.orders(), customerApi.wishlist()]);
-    setOrders(history); setWishlist(saved);
+    setOrders(history); setOrdersCheckedAt(new Date().toISOString()); setOrdersRefreshError(''); setWishlist(saved);
   };
   useEffect(() => {
     if (resetToken) { history.replaceState(null, '', '/account'); return; }
     if (customerApi.token()) load().catch(e => { setError(e.message); }).finally(() => setLoading(false));
   }, []);
+  const reloadOrders = async () => {
+    const history = await customerApi.orders();
+    setOrders(history); setOrdersCheckedAt(new Date().toISOString()); setOrdersRefreshError('');
+  };
+  useEffect(() => {
+    if (!customer) return;
+    let active = true, refreshing = false;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible' || busy || refreshing) return;
+      refreshing = true;
+      try {
+        const history = await customerApi.orders();
+        if (active) { setOrders(history); setOrdersCheckedAt(new Date().toISOString()); setOrdersRefreshError(''); }
+      } catch { if (active) setOrdersRefreshError('Updates could not be checked. Your last order details are shown. Try Refresh orders.'); }
+      finally { refreshing = false; }
+    };
+    const timer = setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { active = false; clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [customer?.id, busy]);
   const run = async (action, message) => {
     if (busy) return;
     setBusy(true); setError(''); setNotice('');
@@ -86,11 +109,11 @@ export default function Account({ onPayOrder }) {
   </form><div className="account-auth-links">{mode === 'login' && <button disabled={busy} onClick={() => { setForm({ ...form, password: '', confirm: '' }); setMode('forgot'); setError(''); setNotice(''); }}>Forgot password?</button>}<button disabled={busy} onClick={() => { setForm({ ...form, password: '', confirm: '' }); setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setNotice(''); }}>{mode === 'login' ? 'Create an account' : 'Back to sign in'}</button></div></div></section></main>;
   return <main className="account-page account-dashboard"><div className="account-wrap">{feedback}<section className="account-welcome"><div><p className="eyebrow">MY ACCOUNT</p><h1>Hello, {customer.name.split(' ')[0]}</h1><p className="account-subtitle">{customer.email}</p></div><button className="account-signout" onClick={() => { customerApi.logout(); setCustomer(null); setOrders([]); setWishlist([]); setNotice(''); setError(''); setMode('login'); }}>Sign out</button></section>
     <nav className="account-section-nav" aria-label="Account sections"><a href="#account-profile">Profile</a><a href="#account-addresses">Addresses</a><a href="#account-orders">Orders <span>{orders.length}</span></a><a href="#account-notifications">Notifications</a><a href="#account-wishlist">Wishlist</a></nav>
+    <CustomerOrders orders={orders} busy={busy} run={run} reload={reloadOrders} onPayOrder={onPayOrder} lastUpdated={ordersCheckedAt} refreshError={ordersRefreshError} />
     <div className="account-columns"><div>
       <section className="account-card account-profile" id="account-profile"><h2>Profile</h2><p className="account-section-description">Your contact details for orders and delivery.</p><form className="customer-form" onSubmit={e => { e.preventDefault(); run(async () => { await customerApi.update({ name: profile.name.trim(), phone: profile.phone }); await load(); }, 'Profile saved.'); }}><label>Full name<input required minLength={2} maxLength={100} value={profile.name} onChange={e => setProfile({ ...profile, name: e.target.value })} /></label><label>Phone<input type="tel" pattern="[0-9]{10}" value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} /></label><button disabled={busy}>Save profile</button></form></section>
       <section className="account-card" id="account-addresses"><h2>Delivery addresses</h2>{customer.addresses.map(item => <div className="customer-address" key={item.id}><div className="account-address-heading"><b>{item.label}</b>{item.isDefault && <span className="account-default-label">Default</span>}</div><p>{item.name} · {item.phone}<br />{item.street}, {item.city}, {item.state} {item.pin}</p><div className="customer-actions"><button disabled={busy} onClick={() => setAddress(item)}>Edit</button>{!item.isDefault && <button disabled={busy} onClick={() => run(async () => { await customerApi.defaultAddress(item.id); await load(); }, 'Default address updated.')}>Make default</button>}<button className="account-action-danger" disabled={busy} onClick={() => { if (confirm('Remove this address?')) run(async () => { await customerApi.removeAddress(item.id); await load(); }, 'Address removed.'); }}>Remove</button></div></div>)}{!customer.addresses.length && <p>No saved addresses yet.</p>}<button disabled={busy} onClick={() => setAddress({ ...blankAddress, name: customer.name, phone: customer.phone ?? '' })}>Add address</button>
       {address && <form className="customer-form" onSubmit={e => { e.preventDefault(); run(async () => { const { id, isDefault, ...payload } = address; if (id) await customerApi.updateAddress(id, payload); else await customerApi.addAddress(payload); setAddress(null); await load(); }, 'Address saved.'); }}><h3>{address.id ? 'Edit address' : 'New address'}</h3>{Object.entries({ label: 'Label', name: 'Recipient name', phone: 'Phone', street: 'Street address', city: 'City', state: 'State', pin: 'PIN code', landmark: 'Landmark (optional)' }).map(([key, label]) => <label key={key}>{label}<input required={key !== 'landmark'} value={address[key] ?? ''} pattern={key === 'phone' ? '[0-9]{10}' : key === 'pin' ? '[0-9]{6}' : undefined} onChange={e => setAddress({ ...address, [key]: e.target.value })} /></label>)}<div className="customer-actions"><button disabled={busy}>Save address</button><button type="button" onClick={() => setAddress(null)}>Cancel</button></div></form>}</section>
-      <CustomerOrders orders={orders} busy={busy} run={run} reload={load} onPayOrder={onPayOrder} />
     </div><div className="account-side"><Notifications /><section className="account-card" id="account-wishlist"><h2>Wishlist</h2>{wishlist.length ? wishlist.map(product => <div className="customer-wishlist" key={product.slug}><a href={`/products/${encodeURIComponent(product.slug)}`}>{product.title}</a><button disabled={busy} onClick={() => run(async () => { await customerApi.removeWishlist(product.slug); await load(); }, 'Removed from wishlist.')}>Remove</button></div>) : <p>Your saved favourites will appear here.</p>}<a className="account-browse-link" href="/shop">Browse products <span aria-hidden="true">→</span></a></section></div></div>
   </div></main>;
 }

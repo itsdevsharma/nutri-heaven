@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'crypto';
 import { compare, hash } from 'bcryptjs';
+import { ShiprocketShipment } from '../shipping/shipping.schema';
 import { OrderService } from '../orders/order.service';
 import { NotificationService } from '../engagement/notification.service';
 import { MailService } from '../mail/mail.module';
@@ -19,7 +20,7 @@ const publicCustomer = (customer: CustomerDocument | Record<string, any>) => ({ 
 
 @Injectable()
 export class CustomerService {
-  constructor(@InjectModel(Customer.name) private readonly customers: Model<CustomerDocument>, @InjectModel(Product.name) private readonly products: Model<ProductDocument>, @InjectModel(Order.name) private readonly orders: Model<OrderDocument>, private readonly jwt: JwtService, private readonly audit: AuditService, private readonly mail: MailService, private readonly notifications: NotificationService, private readonly orderService: OrderService) {}
+  constructor(@InjectModel(ShiprocketShipment.name) private readonly shipments: Model<ShiprocketShipment>, @InjectModel(Customer.name) private readonly customers: Model<CustomerDocument>, @InjectModel(Product.name) private readonly products: Model<ProductDocument>, @InjectModel(Order.name) private readonly orders: Model<OrderDocument>, private readonly jwt: JwtService, private readonly audit: AuditService, private readonly mail: MailService, private readonly notifications: NotificationService, private readonly orderService: OrderService) {}
   private async token(customer: CustomerDocument) { return this.jwt.signAsync({ sub: String(customer._id), email: customer.email, type: 'customer', version: customer.authVersion ?? 0 }, { expiresIn: '7d' }); }
   async signup(dto: SignupDto) {
     try { const customer = await this.customers.create({ name: dto.name.trim(), email: dto.email.toLowerCase(), passwordHash: await hash(dto.password, 12), phone: dto.phone, addresses: [], wishlist: [] }); await this.notifications.add(customer.email, 'Welcome to Nutri Heaven', 'Your account is ready. Save favourites and manage your orders from your account.', 'welcome-' + customer.id, true, customer.id); return { accessToken: await this.token(customer), customer: publicCustomer(customer) }; }
@@ -37,7 +38,8 @@ export class CustomerService {
   async ownedOrder(customerId: string, id: string) {
     const order = await this.orders.findOne({ id, customerId }).lean().exec();
     if (!order) throw new NotFoundException('Order not found');
-    return order;
+    const [view] = await this.withDeliveryTracking([order]);
+    return view!;
   }
   async requestOrderAction(customerId: string, id: string, reason: string, kind: 'cancel' | 'return') {
     const order = await this.ownedOrder(customerId, id);
@@ -45,7 +47,21 @@ export class CustomerService {
     if (order.status !== 'delivered') throw new BadRequestException('A return can only be requested for a delivered order.');
     return this.orderService.updateStatus(order.id, 'return_requested', { actor: 'customer:' + customerId, note: reason });
   }
-  async ordersFor(customerId: string) { return this.orders.find({ customerId }).sort({ createdAt: -1 }).lean().exec(); }
+  private async withDeliveryTracking(orders: Order[]) {
+    if (!orders.length) return [];
+    const shipments = await this.shipments.find({ orderId: { $in: orders.map(order => order.id) }, providerCancelled: { $ne: true } }).select('orderId awb courier tracking').lean().exec();
+    const byOrder = new Map(shipments.map(shipment => [shipment.orderId, shipment]));
+    return orders.map(order => {
+      const shipment = byOrder.get(order.id);
+      return { ...order, deliveryTracking: shipment ? {
+        number: shipment.awb || order.trackingNumber || '', courier: shipment.courier || order.operations?.courier || '',
+        url: shipment.awb ? `https://shiprocket.co/tracking/${encodeURIComponent(shipment.awb)}` : order.trackingUrl || '',
+        status: shipment.tracking?.status || '', updatedAt: shipment.tracking?.updatedAt,
+        activities: (shipment.tracking?.activities ?? []).slice(0, 30).map(item => ({ date: item.date, activity: item.activity, location: item.location })),
+      } : undefined };
+    });
+  }
+  async ordersFor(customerId: string) { return this.withDeliveryTracking(await this.orders.find({ customerId }).sort({ createdAt: -1 }).lean().exec()); }
   private readonly resetAttempts = new Map<string, number>();
   async forgotPassword(email: string) {
     email = email.trim().toLowerCase();
