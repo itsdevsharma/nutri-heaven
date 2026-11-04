@@ -7,6 +7,9 @@ import Razorpay from 'razorpay';
 import { VerifyRazorpayPaymentDto } from './payments.dto';
 import { RefundsService } from './refunds.service';
 import { OrderService } from '../orders/order.service';
+import { OverrideOrderAmountDto } from '../orders/order.dto';
+import { amountOverrideBlockedReason } from '../orders/order-workflow';
+import type { Order } from '../orders/order.schema';
 
 @Injectable()
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
@@ -29,7 +32,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         try {
           const order = await this.paymentStatus(record.id, record.cartId);
           if (order.status === 'pending' && !['paid', 'refunded'].includes(order.paymentStatus)) {
-            await this.orders.cancel(order.id, 'Online payment reservation expired after 30 minutes', 'system', true);
+            await this.orders.cancel(order.id, 'Online payment reservation expired after 30 minutes', 'system', true, new Date(Date.now() - 30 * 60_000));
           }
         } catch { this.logger.warn(`Could not reconcile expiring online order ${record.id}; will retry`); }
       }
@@ -66,10 +69,39 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     return order;
   }
 
+  // Provider checks are read-only. Any uncertain or in-flight payment blocks a
+  // replacement; a captured payment is reconciled before returning an error.
+  private async checkReplaceablePayments(order: Order) {
+    const ids = [...(order.supersededRazorpayOrders ?? []).map(item => item.id), ...(order.razorpayOrderId ? [order.razorpayOrderId] : [])];
+    for (const id of ids) {
+      let result;
+      try { result = await this.client().orders.fetchPayments(id); }
+      catch { throw new ServiceUnavailableException('Could not check payment with Razorpay. The total has not been changed; try again shortly.'); }
+      for (const payment of result.items) {
+        if (payment.status === 'captured') {
+          await this.orders.captureRazorpayPayment(id, payment.id, Number(payment.amount), payment.currency);
+          throw new ConflictException('A payment was received. Refresh the order and review payment before changing its total.');
+        }
+        if (payment.status !== 'failed') throw new ConflictException('A payment is still in progress or requires review. Ask the customer to close checkout, then check payment status before trying again.');
+      }
+    }
+  }
+
+  async overrideOrderAmount(id: string, dto: OverrideOrderAmountDto, actor: string) {
+    const order = await this.orders.getOrder(id);
+    // The transactional service validates the original fingerprint on retries.
+    if (order.activity.some(item => item.idempotencyKey === dto.idempotencyKey)) return this.orders.overrideAmount(id, dto, actor);
+    const blocked = amountOverrideBlockedReason(order);
+    if (blocked) throw new BadRequestException(blocked);
+    if (order.paymentMethod === 'razorpay') await this.checkReplaceablePayments(order);
+    return this.orders.overrideAmount(id, dto, actor, order.razorpayOrderId, order.paymentRevision ?? 0);
+  }
+
   async createRazorpayOrder(orderId: string, cartId?: string) {
     const client = this.client();
     let order = await this.ownedOrder(orderId, cartId);
     if (order.status !== 'pending' || !order.stockReserved || order.paymentReconciliationRequired) throw new BadRequestException('This order can no longer be paid');
+    if (order.supersededRazorpayOrders?.length) await this.checkReplaceablePayments({ ...order, razorpayOrderId: undefined });
     if (order.paymentStatus === 'failed') order = await this.orders.prepareRazorpayRetry(orderId);
     if (order.paymentStatus !== 'pending') throw new BadRequestException('This order can no longer be paid');
     if (!Number.isInteger(order.totalPaise) || order.totalPaise < 100) throw new BadRequestException('Online payments require an order total of at least ₹1. Choose cash on delivery for this order.');
@@ -77,25 +109,29 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       // Existing provider orders already fix the amount. Their checkout quote
       // may expire while the customer retries; stock and payment state above
       // still determine whether the existing payment can be resumed.
-      await this.orders.validatePaymentCheckout(order);
-      if (!await this.orders.claimPaymentCreation(order.id, order.totalPaise)) {
+      // A revised order retains its agreed shipping snapshot and reserved stock.
+      // Its original quote may have expired while the admin agreed a new total.
+      if (!order.supersededRazorpayOrders?.length) await this.orders.validatePaymentCheckout(order);
+      const revision = order.paymentRevision ?? 0;
+      const receipt = revision ? `${order.id}-r${revision}` : order.id;
+      if (!await this.orders.claimPaymentCreation(order.id, order.totalPaise, revision)) {
         // A previous request may have reached Razorpay before our process stopped.
         // Search the receipt; never blindly issue a second provider order.
         let matches;
-        try { matches = await client.orders.all({ receipt: order.id, count: 2 }); }
+        try { matches = await client.orders.all({ receipt, count: 2 }); }
         catch (error) { this.providerOrderError(error); }
-        const found = matches.items.filter(item => item.receipt === order.id);
+        const found = matches.items.filter(item => item.receipt === receipt);
         const recovered = found[0];
         if (found.length !== 1 || !recovered || Number(recovered.amount) !== order.totalPaise || recovered.currency !== 'INR') throw new ConflictException('Payment creation is in progress or needs reconciliation. Check payment status before retrying.');
-        order = await this.orders.attachRazorpayOrder(order.id, recovered.id);
+        order = await this.orders.attachRazorpayOrder(order.id, recovered.id, revision);
       } else {
         let remote;
-        try { remote = await client.orders.create({ amount: order.totalPaise, currency: 'INR', receipt: order.id, notes: { orderId: order.id } }); }
+        try { remote = await client.orders.create({ amount: order.totalPaise, currency: 'INR', receipt, notes: { orderId: order.id } }); }
         catch (error) { this.providerOrderError(error); }
-        order = await this.orders.attachRazorpayOrder(order.id, remote.id);
+        order = await this.orders.attachRazorpayOrder(order.id, remote.id, revision);
       }
     }
-    if (!order.razorpayOrderId || order.status !== 'pending' || order.paymentStatus !== 'pending') throw new BadRequestException('This order can no longer be paid');
+    if (!order.razorpayOrderId || order.paymentReconciliationRequired || order.status !== 'pending' || order.paymentStatus !== 'pending') throw new BadRequestException('This order can no longer be paid');
     return { keyId: process.env.RAZORPAY_KEY_ID, orderId: order.id, razorpayOrderId: order.razorpayOrderId, amount: order.totalPaise, currency: 'INR' };
   }
 
@@ -103,30 +139,40 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     const order = await this.ownedOrder(orderId, cartId);
     const secret = process.env.RAZORPAY_KEY_SECRET;
     if (!secret) throw new ServiceUnavailableException('Online payments are not configured');
-    if (!order.razorpayOrderId || body.razorpay_order_id !== order.razorpayOrderId) throw new BadRequestException('Payment order does not match your order');
-    const expected = createHmac('sha256', secret).update(`${order.razorpayOrderId}|${body.razorpay_payment_id}`).digest('hex');
+    const superseded = order.supersededRazorpayOrders?.find(item => item.id === body.razorpay_order_id);
+    if (body.razorpay_order_id !== order.razorpayOrderId && !superseded) throw new BadRequestException('Payment order does not match your order');
+    const expected = createHmac('sha256', secret).update(`${body.razorpay_order_id}|${body.razorpay_payment_id}`).digest('hex');
     const signature = Buffer.from(body.razorpay_signature, 'hex');
     if (signature.length !== 32 || !timingSafeEqual(Buffer.from(expected, 'hex'), signature)) throw new BadRequestException('Invalid payment signature');
     const client = this.client();
     let payment = await client.payments.fetch(body.razorpay_payment_id);
-    if (payment.order_id !== order.razorpayOrderId || Number(payment.amount) !== order.totalPaise || payment.currency !== 'INR') throw new BadRequestException('Payment amount or order does not match');
+    if (payment.order_id !== body.razorpay_order_id || Number(payment.amount) !== (superseded?.amountPaise ?? order.totalPaise) || payment.currency !== 'INR') throw new BadRequestException('Payment amount or order does not match');
+    if (superseded) {
+      if (payment.status === 'failed') return this.orders.getOrder(order.id);
+      if (payment.status !== 'captured') throw new BadRequestException('This checkout was replaced. Close it and reopen payment from your order.');
+      await this.orders.captureRazorpayPayment(body.razorpay_order_id, payment.id, Number(payment.amount), payment.currency);
+      return this.orders.getOrder(order.id);
+    }
     if (payment.status === 'authorized') {
-      if (order.status !== 'pending' || !order.stockReserved) throw new BadRequestException('This order is no longer payable. Contact support about your payment.');
+      if (order.status !== 'pending' || !order.stockReserved || order.paymentReconciliationRequired) throw new BadRequestException('This order is no longer payable. Contact support about your payment.');
       try { payment = await client.payments.capture(payment.id, order.totalPaise, 'INR'); }
       catch { payment = await client.payments.fetch(payment.id); } // Automatic capture can win the race.
     }
     if (payment.status !== 'captured') throw new BadRequestException('Payment has not been captured yet. Check payment status before retrying.');
-    await this.orders.captureRazorpayPayment(order.razorpayOrderId, payment.id, Number(payment.amount), payment.currency);
+    await this.orders.captureRazorpayPayment(body.razorpay_order_id, payment.id, Number(payment.amount), payment.currency);
     return this.orders.getOrder(order.id);
   }
 
   async paymentStatus(orderId: string, cartId?: string, force = false) {
     const order = await this.ownedOrder(orderId, cartId);
     // Recover captured payments if the browser closed before verification or a webhook was delayed.
-    if (order.razorpayOrderId && (force || !['paid', 'refunded'].includes(order.paymentStatus))) {
-      const payments = await this.client().orders.fetchPayments(order.razorpayOrderId);
-      for (const payment of payments.items.filter(payment => payment.status === 'captured')) {
-        await this.orders.captureRazorpayPayment(order.razorpayOrderId, payment.id, Number(payment.amount), payment.currency);
+    const ids = [...(order.supersededRazorpayOrders ?? []).map(item => item.id), ...(order.razorpayOrderId ? [order.razorpayOrderId] : [])];
+    if (force || order.paymentStatus !== 'refunded') {
+      for (const id of ids) {
+        const payments = await this.client().orders.fetchPayments(id);
+        for (const payment of payments.items.filter(payment => payment.status === 'captured')) {
+          await this.orders.captureRazorpayPayment(id, payment.id, Number(payment.amount), payment.currency);
+        }
       }
     }
     return this.orders.getOrder(order.id);

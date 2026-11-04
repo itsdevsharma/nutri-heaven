@@ -62,7 +62,7 @@ export default function OrdersPage() {
     const reason = window.prompt('Refund reason (min. 3 characters)');
     if (!reason) return;
     if (reason.trim().length < 3) { toast.error('Enter a refund reason with at least 3 characters.'); return; }
-    if (!await confirm({ title: 'Issue full refund?', message: `Refund ${formatPaise(selected.totalPaise)} for order ${selected.id} through Razorpay?`, confirmLabel: 'Issue refund', tone: 'danger' })) return;
+    if (!await confirm({ title: 'Issue full refund?', message: `Refund ${formatPaise(selected.capturedAmountPaise ?? selected.totalPaise)} for order ${selected.id} through Razorpay?`, confirmLabel: 'Issue refund', tone: 'danger' })) return;
     await mutate(() => adminApi.payments.refund(selected.id, reason.trim()), 'Refund request recorded. Check its processing status below.');
   };
   const statValue = value => loading || error ? '—' : value;

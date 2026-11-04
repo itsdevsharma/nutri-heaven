@@ -1,3 +1,4 @@
+import { OrderAmountController } from './order-amount.controller';
 import { PaymentWebhookEvent, PaymentWebhookEventSchema } from './webhook-event.schema';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrderRefund, OrderRefundSchema } from './refund.schema';
@@ -9,5 +10,5 @@ import { PaymentsService } from './payments.service';
 import { AuthModule } from '../auth/auth.module';
 import { AdminModule } from '../admin/admin.module';
 
-@Module({ imports: [MongooseModule.forFeature([{ name: OrderRefund.name, schema: OrderRefundSchema }, { name: PaymentWebhookEvent.name, schema: PaymentWebhookEventSchema }]), OrderModule, AuthModule, AdminModule], controllers: [PaymentsController], providers: [PaymentsService, RefundsService], exports: [PaymentsService] })
+@Module({ imports: [MongooseModule.forFeature([{ name: OrderRefund.name, schema: OrderRefundSchema }, { name: PaymentWebhookEvent.name, schema: PaymentWebhookEventSchema }]), OrderModule, AuthModule, AdminModule], controllers: [PaymentsController, OrderAmountController], providers: [PaymentsService, RefundsService], exports: [PaymentsService] })
 export class PaymentsModule {}

@@ -36,9 +36,12 @@ export class RefundsService {
       if (!order) throw new NotFoundException('Order not found');
       if (order.paymentMethod !== 'razorpay' || order.paymentStatus !== 'paid' || !['returned', 'cancelled'].includes(order.status) || !order.razorpayPaymentId) throw new BadRequestException('Only cancelled or inspected returned, captured Razorpay orders can be refunded');
       if (order.status === 'returned' && order.operations?.returnStatus !== 'inspected') throw new BadRequestException('Inspect the return before authorizing a refund');
-      if (order.paymentReconciliationRequired && !(retry && existing?.status === 'failed') && !/Paid order cancelled|reservation was released/.test(order.paymentReconciliationNote || '')) throw new BadRequestException('Investigate the payment exception before refunding');
-      const available = order.totalPaise - (order.refundedPaise || 0) - (order.refundReservedPaise || 0);
-      if (available !== order.totalPaise || available < 1) throw new BadRequestException('Refund balance is already reserved or refunded');
+      const refundableException = /Paid order cancelled|reservation was released/.test(order.paymentReconciliationNote || '')
+        || Boolean(order.capturedAmountPaise && order.paymentReconciliationNote?.startsWith('Payment captured on a replaced checkout;'));
+      if (order.paymentReconciliationRequired && !(retry && existing?.status === 'failed') && !refundableException) throw new BadRequestException('Investigate the payment exception before refunding');
+      const capturedPaise = order.capturedAmountPaise ?? order.totalPaise;
+      const available = capturedPaise - (order.refundedPaise || 0) - (order.refundReservedPaise || 0);
+      if (available !== capturedPaise || available < 1) throw new BadRequestException('Refund balance is already reserved or refunded');
       const requestId = randomUUID();
       const values = { orderId, requestId, paymentId: order.razorpayPaymentId, amountPaise: available, status: 'processing', actor, reason, attempts: 1, nextCheckAt: new Date(Date.now() + 60000), history: [{ at: new Date(), status: 'submission_started', actor, note: reason }] };
       if (retry && existing) {

@@ -21,6 +21,10 @@ export class Order {
   @Prop({ default: 'INR' }) currency!: string;
   @Prop({ default: 0, min: 0 }) taxPaise!: number;
   @Prop() paymentCreationStartedAt?: Date;
+  @Prop({ default: 0 }) paymentRevision!: number;
+  @Prop({ type: [Object], default: [] }) supersededRazorpayOrders!: Array<{ id: string; amountPaise: number; at: Date }>;
+  @Prop() capturedAmountPaise?: number;
+  @Prop() paymentWindowStartedAt?: Date;
   @Prop() nextShippingAttemptAt?: Date;
   @Prop() shippingReviewReason?: string;
   @Prop() checkoutFingerprint?: string;

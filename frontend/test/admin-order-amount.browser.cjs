@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
       const page = await browser.newPage({ viewport: { width, height: 960 } });
       const errors = []; page.on('pageerror', error => errors.push(error.message));
       await page.addInitScript(() => sessionStorage.setItem('nutri_admin_session', JSON.stringify({ accessToken: 'fixture.' + btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })) + '.fixture', admin: { email: 'admin@example.com', name: 'Admin', role: 'super_admin' } })));
-      const order = { id: 'NH-AMOUNT', customerName: 'Test Buyer', customerEmail: 'buyer@example.com', customerPhone: '9000000000', createdAt: new Date().toISOString(), status: 'confirmed', paymentStatus: 'pending', paymentMethod: 'cod', stockReserved: true, totalPaise: 25000, subtotalPaise: 20000, shippingPaise: 5000, deliveryAddress: { street: '12 Market Road', city: 'Hisar', state: 'Haryana', pin: '125001' }, operations: { fulfillment: 'unaccepted', shipment: 'not_created', returnStatus: 'not_requested' }, allowedActions: ['accept'], amountOverrideBlockedReason: null, lines: [{ productSlug: 'nuts', productName: 'Nuts', packSize: '250g', quantity: 1, lineTotalPaise: 20000 }], activity: [] };
+      const order = { id: 'NH-AMOUNT', customerName: 'Test Buyer', customerEmail: 'buyer@example.com', customerPhone: '9000000000', createdAt: new Date().toISOString(), status: 'confirmed', paymentStatus: 'pending', paymentMethod: 'razorpay', razorpayOrderId: 'order_existing', paymentCreationStartedAt: new Date().toISOString(), stockReserved: true, totalPaise: 25000, subtotalPaise: 20000, shippingPaise: 5000, deliveryAddress: { street: '12 Market Road', city: 'Hisar', state: 'Haryana', pin: '125001' }, operations: { fulfillment: 'unaccepted', shipment: 'not_created', returnStatus: 'not_requested' }, allowedActions: ['accept'], amountOverrideBlockedReason: null, lines: [{ productSlug: 'nuts', productName: 'Nuts', packSize: '250g', quantity: 1, lineTotalPaise: 20000 }], activity: [] };
       let saves = 0, fail = true;
       await page.route('http://localhost:3000/**', async route => {
         const path = new URL(route.request().url()).pathname;
@@ -30,7 +30,8 @@ const assert = require('node:assert/strict');
       await page.goto((process.env.FRONTEND_URL || 'http://127.0.0.1:5173') + '/admin/orders');
       await page.getByRole('button', { name: 'View order →' }).click();
       const dialog = page.getByRole('dialog', { name: 'Order NH-AMOUNT' });
-      await dialog.getByRole('button', { name: 'Override amount', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Override final total', exact: true }).click();
+      await dialog.getByText('Ask the customer to close any open payment window before saving.', { exact: false }).waitFor();
       await dialog.getByLabel('New order total (₹)').fill('225.50');
       await dialog.getByLabel('Reason for amount change').fill('Customer discount');
       await page.screenshot({ path: `/tmp/nutri-amount-form-${width}.png`, fullPage: true });

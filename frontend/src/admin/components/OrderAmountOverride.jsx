@@ -26,8 +26,9 @@ export default function OrderAmountOverride({ order, busy, save }) {
     if (await save({ totalPaise, expectedTotalPaise: originalTotal, reason: reason.trim(), idempotencyKey: requestKey })) setEditing(false);
   };
   return <section className="admin-order-section">
-    <h3>Order amount</h3>
-    {order.amountOverrideBlockedReason ? <p className="admin-hint">{order.amountOverrideBlockedReason}</p> : !editing ? <><p className="admin-hint">Change the final amount payable for this order. The adjustment and your reason are saved in its history.</p><button type="button" className="admin-btn admin-btn-ghost" disabled={busy} onClick={start}>Override amount</button></> : <form className="admin-stack admin-operation-form" onSubmit={submit}>
+    <h3>Final order total</h3>
+    {order.amountOverrideBlockedReason ? <p className="admin-hint">{order.amountOverrideBlockedReason}</p> : !editing ? <><p className="admin-hint">Change the final amount payable for this order. The adjustment and your reason are saved in its history.</p><button type="button" className="admin-btn admin-btn-ghost" disabled={busy} onClick={start}>Override final total</button></> : <form className="admin-stack admin-operation-form" onSubmit={submit}>
+      {order.paymentMethod === 'razorpay' && <p className="admin-hint">Ask the customer to close any open payment window before saving. Their next “Complete payment” action will use the revised total. The old checkout remains tracked for payment review.</p>}
       <p>Current total: <strong>{formatPaise(order.totalPaise)}</strong></p>
       {originalTotal !== order.totalPaise && <p role="alert" className="admin-alert admin-alert-error">The amount changed while you were editing. Go back and reopen the form.</p>}
       <FormField label="New order total (₹)" hint="Enter the final amount including delivery and discounts."><input aria-label="New order total (₹)" className="admin-input" type="number" min={order.paymentMethod === 'razorpay' ? '1' : '0.01'} step="0.01" required disabled={busy} value={amount} onChange={change(setAmount)} /></FormField>

@@ -1,7 +1,7 @@
 import { OptionalCustomerAuthGuard } from '../customers/optional-customer-auth.guard';
 import { Body, Controller, Get, Headers, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { OrderService } from './order.service';
-import { CancelOrderDto, OrderCreateDto, UpdateOrderStatusDto, OrderActionDto, OverrideOrderAmountDto } from './order.dto';
+import { CancelOrderDto, OrderCreateDto, UpdateOrderStatusDto, OrderActionDto } from './order.dto';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -36,13 +36,6 @@ export class OrderController {
   async adminGet(@Param('id') id: string, @Request() request: AdminRequest) {
     const order = await this.service.getOrder(id);
     return { ...order, amountOverrideBlockedReason: amountOverrideBlockedReason(order), operations: operationsFor(order), allowedActions: allowedOrderActions(order, request.admin?.role ?? '') };
-  }
-
-  @Patch('admin/:id/amount')
-  @UseGuards(AdminAuthGuard, RolesGuard)
-  @Roles(AdminRole.SUPER_ADMIN)
-  overrideAmount(@Param('id') id: string, @Body() dto: OverrideOrderAmountDto, @Request() request: AdminRequest) {
-    return this.service.overrideAmount(id, dto, request.admin?.email ?? 'unknown-admin');
   }
 
   /** Admin update of fulfilment state. Protected by RBAC. */

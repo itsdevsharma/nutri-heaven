@@ -72,7 +72,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
   }
 
   async staleOnlineOrders(before: Date) {
-    return this.orders.find({ paymentMethod: 'razorpay', status: 'pending', paymentStatus: { $in: ['pending', 'failed'] }, stockReserved: true, createdAt: { $lt: before } }).select('id cartId').limit(100).lean().exec();
+    return this.orders.find({ paymentMethod: 'razorpay', status: 'pending', paymentStatus: { $in: ['pending', 'failed'] }, stockReserved: true, $or: [{ paymentWindowStartedAt: { $lt: before } }, { paymentWindowStartedAt: { $exists: false }, createdAt: { $lt: before } }] }).select('id cartId').limit(100).lean().exec();
   }
 
   async listAdmin(): Promise<Order[]> {
@@ -181,7 +181,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async overrideAmount(id: string, dto: OverrideOrderAmountDto, actor: string): Promise<Order> {
+  async overrideAmount(id: string, dto: OverrideOrderAmountDto, actor: string, checkedProviderOrderId?: string, checkedRevision?: number): Promise<Order> {
     const session = await this.connection.startSession();
     let result: Order | undefined;
     try { await session.withTransaction(async () => {
@@ -195,12 +195,24 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
       }
       const blocked = amountOverrideBlockedReason(order);
       if (blocked) throw new BadRequestException(blocked);
+      if (checkedRevision !== undefined && (order.paymentRevision ?? 0) !== checkedRevision) throw new ConflictException('The order changed while payment was being checked. Refresh and try again.');
+      if (order.razorpayOrderId && checkedProviderOrderId !== order.razorpayOrderId) throw new ConflictException('Check the existing online payment before replacing its checkout.');
       if (!Number.isSafeInteger(dto.totalPaise) || dto.totalPaise < (order.paymentMethod === 'razorpay' ? 100 : 1)) throw new BadRequestException('Enter a valid amount of at least ₹' + (order.paymentMethod === 'razorpay' ? '1' : '0.01'));
       if (!dto.idempotencyKey || !dto.reason?.trim() || dto.reason.trim().length < 3) throw new BadRequestException('An action key and a reason of at least 3 characters are required');
       if (order.totalPaise !== dto.expectedTotalPaise) throw new ConflictException('The order amount changed. Refresh the order and try again.');
       if (order.totalPaise === dto.totalPaise) throw new BadRequestException('Enter an amount different from the current total');
       const before = { totalPaise: order.totalPaise, amountAdjustmentPaise: order.amountAdjustmentPaise ?? 0 };
       const baseTotal = Math.max(0, order.subtotalPaise - (order.couponDiscountPaise ?? 0)) + order.shippingPaise;
+      if (order.paymentMethod === 'razorpay') {
+        if (order.razorpayOrderId) {
+          order.supersededRazorpayOrders.push({ id: order.razorpayOrderId, amountPaise: order.totalPaise, at: new Date() });
+          order.razorpayOrderId = undefined;
+          order.paymentCreationStartedAt = undefined;
+        }
+        order.paymentRevision = (order.paymentRevision ?? 0) + 1;
+        order.paymentWindowStartedAt = new Date();
+        order.paymentStatus = 'pending';
+      }
       order.totalPaise = dto.totalPaise;
       order.amountAdjustmentPaise = dto.totalPaise - baseTotal;
       order.activity.push({ action: 'override_amount', actor, at: new Date(), reason: dto.reason.trim(), idempotencyKey: dto.idempotencyKey, fingerprint, before, after: { totalPaise: order.totalPaise, amountAdjustmentPaise: order.amountAdjustmentPaise } });
@@ -321,21 +333,22 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
-  async cancel(id: string, reason: string, actor = 'admin', pendingOnly = false): Promise<Order> {
+  async cancel(id: string, reason: string, actor = 'admin', pendingOnly = false, expireBefore?: Date): Promise<Order> {
     const session = await this.connection.startSession();
     let result: Order | undefined;
     try {
       await session.withTransaction(async () => {
         const order = await this.orders.findOne({ id }).session(session).exec();
         if (!order) throw new NotFoundException(`No order found for "${id}"`);
+        if (expireBefore && new Date(order.paymentWindowStartedAt ?? order.get('createdAt')).getTime() >= expireBefore.getTime()) { result = order.toObject(); return; }
         if (pendingOnly && (order.paymentMethod !== 'razorpay' || order.paymentStatus === 'paid' || order.status !== 'pending')) throw new BadRequestException('Only unpaid pending online orders can be cancelled');
         if (order.status === 'cancelled') { result = order.toObject(); return; }
         if (order.shiprocketBookingStarted) throw new BadRequestException('Cancel the Shiprocket shipment and refresh provider details before cancelling this order');
         if (!['pending', 'confirmed', 'packed'].includes(order.status)) throw new BadRequestException(`Cannot cancel an order in ${order.status}`);
         if (order.stockReserved) await this.inventory.releaseForOrder(order.idempotencyKey, order.lines.map((line) => ({ productSlug: line.productSlug, packSize: line.packSize, quantity: line.quantity })), 'cancelled', actor, session);
         if (order.paymentMethod === 'razorpay' && order.paymentStatus === 'paid') {
+          if (!order.paymentReconciliationRequired) order.paymentReconciliationNote = 'Paid order cancelled; issue or record a provider refund';
           order.paymentReconciliationRequired = true;
-          order.paymentReconciliationNote = 'Paid order cancelled; issue or record a provider refund';
         }
         order.operations = { ...operationsFor(order), fulfillment: 'cancelled' };
         order.stockReserved = false;
@@ -348,7 +361,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
       });
     } finally { await session.endSession(); }
     if (!result) throw new Error('Cancellation transaction produced no order');
-    await this.coupons.refundRedemption(result.id);
+    if (result.status === 'cancelled') await this.coupons.refundRedemption(result.id);
     return result;
   }
 
@@ -358,13 +371,13 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
     if (result.quote.subtotalPaise - result.quote.discountPaise + result.selected.shippingPaise !== order.totalPaise - (order.amountAdjustmentPaise ?? 0)) throw new ConflictException('Order total changed. Return to checkout.');
   }
 
-  async claimPaymentCreation(id: string, expectedTotalPaise?: number) {
-    return Boolean(await this.orders.findOneAndUpdate({ id, ...(expectedTotalPaise === undefined ? {} : { totalPaise: expectedTotalPaise }), status: 'pending', paymentStatus: 'pending', razorpayOrderId: { $exists: false }, paymentCreationStartedAt: { $exists: false } }, { $set: { paymentCreationStartedAt: new Date() } }));
+  async claimPaymentCreation(id: string, expectedTotalPaise?: number, expectedRevision = 0) {
+    return Boolean(await this.orders.findOneAndUpdate({ id, $or: [{ paymentRevision: expectedRevision }, ...(expectedRevision === 0 ? [{ paymentRevision: { $exists: false } }] : [])], ...(expectedTotalPaise === undefined ? {} : { totalPaise: expectedTotalPaise }), status: 'pending', paymentStatus: 'pending', razorpayOrderId: { $exists: false }, paymentCreationStartedAt: { $exists: false } }, { $set: { paymentCreationStartedAt: new Date() } }));
   }
 
-  async attachRazorpayOrder(id: string, razorpayOrderId: string): Promise<Order> {
+  async attachRazorpayOrder(id: string, razorpayOrderId: string, expectedRevision = 0): Promise<Order> {
     // The first provider order wins; concurrent checkout requests reuse it.
-    await this.orders.updateOne({ id, paymentMethod: 'razorpay', paymentStatus: 'pending', status: 'pending', razorpayOrderId: { $exists: false } }, { $set: { razorpayOrderId } }).exec();
+    await this.orders.updateOne({ id, $or: [{ paymentRevision: expectedRevision }, ...(expectedRevision === 0 ? [{ paymentRevision: { $exists: false } }] : [])], paymentMethod: 'razorpay', paymentStatus: 'pending', status: 'pending', razorpayOrderId: { $exists: false } }, { $set: { razorpayOrderId } }).exec();
     return this.getOrder(id);
   }
 
@@ -381,7 +394,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
   async captureRazorpayPayment(razorpayOrderId: string, paymentId: string, amount: number, currency: string): Promise<void> {
     const session = await this.connection.startSession();
     try { await session.withTransaction(async () => {
-      const order = await this.orders.findOne({ razorpayOrderId }).session(session).exec();
+      const order = await this.orders.findOne({ $or: [{ razorpayOrderId }, { 'supersededRazorpayOrders.id': razorpayOrderId }] }).session(session).exec();
       if (!order) throw new NotFoundException('Payment order is not attached yet; retry event');
       if (order.paymentStatus === 'refunded') {
         if (order.razorpayPaymentId === paymentId) return;
@@ -400,6 +413,16 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
         }
         return;
       }
+      const superseded = order.supersededRazorpayOrders?.find(item => item.id === razorpayOrderId);
+      if (superseded) {
+        order.paymentStatus = 'paid'; order.razorpayPaymentId = paymentId;
+        if (Number.isSafeInteger(amount) && amount === superseded.amountPaise && currency === 'INR') order.capturedAmountPaise = amount;
+        order.paymentReconciliationRequired = true;
+        order.paymentReconciliationNote = 'Payment captured on a replaced checkout; cancel and refund the captured payment before placing a new order';
+        order.activity.push({ action: 'superseded_payment_captured', actor: 'razorpay', at: new Date(), reason: `Capture ${paymentId} on replaced checkout ${razorpayOrderId}`, after: { amount, currency } });
+        await this.persistOrder(order, session); return;
+      }
+      if (Number.isSafeInteger(amount) && amount > 0 && currency === 'INR') order.capturedAmountPaise = amount;
       if (order.status === 'cancelled' || !order.stockReserved) {
         // Persist captured money explicitly for reconciliation; never restore a cancelled order.
         order.paymentStatus = 'paid'; order.razorpayPaymentId = paymentId;
