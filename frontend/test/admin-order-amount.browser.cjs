@@ -13,7 +13,8 @@ const assert = require('node:assert/strict');
       await page.route('http://localhost:3000/**', async route => {
         const path = new URL(route.request().url()).pathname;
         let body = [], status = 200;
-        if (path === '/orders/admin') body = [order];
+        if (path === '/orders/admin/page') body = { items: [order], total: 1, limit: 20, offset: 0, summary: { totalOrders: 1, toFulfil: 1, inTransit: 0, delivered: 0 } };
+        else if (path === '/orders/admin/NH-AMOUNT') body = order;
         else if (path === '/admin/shipping/configuration') body = { configured: false };
         else if (path.endsWith('/amount')) {
           const payload = route.request().postDataJSON(); saves++;

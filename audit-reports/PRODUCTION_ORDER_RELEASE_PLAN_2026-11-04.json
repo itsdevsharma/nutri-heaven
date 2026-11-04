@@ -1,0 +1,112 @@
+{
+  "mode": "read_only_release_plan",
+  "productionWritesPerformed": false,
+  "auditGeneratedAt": "2026-11-04T08:36:35.323Z",
+  "databaseConfirmation": "nutri_heaven",
+  "referenceMetadataBackfills": {
+    "expectedCount": 8,
+    "sampleRecordIds": [
+      "6ae8690df443a03f8793dae5",
+      "6ae977a44d094e61741d28d0",
+      "6ae979234d094e61741d2b5b",
+      "6ae97b124d094e61741d2ea7",
+      "6ae97bd3bc95937e8324ac1a",
+      "6ae97cffbc95937e8324ad77",
+      "6aeabd8889c24f4c65d4e5aa",
+      "6aeada6dbd4d22e83743f4a7"
+    ],
+    "fields": [
+      "razorpayOrderReferences"
+    ],
+    "sourceFields": [
+      "razorpayOrderId",
+      "supersededRazorpayOrders.id"
+    ],
+    "preserveFinancialAndHistoricalFields": true
+  },
+  "indexes": [
+    {
+      "key": {
+        "razorpayOrderReferences": 1
+      },
+      "options": {
+        "name": "unique_razorpay_order_reference",
+        "unique": true,
+        "partialFilterExpression": {
+          "razorpayOrderReferences": {
+            "$type": "string",
+            "$gt": ""
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "razorpayOrderId": 1
+      },
+      "options": {
+        "name": "unique_active_razorpay_order",
+        "unique": true,
+        "partialFilterExpression": {
+          "razorpayOrderId": {
+            "$type": "string",
+            "$gt": ""
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "razorpayPaymentId": 1
+      },
+      "options": {
+        "name": "unique_razorpay_payment_reference",
+        "unique": true,
+        "partialFilterExpression": {
+          "razorpayPaymentId": {
+            "$type": "string",
+            "$gt": ""
+          }
+        }
+      }
+    },
+    {
+      "key": {
+        "createdAt": -1,
+        "_id": -1
+      },
+      "options": {
+        "name": "order_page_created"
+      }
+    },
+    {
+      "key": {
+        "status": 1,
+        "createdAt": -1,
+        "_id": -1
+      },
+      "options": {
+        "name": "order_page_status"
+      }
+    },
+    {
+      "key": {
+        "paymentStatus": 1,
+        "createdAt": -1,
+        "_id": -1
+      },
+      "options": {
+        "name": "order_page_payment"
+      }
+    }
+  ],
+  "preflightReady": true,
+  "requiredBeforeProductionExecution": [
+    "Explicit approval for production metadata/index changes and deployment",
+    "Staging API URL and sandbox environment-file path",
+    "Candidate backend deployed and all application writers updated to maintain reference metadata",
+    "Fresh audit with unchanged reviewed backfill count",
+    "Protected exclusive backup file for each prior reference-cache value"
+  ],
+  "rollback": "Restore previous paired application artifacts. Keep optional reference metadata and uniqueness indexes unless a separately reviewed index issue requires intervention; do not restore financial records or remove constraints to admit duplicates."
+}

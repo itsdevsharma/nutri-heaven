@@ -17,7 +17,7 @@ const deliveryName = storeMode ? 'Interstate delivery' : 'Standard surface deliv
       const errors = []; page.on('pageerror', error => errors.push(error.message));
       const product = { slug: 'nuts', title: 'Almonds', description: 'Fresh almonds.', category: 'Nuts', image: 'almonds_ze0A.jpg', pricePaise: 10000, variants: [{ size: '250g', pricePaise: 10000, stockQuantity: 20, isActive: true }] };
       const cart = { items: [{ productId: 'nuts', productName: 'Almonds', packSize: '250g', quantity: 1, image: product.image, unitPricePaise: 10000 }], subtotalPaise: 10000, shippingPending: true, shippingPaise: null, totalPaise: null };
-      let submitted, savedOrder, quoteRequests = [];
+      let submitted, savedOrder, quoteRequests = [], placements = 0;
       let failNextQuote = false;
       await page.addInitScript(() => {
         window.Razorpay = class {
@@ -44,7 +44,7 @@ const deliveryName = storeMode ? 'Interstate delivery' : 'Standard surface deliv
               return route.fulfill({ status: 503, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ message: 'Could not calculate delivery rates. Please retry.' }) });
             }
             body = { id: '00000000-0000-4000-8000-000000000001', subtotalPaise: 10000, discountPaise: 0, taxPaise: 0, expiresAt: new Date(Date.now() + 600000).toISOString(), options: storeMode ? [{ courierId, name: deliveryName, shippingPaise, estimatedDays: '' }] : [{ courierId, name: deliveryName, shippingPaise, estimatedDays: '3–5' }, { courierId: 9, name: 'Express air delivery', shippingPaise: 9500, estimatedDays: '1–2' }], ...(storeMode ? { source: 'store', storeRate: { zone: 'interstate', weightGrams: 250, slabGrams: 1000, slabs: 1, ratePaise: shippingPaise } } : { parcel: { weight: 0.28 } }) }; }
-          else if (url.pathname === '/orders') { submitted = route.request().postDataJSON(); body = savedOrder = { ...submitted, id: 'NH-PREVIEW', subtotalPaise: 10000, shippingPaise, totalPaise, status: submitted.paymentMethod === 'cod' ? 'confirmed' : 'pending', paymentStatus: 'pending', lines: [{ productName: 'Almonds', packSize: '250g', quantity: 1, unitPricePaise: 10000, lineTotalPaise: 10000 }] }; }
+          else if (url.pathname === '/orders') { placements++; submitted = route.request().postDataJSON(); body = savedOrder = { ...submitted, id: 'NH-PREVIEW', subtotalPaise: 10000, shippingPaise, totalPaise, status: submitted.paymentMethod === 'cod' ? 'confirmed' : 'pending', paymentStatus: 'pending', lines: [{ productName: 'Almonds', packSize: '250g', quantity: 1, unitPricePaise: 10000, lineTotalPaise: 10000 }] }; }
           else if (url.pathname === '/payments/razorpay/orders/NH-PREVIEW/verify') body = { ...savedOrder, status: 'confirmed', paymentStatus: 'paid' };
           else if (url.pathname === '/payments/razorpay/orders/NH-PREVIEW') body = route.request().method() === 'POST' ? { keyId: 'rzp_test_fixture', razorpayOrderId: 'order_preview', amount: savedOrder.totalPaise, currency: 'INR' } : savedOrder;
           else if (url.pathname.startsWith('/reviews')) body = { items: [], count: 0, average: 0 };
@@ -103,10 +103,11 @@ const deliveryName = storeMode ? 'Interstate delivery' : 'Standard surface deliv
       await page.getByLabel(deliveryName, { exact: false }).check();
       assert((await page.locator('button[type="submit"]').innerText()).includes(totalText));
       await page.getByRole('checkbox', { name: 'I agree' }).check();
-      await page.getByRole('button', { name: `Pay ₹${totalText}`, exact: false }).click();
+      await page.getByRole('button', { name: `Pay ₹${totalText}`, exact: false }).click({ clickCount: 2 });
       await page.getByText('Payment received', { exact: true }).waitFor();
       assert.equal(submitted.shippingQuoteId, '00000000-0000-4000-8000-000000000001'); assert.equal(submitted.courierId, courierId);
       assert.equal(await page.evaluate(() => window.checkoutOptions.amount), totalPaise);
+      assert.equal(placements, 1, 'Double click must place only one order');
       assert.deepEqual(errors, [], `Browser errors at ${width}px`);
       console.log(`Checkout passed: ${storeMode ? 'store' : 'shiprocket'} ${width}px, checkout refresh/back/forward/return-to-bag, automatic delivery, courier selection, address/payment invalidation, error retry, matching Razorpay amount, no overflow or page errors`);
       await page.close();

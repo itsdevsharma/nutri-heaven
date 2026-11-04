@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, Req, Request, UseGuards } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import { CancelOrderDto } from '../orders/order.dto';
-import { VerifyRazorpayPaymentDto } from './payments.dto';
+import { RefundQueryDto, VerifyRazorpayPaymentDto } from './payments.dto';
 import { PaymentsService } from './payments.service';
 import { AdminAuthGuard, type AdminRequest } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -37,7 +37,7 @@ export class PaymentsController {
   @Get('admin/refunds')
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
-  refunds() { return this.payments.listRefunds(); }
+  refunds(@Query() query: RefundQueryDto) { return this.payments.listRefunds(query.orderId); }
 
   @Get('admin/webhook-failures')
   @UseGuards(AdminAuthGuard, RolesGuard)

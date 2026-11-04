@@ -109,7 +109,7 @@ describe('Shiprocket admin shipping', () => {
     const tracked = await request(app.getHttpServer()).post(`${base}/orders/SHIP-1/track`).set(headers(support)).send({}).expect(201);
     expect(tracked.body.tracking.status).toBe('IN TRANSIT');
     const order = await app.get<Model<Order>>(getModelToken(Order.name)).findOne({ id: 'SHIP-1' });
-    expect(order?.trackingNumber).toBe('AWB123'); expect(order?.status).toBe('packed'); expect(order?.paymentStatus).toBe('pending');
+    expect(order?.trackingNumber).toBe('AWB123'); expect(order?.status).toBe('shipped'); expect(order?.paymentStatus).toBe('pending');
   });
   it('keeps ambiguous bookings recoverable without allowing another provider create', async () => {
     provider.request.mockRejectedValueOnce(new BadGatewayException('Shiprocket timeout'));
@@ -182,7 +182,7 @@ describe('Shiprocket admin shipping', () => {
     const orders = app.get<Model<Order>>(getModelToken(Order.name));
     const { _id, ...fields } = (await orders.findOne({ id: 'SHIP-1' }).lean())!;
     const id = `SHIP-ADJUST-${totalPaise}`;
-    await orders.create({ ...fields, id, cartId: id, idempotencyKey: id, trackingNumber: '', trackingUrl: '', shiprocketBookingStarted: false });
+    await orders.create({ ...fields, id, cartId: id, idempotencyKey: id, status: 'packed', operations: { ...fields.operations, fulfillment: 'ready_to_dispatch', shipment: 'not_created', dispatchedAt: undefined }, trackingNumber: '', trackingUrl: '', shiprocketBookingStarted: false });
     await request(app.getHttpServer()).patch(`/orders/admin/${id}/amount`).set(headers(admin)).send({ totalPaise, expectedTotalPaise: fields.totalPaise, reason: 'Agreed COD amount', idempotencyKey: randomUUID() }).expect(200);
     provider.request.mockResolvedValueOnce({ order_id: totalPaise, shipment_id: totalPaise + 1 });
     await request(app.getHttpServer()).post(`${base}/orders/${id}/create`).set(headers(admin)).send({}).expect(201);

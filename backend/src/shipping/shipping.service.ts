@@ -10,6 +10,7 @@ import { AuditService } from '../audit/audit.service';
 import { ShiprocketClient, ShiprocketRejectedException } from './shiprocket.client';
 import { ShippingConfiguration, ShiprocketShipment } from './shipping.schema';
 import { ShippingConfigurationDto, ShiprocketActionDto } from './shipping.dto';
+import { deliveryRank } from './tracking-status';
 const safeUrl = (value: unknown) => { try { const url = new URL(String(value)); return url.protocol === 'https:' && !url.username && !url.password ? url.href : undefined; } catch { return undefined; } };
 const positiveId = (value: unknown) => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : undefined;
 @Injectable()
@@ -44,10 +45,15 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
         if (!order) break;
         try {
           let shipment = await this.get(order.id);
-          if (!shipment) {
+          if (!shipment || (!shipment.shipmentId && !shipment.error && !shipment.submissionStartedAt)) {
             shipment = await this.action(order.id, 'create', {}, 'system');
           }
-          if (shipment?.error) continue; // Ambiguous calls require the existing reconciliation workflow.
+          if (shipment?.error) {
+            // Read-only provider lookup recovers a response lost during restart;
+            // no match never authorizes resubmitting a financial/provider call.
+            if (shipment.submissionStartedAt) await this.action(order.id, 'reconcile', {}, 'system').catch(() => {});
+            continue;
+          }
           if (shipment?.shipmentId && !shipment.awb) await this.action(order.id, 'awb', {}, 'system');
           await this.orders.updateOne({ id: order.id }, { $unset: { shippingReviewReason: 1 }, $set: { nextShippingAttemptAt: new Date(Date.now() + 86400000) } });
         } catch { await this.orders.updateOne({ id: order.id }, { $set: { shippingReviewReason: 'Shipment booking needs retry or review. Inspect Shiprocket operations before retrying an ambiguous booking.' } }); }
@@ -111,12 +117,21 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
     if (!order) throw new NotFoundException('Order not found');
     const providerQuote = order.shippingQuote?.source === 'store' ? undefined : order.shippingQuote;
     const existing = await this.shipments.findOne({ orderId: id }).lean();
+    if (!existing && action === 'reconcile' && order.shiprocketBookingStarted) {
+      const recovered = await this.providerDetails({ orderId: id, providerReference: id } as ShiprocketShipment, dto.providerOrderId);
+      const session = await this.orders.db.startSession();
+      try { await session.withTransaction(async () => {
+        await this.shipments.updateOne({ orderId: id }, { $setOnInsert: { orderId: id, providerReference: id, ...recovered } }, { upsert: true, session });
+        await this.orders.updateOne({ id }, { $set: { shiprocketBookingStarted: !recovered.providerCancelled } }, { session });
+      }); } finally { await session.endSession(); }
+      return this.get(id);
+    }
     if (!existing && action !== 'create') throw new BadRequestException('Create a shipment first');
-    if (action === 'create' && existing && !existing.providerCancelled) return existing;
+    if (action === 'create' && existing && !existing.providerCancelled && (existing.shipmentId || existing.error || existing.submissionStartedAt)) return existing;
     if (!['track', 'reconcile'].includes(action) && (['cancelled', 'returned', 'refunded', 'return_requested', 'delivered'].includes(order.status) || order.paymentReconciliationRequired || (order.paymentMethod !== 'cod' && order.paymentStatus !== 'paid'))) throw new BadRequestException('Order is not eligible for shipment operations');
     if (action === 'create' && ((!providerQuote && operationsFor(order).fulfillment !== 'ready_to_dispatch') || !order.stockReserved)) throw new BadRequestException('Pack the order and mark it ready to dispatch first');
-    let parcel: ShiprocketShipment['parcel'];
-    if (action === 'create') {
+    let parcel: ShiprocketShipment['parcel'] = existing?.parcel;
+    if (action === 'create' && (!existing || existing.providerCancelled)) {
       if (!this.client.configured) throw new BadRequestException('Configure Shiprocket API credentials first');
       const defaults = await this.config.findOne({ key: 'shiprocket' }).lean();
       if (!defaults) throw new BadRequestException('Save the pickup location and parcel defaults in Shipping settings first');
@@ -126,16 +141,19 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
         const rate = (await this.checkout.rates(providerQuote.parcel, order.deliveryAddress.pin, order.paymentMethod === 'cod', order.subtotalPaise - order.couponDiscountPaise)).find(option => option.courierId === providerQuote.courierId);
         if (!rate || (rate.shippingPaise !== order.shippingPaise && process.env.SHIPROCKET_RATE_DIFFERENCE_POLICY !== 'absorb')) throw new ConflictException('Delivery rate changed after checkout. Review the shipment; customer payment remains unchanged.');
       }
-      if (existing?.providerCancelled) {
-        const archived = await this.shipments.findOneAndUpdate({ _id: existing._id, orderId: id, providerCancelled: true, $or: [{ lockedUntil: { $exists: false } }, { lockedUntil: { $lt: new Date() } }] }, { $set: { orderId: `${id}:cancelled:${randomUUID()}`, originalOrderId: id } }, { new: true }).lean();
-        if (!archived) throw new ConflictException('Another shipment operation is in progress. Refresh the order.');
-        await this.audit.record({ actorId, action: 'shiprocket.rebook', entityType: 'order', entityId: id, before: { providerOrderId: existing.providerOrderId, shipmentId: existing.shipmentId } });
-        await this.orders.updateOne({ id }, { $unset: { trackingNumber: 1, trackingUrl: 1 } });
-      }
-      const providerReference = await this.shipments.exists({ originalOrderId: id }) ? `${id}-${randomUUID()}` : id;
-      const claimed = await this.orders.findOneAndUpdate({ id, totalPaise: order.totalPaise, status: order.status, paymentStatus: order.paymentStatus, paymentReconciliationRequired: { $ne: true }, stockReserved: true, ...(providerQuote ? {} : { 'operations.fulfillment': 'ready_to_dispatch' }), shiprocketBookingStarted: { $ne: true } }, { $set: { shiprocketBookingStarted: true } });
-      if (!claimed) throw new ConflictException('Order changed or another booking has started. Refresh the order.');
-      try { await this.shipments.create({ orderId: id, providerReference, parcel }); } catch (error) { if ((error as { code?: number }).code === 11000) throw new ConflictException('Another booking is already in progress'); throw error; }
+      const providerReference = existing?.providerCancelled || await this.shipments.exists({ originalOrderId: id }) ? `${id}-${randomUUID()}` : id;
+      const session = await this.orders.db.startSession();
+      try { await session.withTransaction(async () => {
+        if (existing?.providerCancelled) {
+          const archived = await this.shipments.findOneAndUpdate({ _id: existing._id, orderId: id, providerCancelled: true, $or: [{ lockedUntil: { $exists: false } }, { lockedUntil: { $lt: new Date() } }] }, { $set: { orderId: `${id}:cancelled:${randomUUID()}`, originalOrderId: id } }, { new: true, session }).lean();
+          if (!archived) throw new ConflictException('Another shipment operation is in progress. Refresh the order.');
+          await this.orders.updateOne({ id }, { $unset: { trackingNumber: 1, trackingUrl: 1 } }, { session });
+        }
+        const claimed = await this.orders.findOneAndUpdate({ id, totalPaise: order.totalPaise, status: order.status, paymentStatus: order.paymentStatus, paymentReconciliationRequired: { $ne: true }, stockReserved: true, ...(providerQuote ? {} : { 'operations.fulfillment': 'ready_to_dispatch' }), shiprocketBookingStarted: { $ne: true } }, { $set: { shiprocketBookingStarted: true } }, { session });
+        if (!claimed) throw new ConflictException('Order changed or another booking has started. Refresh the order.');
+        await this.shipments.create([{ orderId: id, providerReference, parcel }], { session });
+      }); } finally { await session.endSession(); }
+      if (existing?.providerCancelled) await this.audit.record({ actorId, action: 'shiprocket.rebook', entityType: 'order', entityId: id, before: { providerOrderId: existing.providerOrderId, shipmentId: existing.shipmentId } });
     }
     const lockToken = randomUUID();
     const lock = await this.shipments.findOneAndUpdate({ orderId: id, $or: [{ lockedUntil: { $exists: false } }, { lockedUntil: { $lt: new Date() } }] }, { $set: { lockedUntil: new Date(Date.now() + 120000), lockToken } }, { new: true }).lean();
@@ -146,6 +164,11 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
       const update: Record<string, unknown> = {};
       switch (action) {
         case 'create': {
+          if (!parcel) throw new BadRequestException('Saved parcel details are missing; reconcile this shipment');
+          // Persist ambiguity before the external call. A crash from this point
+          // forward must reconcile by reference, never repeat create blindly.
+          const started = await this.shipments.updateOne({ orderId: id, lockToken, submissionStartedAt: { $exists: false } }, { $set: { submissionStartedAt: new Date(), error: 'Booking submission needs provider reconciliation before any retry.' } });
+          if (!started.modifiedCount) throw new ConflictException('Booking already started; reconcile provider details');
           const names = order.customerName.trim().split(/\s+/);
           const data = await this.client.request('orders/create/adhoc', 'POST', {
             order_id: lock.providerReference ?? order.id, order_date: new Date((order as any).createdAt ?? Date.now()).toISOString().slice(0, 10), pickup_location: parcel!.pickupLocation,
@@ -199,19 +222,34 @@ export class ShippingService implements OnModuleInit, OnModuleDestroy {
           const response = await this.client.request(`courier/track/shipment/${lock.shipmentId}`);
           const data = response.tracking_data;
           if (!data || Number(data.track_status) !== 1) throw new BadRequestException('Tracking is not available yet. Try again after the first courier scan.');
-          update.tracking = { status: String(data.shipment_track?.[0]?.current_status ?? data.shipment_status ?? 'Awaiting scan'), updatedAt: new Date().toISOString(), activities: (data.shipment_track_activities ?? []).slice(0, 100).map((item: any) => ({ date: String(item.date ?? ''), activity: String(item.activity ?? ''), location: String(item.location ?? '') })) };
+          const scan = data.shipment_track?.[0];
+          if (scan?.awb_code && lock.awb && String(scan.awb_code) !== lock.awb) throw new BadRequestException('Courier scan AWB does not match this shipment');
+          const status = String(scan?.current_status ?? data.shipment_status ?? 'Awaiting scan');
+          const deliveredAt = scan?.delivered_date ? new Date(scan.delivered_date) : undefined;
+          const eventAt = deliveredAt && Number.isFinite(deliveredAt.getTime()) && deliveredAt.getTime() <= Date.now() ? deliveredAt.toISOString() : undefined;
+          update.tracking = deliveryRank(lock.tracking?.status) > deliveryRank(status) ? lock.tracking : { status, updatedAt: new Date().toISOString(), ...(eventAt ? { eventAt } : {}), activities: (data.shipment_track_activities ?? []).slice(0, 100).map((item: any) => ({ date: String(item.date ?? ''), activity: String(item.activity ?? ''), location: String(item.location ?? '') })) };
           break;
         }
       }
-      const saved = await this.shipments.findOneAndUpdate({ orderId: id, lockToken }, { $set: { ...update, lastOperation: action }, ...(action === 'track' ? {} : { $unset: { error: 1 } }) }, { new: true }).lean();
-      if (saved?.providerCancelled) await this.orders.updateOne({ id }, { $set: { shiprocketBookingStarted: false } });
-      if (saved?.awb) await this.orders.updateOne({ id }, { $set: { trackingNumber: saved.awb, trackingUrl: `https://shiprocket.co/tracking/${encodeURIComponent(saved.awb)}` } });
+      const session = await this.orders.db.startSession();
+      let saved;
+      try { saved = await session.withTransaction(async () => {
+        const row = await this.shipments.findOneAndUpdate({ orderId: id, lockToken }, { $set: { ...update, lastOperation: action }, ...(action === 'track' ? {} : { $unset: { error: 1 } }) }, { new: true, session }).lean();
+        if (!row) throw new ConflictException('Shipment lease was lost; reconcile provider details');
+        if (row.providerCancelled) await this.orders.updateOne({ id }, { $set: { shiprocketBookingStarted: false } }, { session });
+        if (row.awb) await this.orders.updateOne({ id }, { $set: { trackingNumber: row.awb, trackingUrl: `https://shiprocket.co/tracking/${encodeURIComponent(row.awb)}` } }, { session });
+        if (action === 'track' && row.tracking) await this.orderService.applyCourierTracking(id, row.tracking, { shipmentId: row.shipmentId!, awb: row.awb || '', courier: row.courier || 'Shiprocket' }, session);
+        return row;
+      }); } finally { await session.endSession(); }
       await this.audit.record({ actorId, action: `shiprocket.${action}`, entityType: 'order', entityId: id, after: { shipmentId: saved?.shipmentId, providerOrderId: saved?.providerOrderId } });
       return saved;
     } catch (error) {
       if (action === 'create' && (error instanceof ShiprocketRejectedException || error instanceof ServiceUnavailableException)) {
-        await this.shipments.deleteOne({ orderId: id, lockToken });
-        await this.orders.updateOne({ id }, { $set: { shiprocketBookingStarted: false } });
+        const session = await this.orders.db.startSession();
+        try { await session.withTransaction(async () => {
+          const removed = await this.shipments.deleteOne({ orderId: id, lockToken }, { session });
+          if (removed.deletedCount) await this.orders.updateOne({ id }, { $set: { shiprocketBookingStarted: false } }, { session });
+        }); } finally { await session.endSession(); }
         await this.audit.record({ actorId, action: 'shiprocket.create_rejected', entityType: 'order', entityId: id });
       } else if (!['track', 'reconcile'].includes(action)) await this.shipments.updateOne({ orderId: id, lockToken }, { $set: { error: 'Provider operation needs reconciliation before retrying.' } });
       throw error;

@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, type IndexDefinition, type IndexOptions } from 'mongoose';
+import providerIndexes from './provider-indexes.json';
 import type { ShippingSnapshot } from '../checkout/checkout.schema';
 import type { OrderOperations } from './order-workflow';
 
@@ -89,6 +90,10 @@ export class Order {
   @Prop({ trim: true })
   razorpayOrderId?: string;
 
+  /** Current and superseded provider orders share one uniqueness namespace. */
+  @Prop({ type: [String], default: undefined })
+  razorpayOrderReferences?: string[];
+
   @Prop({ trim: true })
   razorpayPaymentId?: string;
 
@@ -142,3 +147,12 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 OrderSchema.index({ cartId: 1, createdAt: -1 });
 OrderSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 OrderSchema.index({ customerEmail: 1, createdAt: -1 });
+OrderSchema.pre('validate', function () {
+  const references = [...new Set([this.razorpayOrderId, ...(this.supersededRazorpayOrders ?? []).map(item => item.id)].filter((id): id is string => typeof id === 'string' && Boolean(id.trim())).map(id => id.trim()))];
+  this.razorpayOrderReferences = references.length ? references : undefined;
+});
+// Production index creation is a reviewed maintenance step after the read-only
+// consistency audit/backfill, never a surprise unique-index build at startup.
+if (process.env.NODE_ENV === 'test' || (process.env.NODE_ENV !== 'production' && process.env.ORDER_AUTO_BUILD_INDEXES === 'true')) {
+  for (const index of providerIndexes) OrderSchema.index(index.key as unknown as IndexDefinition, index.options as IndexOptions);
+}

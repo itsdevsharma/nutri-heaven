@@ -92,6 +92,7 @@ export class RefundsService {
       if (refund.status === 'failed' && remote.status !== 'processed') { result = refund.toObject(); return; }
       const order = await this.orders.findOne({ id: refund.orderId }).session(session).exec();
       if (!order) throw new NotFoundException('Order not found');
+      const extraCapture = order.activity.some(item => ['duplicate_payment', 'payment_after_refund'].includes(item.action));
       const status = remote.status === 'processed' ? 'completed' : remote.status === 'failed' ? 'failed' : 'processing';
       refund.providerRefundId = remote.id; refund.status = status; refund.error = '';
       refund.nextCheckAt = new Date(Date.now() + 60000);
@@ -99,11 +100,20 @@ export class RefundsService {
       if (status === 'completed') {
         order.refundReservedPaise = 0; order.refundedPaise = refund.amountPaise;
         order.status = 'refunded'; order.paymentStatus = 'refunded'; order.refundReference = remote.id;
-        order.paymentReconciliationRequired = false; order.paymentReconciliationNote = '';
+        // This refund resolves its own cancellation/return exception only.
+        // A second capture can arrive while the provider refund is pending.
+        const note = order.paymentReconciliationNote || '';
+        const resolvedByRefund = /Paid order cancelled|reservation was released/.test(note)
+          || note.startsWith('Payment captured on a replaced checkout;')
+          || /^Refund .+ failed; finance review required$/.test(note);
+        if (!extraCapture && (!order.paymentReconciliationRequired || resolvedByRefund)) {
+          order.paymentReconciliationRequired = false; order.paymentReconciliationNote = '';
+        }
         order.statusHistory.push({ status: 'refunded', at: new Date(), actor, note: `Refund ${remote.id} processed` });
       } else if (status === 'failed') {
         order.refundReservedPaise = 0;
-        order.paymentReconciliationRequired = true; order.paymentReconciliationNote = `Refund ${remote.id} failed; finance review required`;
+        order.paymentReconciliationRequired = true;
+        if (!extraCapture) order.paymentReconciliationNote = `Refund ${remote.id} failed; finance review required`;
       }
       order.activity.push({ action: `refund_${status}`, actor, at: new Date(), reason: `Provider refund ${remote.id}`, after: { amountPaise: refund.amountPaise, status } });
       await order.save({ session }); await enqueueOrderNotification(this.outbox, order, session); await refund.save({ session }); result = refund.toObject();

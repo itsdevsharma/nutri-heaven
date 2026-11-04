@@ -36,7 +36,11 @@ export class CartService {
     const packSize = dto.packSize ?? item.packSize; const { product, variant, stock } = await this.variant(item.productId, packSize); const quantity = dto.quantity ?? item.quantity;
     if (quantity > Math.min(stock, 20)) throw new BadRequestException(`Only ${Math.min(stock, 20)} available for this pack`);
     const duplicate = cart.items.findIndex((line, i) => i !== index && !line.savedForLater && line.productId === item.productId && line.packSize === packSize);
-    if (duplicate >= 0) { cart.items[duplicate]!.quantity += quantity; cart.items.splice(index, 1); } else Object.assign(item, { packSize, quantity, unitPricePaise: variant.pricePaise, productName: product.title, image: product.image, stock });
+    if (duplicate >= 0) {
+      const mergedQuantity = cart.items[duplicate]!.quantity + quantity;
+      if (mergedQuantity > Math.min(stock, 20)) throw new BadRequestException(`Only ${Math.min(stock, 20)} available for this pack`);
+      cart.items[duplicate]!.quantity = mergedQuantity; cart.items.splice(index, 1);
+    } else Object.assign(item, { packSize, quantity, unitPricePaise: variant.pricePaise, productName: product.title, image: product.image, stock });
     await cart.save(); return this.summary(cart);
   }
   async remove(cartId: string, index: number) { const cart = await this.cart(cartId); if (!cart.items[index]) throw new NotFoundException('Cart line not found'); cart.items.splice(index, 1); await cart.save(); return this.summary(cart); }
@@ -47,9 +51,10 @@ export class CartService {
   private async summary(cart: CartDocument) {
     const active = cart.items.filter(item => !item.savedForLater);
     const items = await Promise.all(active.map(async item => {
-      const product = await this.products.findOne({ slug: item.productId, isActive: true, status: 'active' }).select('slug category').lean().exec();
-      const unitPricePaise = product ? await this.offers.priceFor(product, item.unitPricePaise) : item.unitPricePaise;
-      return { productId: item.productId, packSize: item.packSize, quantity: item.quantity, unitPricePaise, productName: item.productName, image: item.image, stock: item.stock, savedForLater: item.savedForLater };
+      const product = await this.products.findOne({ slug: item.productId, isActive: true, status: 'active' }).select('slug category variants title image').lean().exec();
+      const variant = product?.variants.find(variant => variant.size === item.packSize && variant.isActive);
+      const unitPricePaise = product && variant ? await this.offers.priceFor(product, variant.pricePaise) : item.unitPricePaise;
+      return { productId: item.productId, packSize: item.packSize, quantity: item.quantity, unitPricePaise, productName: product?.title ?? item.productName, image: product?.image ?? item.image, stock: variant?.stockQuantity ?? 0, savedForLater: item.savedForLater };
     }));
     const subtotalPaise = items.reduce((sum, item) => sum + item.unitPricePaise * item.quantity, 0);
     const shippingPending = checkoutRatesEnabled();

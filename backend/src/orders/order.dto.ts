@@ -77,9 +77,9 @@ export class OrderCreateDto {
   @IsIn(['cod', 'razorpay'])
   paymentMethod!: 'cod' | 'razorpay';
 
-  @IsOptional()
   @IsString()
-  idempotencyKey?: string;
+  @Matches(/^\S{1,128}$/)
+  idempotencyKey!: string;
 
   @IsOptional()
   @IsString()

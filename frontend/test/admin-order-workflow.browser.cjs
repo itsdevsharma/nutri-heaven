@@ -7,7 +7,8 @@ await page.addInitScript(()=>sessionStorage.setItem('nutri_admin_session',JSON.s
 let configured=false, shipment=null,bookings=0,trackingSaved=false;
 const order={id:'NH-PREVIEW',customerName:'Dev Sharma',customerEmail:'dev@example.com',customerPhone:'9000000000',createdAt:new Date().toISOString(),status:'confirmed',paymentStatus:'pending',paymentMethod:'cod',stockReserved:true,totalPaise:204035,subtotalPaise:194035,shippingPaise:10000,deliveryAddress:{street:'123 Market Road',city:'Hisar',state:'Haryana',pin:'125001'},operations:{fulfillment:'unaccepted',shipment:'not_created',returnStatus:'not_requested'},allowedActions:['accept','verify'],lines:[{productSlug:'almonds',productName:'Almonds',packSize:'250g',quantity:2,lineTotalPaise:194035}],shippingQuote:{source:'store',name:'Regional delivery'},statusHistory:[],activity:[]};
 await page.route('http://localhost:3000/**',async route=>{const req=route.request(),path=new URL(req.url()).pathname;let body=[];
-if(path==='/orders/admin')body=[order];
+if(path==='/orders/admin/page')body={items:[order],total:1,limit:20,offset:0,summary:{totalOrders:1,toFulfil:1,inTransit:0,delivered:0}};
+else if(path==='/orders/admin/NH-PREVIEW')body=order;
 else if(path==='/admin/shipping/configuration')body={configured,defaults:{weight:0.5,length:20,breadth:12,height:6,pickupLocation:'Store'}};
 else if(path==='/admin/shipping/orders/NH-PREVIEW')body=shipment;
 else if(path.endsWith('/verify-and-ship')){bookings++;const payload=req.postDataJSON();assert.equal(payload.weight,0.5);assert.equal(payload.breadth,12);await new Promise(r=>setTimeout(r,250));body=shipment={providerOrderId:123,shipmentId:456,awb:'TRACK123',courier:'Preview courier',pickupScheduled:true,labelUrl:'https://example.com/label',manifestUrl:'https://example.com/list',parcel:payload};}

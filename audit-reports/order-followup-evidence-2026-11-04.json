@@ -1,0 +1,1316 @@
+{
+  "date": "2026-11-04",
+  "backendRuns": [
+    {
+      "name": "complete_backend",
+      "passedTests": 200,
+      "failedTests": 0,
+      "passedSuites": 19,
+      "failedSuites": 0,
+      "startedAtUnixMs": 1793781426330,
+      "tests": [
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery returns one order and one limited-coupon redemption under concurrent checkout retries",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery accepts reordered JSON keys but rejects changed payloads and other owners",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery recovers a lost checkout response by key only for the owning shopping session",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery rolls back coupon, reservation and stock when order persistence fails",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery rolls back cancelled order and stock if coupon release is interrupted; retry releases once",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery rolls back booking claim when shipment intent persistence fails before any provider call",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery reconciles a provider-accepted booking after a lost response without resubmitting create",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery resumes a committed but unsubmitted intent after simulated restart",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery never resubmits a started booking with no provider match",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery recovers a legacy booking flag without an intent through read-only provider lookup",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery commits courier scan and order progression together, recovering from a persistence interruption",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery ignores repeated and old scans, preserves delivery evidence and never records COD cash automatically",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery does not fulfil unpaid, cancelled or payment-exception orders from courier scans",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery shows the same delivered state and history in authenticated customer and admin APIs",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery ignores unknown/RTO scans and refuses delivery without a matching AWB",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery serializes cancellation against shipment booking without a released booked order",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery survives actual worker SIGKILL after uncommitted coupon redemption",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery survives actual worker SIGKILL between booking claim and intent commit",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/workflow-recovery.e2e-spec.ts",
+          "name": "Checkout, courier synchronization and interruption recovery recovers actual SIGKILL after provider commit using its persisted reference, with no second create",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit paginates beyond 50 products with global search, sorting and validation",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit keeps notifications private and persists read state",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit does not link guest or legacy notifications when an email is claimed at signup",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit delivers order inbox entries to the order customer ID only",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit requires newsletter consent, confirmation and token ownership",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit allows only delivered purchasers to review and exposes only approved reviews",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit issues private receipts only after verified payment, including historical refunds",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit shows only the owned order courier updates without shipping operation secrets",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit enforces ownership on addresses, orders, cancellation and receipts",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit provides accurate reporting definitions and protects reports",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit keeps queued emails retryable when delivery fails",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit consumes password reset links atomically and revokes previous sessions",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit paginates filtered engagement data and validates report periods",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/website-completion.e2e-spec.ts",
+          "name": "Website completion audit records completed COD refunds once and rejects invalid amounts or repeated transfers",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/customers.e2e-spec.ts",
+          "name": "Customer accounts (e2e) registers, rejects a duplicate account, and authenticates the customer",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/customers.e2e-spec.ts",
+          "name": "Customer accounts (e2e) protects profile data and persists an address",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/customers.e2e-spec.ts",
+          "name": "Customer accounts (e2e) uses an expiring, one-time password reset token",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/customers.e2e-spec.ts",
+          "name": "Customer accounts (e2e) keeps unknown accounts private and rate-limits repeat reset emails",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/customers.e2e-spec.ts",
+          "name": "Customer accounts (e2e) lists and edits customers with permission checks and validated filters",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/customers.e2e-spec.ts",
+          "name": "Customer accounts (e2e) blocks disabled customer sessions and keeps them revoked after reactivation",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-users.e2e-spec.ts",
+          "name": "Admin user management restricts all operations to super admins",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-users.e2e-spec.ts",
+          "name": "Admin user management creates normalized accounts, validates input, and excludes credentials",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-users.e2e-spec.ts",
+          "name": "Admin user management prevents self lockout and handles missing IDs",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-users.e2e-spec.ts",
+          "name": "Admin user management revokes sessions on role changes, deactivation, and password reset",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions overrides one order total, keeps its price breakdown and audits retries",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions allows only one concurrent amount change from the same original total",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions protects booked, dispatched, paid, cancelled and provider-linked order amounts",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions replaces an unpaid provider checkout and charges the revised total exactly once",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions blocks captured, in-flight and uncertain provider payments before changing the total",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions records a delayed old-checkout capture without fulfillment and refunds its actual captured amount",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions rejects stale revision writes and retains all replaced payment references across concurrent edits",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions never captures an authorized replaced checkout and can recover a failed saved response",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions keeps revision receipts recoverable and does not expire a newly revised order",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions uses the overridden total for online payment and COD collection",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions resumes customer-owned payments across devices and protects other customers orders",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions blocks unpaid online fulfilment through legacy and explicit endpoints",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions requires ordered actions, shipment details and delivery evidence",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions separates COD delivery, cash collection and partial remittance, and deduplicates actions",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions enforces operational versus financial permissions on the server",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions releases inventory once when cancellation requests run concurrently",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions requires return approval and inspection, and never restocks opened food",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions reserves a refund once across concurrent submissions and waits for final provider status",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions recovers a provider-accepted refund after a lost response without resubmitting",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions rejects mismatched refund values and leaves the reserved balance protected",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions recovers a provider-accepted refund after the local outcome write fails",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions does not extend the original return window when tracking is edited",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions retries only a definitively failed refund, keeping prior attempt history",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions records durable reservations through allocation and dispatch",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions commits notification intent with the order and recovers delivery after failure",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions does not oversell stock under concurrent checkouts",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-workflow.e2e-spec.ts",
+          "name": "Order workflow safety with actual MongoDB transactions deduplicates signed webhook delivery and persists failed work for replay",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit returns bounded distinct pages, full matching counts and global summary",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit validates page inputs and combines server filters with literal escaped search",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit includes open failed refunds in the returns queue independently of the page or reserved balance",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit bounds the legacy array endpoint without changing its response shape",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit snapshots selected variant images with product fallback and never rewrites historical images",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit enforces a shared uniqueness namespace for current and superseded provider orders",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit enforces unique payment references while allowing many absent/blank references",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit audits deliberately inconsistent native records with no mutations or personal information in the report",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit backfills reference metadata and installs indexes only after explicit local opt-in and clean preflight",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) preserves correct historical line totals when the same pack occurs twice",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) restores every repeated-pack unit once across concurrent cancellation retries",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) rejects cart pack merging above stock without changing the cart",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) reports invalid shopping-session headers as validation errors",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) rejects missing, blank or oversized checkout keys before creating an order",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) refreshes cart prices after a catalogue price update",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) retains a duplicate-capture exception when the first payment refund completes",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) allows only one of two simultaneous customers to buy the final unit",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) deduplicates repeated HTTP placement using the same checkout key",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) rejects processing a cancelled order and reopening a delivered order",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) reads synthetic historical orders without migrating or repricing them",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-audit.e2e-spec.ts",
+          "name": "Order audit regressions (disposable database, no provider credentials) advances delivered courier scans once with their history and inventory allocation",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout requires a quote, calculates gross weight and dimensions, and rejects client totals",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout does not present a fixed shipping fee as the final cart total",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout rejects wrong ownership, changed address, stock, rates and expired quotes",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout handles provider failures and unserviceable destinations clearly",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout uses the exact saved amount, verifies signatures, and books a paid shipment once",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout holds amount mismatches and refunds without creating a shipment",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout preserves coupon totals and detects price changes and expiry before payment",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout holds changed post-payment rates, supports merchant absorption and never books refunds",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout recovers an ambiguous Razorpay create by receipt without issuing another order",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout quotes mixed pack sizes and quantities, then sends the full total to Razorpay",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout validates the saved quote while charging an admin-adjusted amount",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout resumes an existing provider order after its delivery quote expires without creating another payment",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping verifies and ships a new order in one action, and resumes without duplicate bookings",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping stops on an ambiguous booking and requires reconciliation before resuming",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping protects configuration, validates parcel units and projects pickup details",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping books from authoritative prices once and supports AWB, pickup, label, manifest and tracking",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping keeps ambiguous bookings recoverable without allowing another provider create",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping preserves reconciliation errors through manual and automatic tracking",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping rejects unknown pickup names and preserves the saved defaults",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping rebooks only confirmed cancellations using a new reference and keeps their history",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping rejects invalid input, unpaid prepaid orders and concurrent actions",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping allows a corrected booking after a definitive provider rejection",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping books the adjusted COD total of 25000 paise",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/shipping.e2e-spec.ts",
+          "name": "Shiprocket admin shipping books the adjusted COD total of 32000 paise",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) requires a token and an inventory-capable role",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) lists variant-level stock with a summary and rejects bad views",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) adjusts stock and writes a ledger row with the resulting balance",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) accepts a counted balance from zero and blocks invalid adjustments",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) is idempotent: a retried submit does not apply twice",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) deducts stock automatically through the order hook and restores it on cancel",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) prevents overselling under competing orders and rolls back a multi-line reservation",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) commits captured payment once, releases failed payment once, and flags late capture for reconciliation",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) restores returned stock and only marks refunded after a provider refund reference exists",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/inventory.e2e-spec.ts",
+          "name": "Inventory (e2e) carries independently priced selected packs through the public order API into their stock ledgers",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments.e2e-spec.ts",
+          "name": "Razorpay checkout (e2e) exposes availability without credentials and uses server totals with idempotent orders",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments.e2e-spec.ts",
+          "name": "Razorpay checkout (e2e) rejects another cart, forged signatures and mismatched payment amounts",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments.e2e-spec.ts",
+          "name": "Razorpay checkout (e2e) captures authorized payments and commits stock once across verification and webhook replays",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments.e2e-spec.ts",
+          "name": "Razorpay checkout (e2e) retains the provider order on retries and recovers captured payments without a browser callback",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments.e2e-spec.ts",
+          "name": "Razorpay checkout (e2e) releases unpaid stock on cancellation and flags late captured payments for review",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments.e2e-spec.ts",
+          "name": "Razorpay checkout (e2e) expires abandoned reservations after reconciling provider captures",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments.e2e-spec.ts",
+          "name": "Razorpay checkout (e2e) refunds a captured cancelled order without charging or releasing stock twice",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) requires a token",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) rejects a wrong password",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) lists every lifecycle state, drafts included",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) filters by status and by search needle",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) rejects an invalid status or limit instead of ignoring it",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) reads a draft by slug and 404s unknown slugs",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) keeps the public catalogue free of drafts",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) lets a read-only role read but not write",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) does not let catalogue updates bypass the inventory ledger",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) rejects alternate stock update representations: {\"variants.0.stockQuantity\":999}",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) rejects alternate stock update representations: {\"variants.$[].stockQuantity\":999}",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) rejects alternate stock update representations: {\"$set\":{\"variants.0.stockQuantity\":999}}",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) rejects alternate stock update representations: {\"variants\":{\"0\":{\"stockQuantity\":999}}}",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) rejects alternate stock update representations: {\"variants\":[{\"size\":\"250g\",\"pricePaise\":27500,\"stockQuantity\":12,\"stockQuantity.value\":999}]}",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) keeps inventory product identifiers stable while allowing unchanged slugs",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) rejects opening stock and creates zero-stock drafts",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) duplicates catalogue information with zero stock",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) allows ordinary pack edits while preserving the balance",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) does not overwrite an inventory change that races a catalogue save",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/admin-products.e2e-spec.ts",
+          "name": "Admin catalogue reads (e2e) exports spreadsheet formulas as literal cells and retains CSV escaping",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/notification-recovery.e2e-spec.ts",
+          "name": "Failed notification recovery restricts recovery to super admins and rejects invalid IDs",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/notification-recovery.e2e-spec.ts",
+          "name": "Failed notification recovery uses the corrected account email and changes the provider key for the corrected payload",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/notification-recovery.e2e-spec.ts",
+          "name": "Failed notification recovery queues a guest email once under concurrent retries and preserves its idempotency key",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/notification-recovery.e2e-spec.ts",
+          "name": "Failed notification recovery sends future updates for older orders to the current linked account email",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/notification-recovery.e2e-spec.ts",
+          "name": "Failed notification recovery does not retry an inactive account or steal a live processing lease",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/notification-recovery.e2e-spec.ts",
+          "name": "Failed notification recovery blocks recovery without sender configuration",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/notification-recovery.e2e-spec.ts",
+          "name": "Failed notification recovery does not mark an unaccepted send as sent and recovers a transient provider failure",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Hisar\",\"state\":\"Haryana\",\"pin\":\"125001\"} at 500g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Hisar\",\"state\":\"Haryana\",\"pin\":\"125001\"} at 501g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Hisar\",\"state\":\"Haryana\",\"pin\":\"125001\"} at 1000g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Panipat\",\"state\":\"Haryana\",\"pin\":\"132103\"} at 3000g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Panipat\",\"state\":\"Haryana\",\"pin\":\"132103\"} at 3001g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Delhi\",\"state\":\"Delhi\",\"pin\":\"110001\"} at 250g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Delhi\",\"state\":\"Delhi\",\"pin\":\"110001\"} at 1000g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Delhi\",\"state\":\"Delhi\",\"pin\":\"110001\"} at 1001g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges uses saved shipping weights or an explicit metric pack label",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges quotes without credentials, pickup defaults, or pack shipping metadata and charges the exact total",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rejects an address changed to claim a cheaper zone and rejects changed rates before payment",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/cms.e2e-spec.ts",
+          "name": "CMS publishing (e2e) blocks anonymous writes and publishes only active ordered records",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/cms.e2e-spec.ts",
+          "name": "CMS publishing (e2e) validates and publishes Meta Pixel settings without replacing store content",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/cms.e2e-spec.ts",
+          "name": "CMS publishing (e2e) publishes SEO configuration and rejects invalid verification markup",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) GET /health reports ok",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) GET /products lists active products",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) GET /products/:slug returns one product",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) GET /products/:slug 404s unknown slugs",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) POST /products/quote prices from the database, not the client",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) POST /products/quote ships free above \u20b95,000",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) POST /products/quote rejects empty carts and unknown slugs",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) charges the correct delivery fee for subtotal 499999 paise",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) charges the correct delivery fee for subtotal 500000 paise",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/products.e2e-spec.ts",
+          "name": "Products (e2e) charges the correct delivery fee for subtotal 500001 paise",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/security-config.e2e-spec.ts",
+          "name": "Security configuration rejects weak administrator bootstrap/rotation passwords",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/security-config.e2e-spec.ts",
+          "name": "Security configuration trusts only explicit proxy networks",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/security-config.e2e-spec.ts",
+          "name": "Security configuration reads the signing secret at module initialization, after configuration loading",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/security-config.e2e-spec.ts",
+          "name": "Security configuration rejects production uploads when remote storage is missing or fails",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) creates the minimum payment using server totals and returns only the public key",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) rejects invalid server amount 0 before calling Razorpay",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) rejects invalid server amount 99 before calling Razorpay",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) rejects invalid server amount 100.5 before calling Razorpay",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) maps provider status 401 to HTTP 401 without leaking details",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) maps provider status 500 to HTTP 500 without leaking details",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) rejects missing verification fields with HTTP 400",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) rejects forged signatures without marking an order paid",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/payments-contract.e2e-spec.ts",
+          "name": "Standard Checkout HTTP contract (isolated provider and database) confirms a signed captured payment after checking the provider amount and order",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/mail.e2e-spec.ts",
+          "name": "Transactional email adapter sends only through the server with a stable idempotency key",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/mail.e2e-spec.ts",
+          "name": "Transactional email adapter does not pretend to deliver when production email is unconfigured",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/mail.e2e-spec.ts",
+          "name": "Transactional email adapter rejects the onboarding sender and insecure recovery URLs in production",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/mail.e2e-spec.ts",
+          "name": "Transactional email adapter hides provider errors and exposes a retryable service failure",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "focused_checkout_and_followup",
+      "passedTests": 32,
+      "failedTests": 0,
+      "passedSuites": 3,
+      "failedSuites": 0,
+      "startedAtUnixMs": 1793780930144,
+      "tests": [
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit returns bounded distinct pages, full matching counts and global summary",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit validates page inputs and combines server filters with literal escaped search",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit includes open failed refunds in the returns queue independently of the page or reserved balance",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit bounds the legacy array endpoint without changing its response shape",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit snapshots selected variant images with product fallback and never rewrites historical images",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit enforces a shared uniqueness namespace for current and superseded provider orders",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit enforces unique payment references while allowing many absent/blank references",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit audits deliberately inconsistent native records with no mutations or personal information in the report",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit backfills reference metadata and installs indexes only after explicit local opt-in and clean preflight",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout requires a quote, calculates gross weight and dimensions, and rejects client totals",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout does not present a fixed shipping fee as the final cart total",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout rejects wrong ownership, changed address, stock, rates and expired quotes",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout handles provider failures and unserviceable destinations clearly",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout uses the exact saved amount, verifies signatures, and books a paid shipment once",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout holds amount mismatches and refunds without creating a shipment",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout preserves coupon totals and detects price changes and expiry before payment",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout holds changed post-payment rates, supports merchant absorption and never books refunds",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout recovers an ambiguous Razorpay create by receipt without issuing another order",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout quotes mixed pack sizes and quantities, then sends the full total to Razorpay",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout validates the saved quote while charging an admin-adjusted amount",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/checkout.e2e-spec.ts",
+          "name": "Authoritative Shiprocket checkout resumes an existing provider order after its delivery quote expires without creating another payment",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Hisar\",\"state\":\"Haryana\",\"pin\":\"125001\"} at 500g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Hisar\",\"state\":\"Haryana\",\"pin\":\"125001\"} at 501g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Hisar\",\"state\":\"Haryana\",\"pin\":\"125001\"} at 1000g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Panipat\",\"state\":\"Haryana\",\"pin\":\"132103\"} at 3000g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Panipat\",\"state\":\"Haryana\",\"pin\":\"132103\"} at 3001g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Delhi\",\"state\":\"Delhi\",\"pin\":\"110001\"} at 250g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Delhi\",\"state\":\"Delhi\",\"pin\":\"110001\"} at 1000g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rounds started slabs for {\"street\":\"12 Main\",\"city\":\"Delhi\",\"state\":\"Delhi\",\"pin\":\"110001\"} at 1001g",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges uses saved shipping weights or an explicit metric pack label",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges quotes without credentials, pickup defaults, or pack shipping metadata and charges the exact total",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/store-delivery.e2e-spec.ts",
+          "name": "Store delivery charges rejects an address changed to claim a cheaper zone and rejects changed rates before payment",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "maintenance_safety",
+      "passedTests": 9,
+      "failedTests": 0,
+      "passedSuites": 1,
+      "failedSuites": 0,
+      "startedAtUnixMs": 1793781388889,
+      "tests": [
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit returns bounded distinct pages, full matching counts and global summary",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit validates page inputs and combines server filters with literal escaped search",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit includes open failed refunds in the returns queue independently of the page or reserved balance",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit bounds the legacy array endpoint without changing its response shape",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit snapshots selected variant images with product fallback and never rewrites historical images",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit enforces a shared uniqueness namespace for current and superseded provider orders",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit enforces unique payment references while allowing many absent/blank references",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit audits deliberately inconsistent native records with no mutations or personal information in the report",
+          "status": "passed"
+        },
+        {
+          "file": "backend/test/order-followup.e2e-spec.ts",
+          "name": "Order pagination, historical images, provider indexes and read-only audit backfills reference metadata and installs indexes only after explicit local opt-in and clean preflight",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "frontendTests": {
+    "passed": 39,
+    "failed": 0
+  },
+  "builds": {
+    "backend": "pass",
+    "frontend": "pass",
+    "warning": "Existing Vite bundle-size warning"
+  },
+  "browserRuns": [
+    {
+      "script": "frontend/test/admin-order-pagination.browser.cjs",
+      "viewports": [
+        1440,
+        768,
+        390,
+        320
+      ],
+      "result": "pass",
+      "checks": [
+        "server page size/offset",
+        "search beyond first page",
+        "status filter",
+        "independent detail requests",
+        "API error and retry",
+        "readable mobile row heights",
+        "no page overflow"
+      ]
+    },
+    {
+      "script": "frontend/test/admin-order-workflow.browser.cjs",
+      "viewports": [
+        1440,
+        768,
+        390,
+        320
+      ],
+      "result": "pass"
+    },
+    {
+      "script": "frontend/test/admin-order-amount.browser.cjs",
+      "viewports": [
+        1440,
+        768,
+        390,
+        320
+      ],
+      "result": "pass"
+    }
+  ],
+  "visualInspection": {
+    "screenshot": "/tmp/nutri-order-pagination-390.png",
+    "result": "Readable compact rows with existing horizontal table scrolling"
+  },
+  "liveDatabase": {
+    "mode": "read_only",
+    "generatedAt": "2026-11-04T08:36:35.323Z",
+    "counts": {
+      "orders": 12,
+      "variants": 24,
+      "reservations": 12,
+      "refunds": 0,
+      "redemptions": 0,
+      "shipments": 0
+    },
+    "findingCounts": {
+      "reference_backfill_required": 8
+    },
+    "indexPreflightReady": true,
+    "productionWritesPerformed": false
+  },
+  "notExecuted": [
+    "Real provider sandbox certification: staging URL/test credentials unavailable",
+    "Production reference backfill/index installation: explicit approval pending",
+    "Application deployment: staging verification and explicit approval pending"
+  ]
+}

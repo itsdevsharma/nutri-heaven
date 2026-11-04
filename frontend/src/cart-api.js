@@ -53,6 +53,7 @@ export const storefrontApi = {
   quoteCoupon: (code, lines, email) => request('/coupons/quote', { method: 'POST', body: JSON.stringify({ code, lines, email }) }),
     placeOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload), headers: localStorage.getItem(CUSTOMER_TOKEN_KEY) ? { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_TOKEN_KEY)}` } : {} }),
   getOrder: (id) => request(`/orders/${encodeURIComponent(id)}`),
+  getCheckout: key => request(`/orders/checkout/${encodeURIComponent(key)}`),
   publicSettings: () => cachedPublic('/storefront/settings', 300_000),
   subscribe: payload => request('/newsletter/subscribe', { method: 'POST', body: JSON.stringify(payload) }),
   newsletterAction: (action, token) => request(`/newsletter/${action}`, { method: 'POST', body: JSON.stringify({ token }) }),

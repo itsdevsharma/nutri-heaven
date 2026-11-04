@@ -634,6 +634,10 @@
 /* Order workspace and details dialog. */
 .admin-orders-page { display: flex; flex-direction: column; gap: 22px; }
 .admin-orders-page .admin-stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-orders-page .admin-table { min-width: 54rem; }
+.admin-orders-page .admin-table td:nth-child(2) { min-width: 12rem; }
+.admin-orders-page .admin-orders-link,
+.admin-orders-page .admin-table td:first-child small { white-space: nowrap; }
 .admin-orders-filters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
 .admin-orders-filter-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .admin-orders-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }

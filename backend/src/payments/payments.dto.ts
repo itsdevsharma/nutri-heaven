@@ -1,4 +1,8 @@
-import { IsString, Matches } from 'class-validator';
+import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+
+export class RefundQueryDto {
+  @IsOptional() @IsString() @MaxLength(128) orderId?: string;
+}
 
 export class VerifyRazorpayPaymentDto {
   @IsString() @Matches(/^order_[a-zA-Z0-9]+$/) razorpay_order_id!: string;

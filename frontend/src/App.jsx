@@ -14,7 +14,7 @@ import { openRazorpay, readPendingCheckout, savePendingCheckout } from './razorp
 import { updateSeo } from './seo.js';
 import { readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from './checkout-storage.js';
 import { initializeMetaPixel, trackMetaEvent, commerceData, trackProductView, trackPurchase } from './meta-pixel.js';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cartApi, cartId, customerApi, storefrontApi, paymentsApi, customerPaymentsApi } from './cart-api.js';
 
 const asset = '/assets/';
@@ -361,6 +361,7 @@ function Checkout({ cart, busy, error, back, submit, paymentConfig }) {
 export default function App() {
   const [products,setProducts] = useState([]), [cart,setCart] = useState(null), [drawer,setDrawer] = useState(false), [screen,setScreen] = useState(() => location.pathname === '/checkout' ? 'checkout' : 'shop'), [order,setOrder] = useState(null), [detail,setDetail] = useState(null), [loading,setLoading] = useState(true), [busy,setBusy] = useState(false), [error,setError] = useState(''), [selectedProduct,setSelectedProduct] = useState(null), [productLoading,setProductLoading] = useState(() => /^\/products\//.test(location.pathname)), [storeSettings,setStoreSettings] = useState({}), [cms,setCms] = useState({}), [categories,setCategories] = useState([]);
   const [pendingPayment,setPendingPayment] = useState(readPendingCheckout), [paymentConfig,setPaymentConfig] = useState({enabled:false,loading:true});
+  const checkoutSubmitting = useRef(false);
   const persistPayment = value => { savePendingCheckout(value); setPendingPayment(value); };
   const enterCheckout = () => {
     if (location.pathname !== '/checkout') history.pushState(null, '', '/checkout');
@@ -432,7 +433,7 @@ export default function App() {
     // A cart cleanup failure must never turn a paid order into a failed checkout.
     try { await cartApi.clear(); await loadCart(); } catch { setError('Your order is confirmed. Refresh your shopping bag before starting another order.'); }
   };
-  const confirmedPayment = result => result.paymentStatus==='paid' && result.status==='confirmed' && !result.paymentReconciliationRequired;
+  const confirmedPayment = result => result.paymentStatus==='paid' && ['confirmed', 'packed', 'shipped', 'out_for_delivery', 'delivered'].includes(result.status) && !result.paymentReconciliationRequired;
   const resumePayment = async (checkOnly = false, attempt = pendingPayment) => {
     setBusy(true); setError('');
     try {
@@ -440,11 +441,16 @@ export default function App() {
       const paymentApi = attempt.source === 'account' ? customerPaymentsApi : paymentsApi;
       let currentOrder;
       if (!attempt.orderId) {
-        currentOrder = await storefrontApi.placeOrder(attempt.payload);
+        currentOrder = attempt.payload ? await storefrontApi.placeOrder(attempt.payload) : await storefrontApi.getCheckout(attempt.checkoutKey);
         attempt = {cartId:attempt.cartId, orderId:currentOrder.id, paymentMethod:currentOrder.paymentMethod};
         persistPayment(attempt);
       }
-      if (attempt.paymentMethod==='cod') { await completeCheckout(currentOrder || await storefrontApi.getOrder(attempt.orderId)); return; }
+      if (attempt.paymentMethod==='cod') {
+        const saved = currentOrder || await storefrontApi.getOrder(attempt.orderId);
+        if (saved.status === 'cancelled') { persistPayment(null); setError('This order was cancelled. You can start a new checkout.'); return; }
+        if (saved.paymentReconciliationRequired || ['return_requested', 'returned', 'refunded'].includes(saved.status)) throw new Error('This order needs support review. Please contact us with order #' + saved.id + '.');
+        await completeCheckout(saved); return;
+      }
       currentOrder = attempt.paymentResponse
         ? await paymentApi.verify(attempt.orderId, attempt.paymentResponse)
         : await paymentApi.status(attempt.orderId);
@@ -460,7 +466,7 @@ export default function App() {
       const verified = await paymentApi.verify(currentOrder.id,paymentResponse);
       if (!confirmedPayment(verified)) throw new Error('Payment received but your order needs support review. Please contact us with order #'+currentOrder.id+'.');
       await completeCheckout(verified, attempt.source !== 'account');
-    } catch(e) { if (!attempt?.orderId && [400,403,404,409,422].includes(e.status)) persistPayment(null); setError(e.message); } finally { setBusy(false); }
+    } catch(e) { if (!attempt?.orderId && attempt?.payload && [400,403,404,409,422].includes(e.status)) persistPayment(null); setError(e.message); } finally { setBusy(false); }
   };
   const cancelPayment = async () => {
     setBusy(true);setError('');
@@ -468,7 +474,7 @@ export default function App() {
       let attempt = pendingPayment;
       const paymentApi = attempt.source === 'account' ? customerPaymentsApi : paymentsApi;
       if (!attempt.orderId) {
-        const created = await storefrontApi.placeOrder(attempt.payload);
+        const created = attempt.payload ? await storefrontApi.placeOrder(attempt.payload) : await storefrontApi.getCheckout(attempt.checkoutKey);
         attempt = {...attempt,orderId:created.id};persistPayment(attempt);
       }
       if (attempt.paymentMethod==='cod' || attempt.payload?.paymentMethod==='cod') throw new Error('A COD order was already submitted. Resume to view its confirmation.');
@@ -481,14 +487,23 @@ export default function App() {
     } catch(e) {setError(e.message);} finally {setBusy(false);}
   };
   const submit = async form => {
+    if (checkoutSubmitting.current) return;
+    checkoutSubmitting.current = true;
     setBusy(true);setError('');
     try {
-      if (form.paymentMethod==='razorpay' && !paymentConfig.enabled) throw new Error('Online payments are currently unavailable.');
-      const current = await loadCart();
-      const attempt = {cartId:cartId(),paymentMethod:form.paymentMethod,payload:{cartId:cartId(),idempotencyKey:randomId(),customerName:form.name,customerEmail:form.email,customerPhone:form.phone.replace(/\D/g,''),deliveryAddress:{street:form.address,landmark:form.landmark,city:form.city,state:form.state,pin:form.pin},lines:current.items.map(i=>({productSlug:i.productId,packSize:i.packSize,quantity:i.quantity})),couponCode:form.couponCode||undefined,shippingQuoteId:form.shippingQuoteId,courierId:form.courierId,paymentMethod:form.paymentMethod}};
-      persistPayment(attempt);
-      await resumePayment(false,attempt);
-    } catch(e) {setError(e.message);setBusy(false);}
+      const place = async () => {
+        const saved = readPendingCheckout();
+        if (saved) { persistPayment(saved); await resumePayment(false, saved); return; }
+        if (form.paymentMethod==='razorpay' && !paymentConfig.enabled) throw new Error('Online payments are currently unavailable.');
+        const current = await loadCart();
+        const attempt = {cartId:cartId(),paymentMethod:form.paymentMethod,payload:{cartId:cartId(),idempotencyKey:randomId(),customerName:form.name,customerEmail:form.email,customerPhone:form.phone.replace(/\D/g,''),deliveryAddress:{street:form.address,landmark:form.landmark,city:form.city,state:form.state,pin:form.pin},lines:current.items.map(i=>({productSlug:i.productId,packSize:i.packSize,quantity:i.quantity})),couponCode:form.couponCode||undefined,shippingQuoteId:form.shippingQuoteId,courierId:form.courierId,paymentMethod:form.paymentMethod}};
+        persistPayment(attempt);
+        await resumePayment(false,attempt);
+      };
+      // Serialize cooperating tabs as well as same-frame double submissions.
+      if (globalThis.navigator?.locks) await navigator.locks.request('nutri-checkout-' + cartId(), place);
+      else await place();
+    } catch(e) {setError(e.message);setBusy(false);} finally { checkoutSubmitting.current = false; }
   };
   const payAccountOrder = async selectedOrder => {
     const attempt = pendingPayment?.source === 'account' && pendingPayment.orderId === selectedOrder.id

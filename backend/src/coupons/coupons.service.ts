@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, type ClientSession } from 'mongoose';
 import { Coupon, CouponDocument } from './coupon.schema';
 import { CouponRedemption, CouponRedemptionDocument } from './coupon-redemption.schema';
 import { CreateCouponDto } from './dto/create-coupon.dto';
@@ -18,19 +18,37 @@ export class CouponsService {
     if (coupon.usageLimit > 0 && coupon.usageCount >= coupon.usageLimit) throw new BadRequestException('This coupon has reached its usage limit');
     return { code: coupon.code, discountPaise: this.discount(coupon, subtotalPaise, products) };
   }
-  async redeem(code: string, subtotalPaise: number, products: Array<{ slug: string; category: string; lineTotalPaise: number }>, email: string, orderId: string) {
-    const coupon = await this.activeCoupon(code, subtotalPaise, products);
-    const discountPaise = this.discount(coupon, subtotalPaise, products);
-    const filter: Record<string, unknown> = { _id: coupon._id, isActive: true, ...(coupon.usageLimit > 0 ? { usageCount: { $lt: coupon.usageLimit } } : {}) };
-    const updated = await this.coupons.findOneAndUpdate(filter, { $inc: { usageCount: 1 } }, { new: true }).lean().exec();
-    if (!updated) throw new BadRequestException('This coupon is no longer available');
-    try { await this.redemptions.create({ couponCode: coupon.code, customerEmail: email.toLowerCase(), orderId, discountPaise }); }
-    catch (error) { await this.coupons.updateOne({ _id: coupon._id }, { $inc: { usageCount: -1 } }).exec(); throw error; }
-    return { code: coupon.code, discountPaise };
+  private async transaction<T>(session: ClientSession | undefined, run: (session: ClientSession) => Promise<T>): Promise<T> {
+    if (session) return run(session);
+    const owned = await this.coupons.db.startSession();
+    let result!: T;
+    try { await owned.withTransaction(async () => { result = await run(owned); }); return result; }
+    finally { await owned.endSession(); }
   }
-  async refundRedemption(orderId: string) { const redemption = await this.redemptions.findOneAndDelete({ orderId }).lean().exec(); if (redemption) await this.coupons.updateOne({ code: redemption.couponCode, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } }).exec(); }
-  private async activeCoupon(code: string, subtotal: number, products: Array<{ slug: string; category: string }>) {
-    const coupon = await this.coupons.findOne({ code: code.trim().toUpperCase(), isActive: true }).lean().exec();
+  async redeem(code: string, subtotalPaise: number, products: Array<{ slug: string; category: string; lineTotalPaise: number }>, email: string, orderId: string, session?: ClientSession) {
+    return this.transaction(session, async transaction => {
+      const prior = await this.redemptions.findOne({ orderId }).session(transaction).lean().exec();
+      if (prior) {
+        if (prior.couponCode !== code.trim().toUpperCase() || prior.customerEmail !== email.toLowerCase()) throw new BadRequestException('Coupon redemption does not match this order');
+        return { code: prior.couponCode, discountPaise: prior.discountPaise };
+      }
+      const coupon = await this.activeCoupon(code, subtotalPaise, products, transaction);
+      const discountPaise = this.discount(coupon, subtotalPaise, products);
+      const filter: Record<string, unknown> = { _id: coupon._id, isActive: true, ...(coupon.usageLimit > 0 ? { usageCount: { $lt: coupon.usageLimit } } : {}) };
+      const updated = await this.coupons.findOneAndUpdate(filter, { $inc: { usageCount: 1 } }, { new: true, session: transaction }).lean().exec();
+      if (!updated) throw new BadRequestException('This coupon is no longer available');
+      await this.redemptions.create([{ couponCode: coupon.code, customerEmail: email.toLowerCase(), orderId, discountPaise }], { session: transaction });
+      return { code: coupon.code, discountPaise };
+    });
+  }
+  async refundRedemption(orderId: string, session?: ClientSession) {
+    await this.transaction(session, async transaction => {
+      const redemption = await this.redemptions.findOneAndDelete({ orderId }).session(transaction).lean().exec();
+      if (redemption) await this.coupons.updateOne({ code: redemption.couponCode, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } }, { session: transaction }).exec();
+    });
+  }
+  private async activeCoupon(code: string, subtotal: number, products: Array<{ slug: string; category: string }>, session?: ClientSession) {
+    const coupon = await this.coupons.findOne({ code: code.trim().toUpperCase(), isActive: true }).session(session ?? null).lean().exec();
     const now = Date.now();
     if (!coupon || (coupon.startsAt && new Date(coupon.startsAt).getTime() > now) || (coupon.endsAt && new Date(coupon.endsAt).getTime() < now)) throw new BadRequestException('Coupon is invalid, inactive, or expired');
     if (subtotal < coupon.minimumOrderPaise) throw new BadRequestException(`Minimum order for this coupon is ₹${(coupon.minimumOrderPaise / 100).toFixed(2)}`);

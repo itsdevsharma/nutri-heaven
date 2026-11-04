@@ -15,6 +15,7 @@ export interface QuoteLineResult {
   slug: string;
   packSize: string;
   title: string;
+  image: string;
   category: string;
   quantity: number;
   unitPricePaise: number;
@@ -379,6 +380,7 @@ export class ProductsService {
         slug: product.slug,
         packSize: variant?.size ?? packSize,
         title: product.title,
+        image: (variant as { images?: string[] } | undefined)?.images?.[0] || product.image,
         category: product.category,
         quantity: line.quantity,
         unitPricePaise,

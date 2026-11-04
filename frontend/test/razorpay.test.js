@@ -13,6 +13,22 @@ test('stores and clears pending checkout for refresh recovery', () => {
   values.set('nutri_pending_checkout','bad-json');
   assert.equal(readPendingCheckout(),null);
 });
+test('recovers an opaque checkout reference after tab loss without retaining personal or payment data', () => {
+  const session = new Map(), local = new Map();
+  const storage = values => ({ getItem: key => values.get(key), setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) });
+  globalThis.sessionStorage = storage(session); globalThis.localStorage = storage(local);
+  savePendingCheckout({ cartId: 'cart', paymentMethod: 'razorpay', payload: { idempotencyKey: 'attempt-key', customerName: 'Private Person', customerEmail: 'private@example.com', deliveryAddress: { street: 'Private Street' } }, paymentResponse: { razorpay_signature: 'private-signature' } });
+  const durable = local.get('nutri_checkout_recovery_v1');
+  for (const secret of ['Private Person', 'private@example.com', 'Private Street', 'private-signature']) assert(!durable.includes(secret));
+  session.clear();
+  assert.deepEqual(readPendingCheckout(), { cartId: 'cart', paymentMethod: 'razorpay', checkoutKey: 'attempt-key' });
+  savePendingCheckout({ cartId: 'cart', orderId: 'NH1', paymentMethod: 'razorpay' }); session.clear();
+  assert.equal(readPendingCheckout().orderId, 'NH1');
+  const expired = JSON.parse(local.get('nutri_checkout_recovery_v1')); expired.expiresAt = Date.now() - 1;
+  local.set('nutri_checkout_recovery_v1', JSON.stringify(expired)); assert.equal(readPendingCheckout(), null);
+  savePendingCheckout({ cartId: 'cart', orderId: 'NH1' }); savePendingCheckout(null);
+  assert.equal(local.size, 0); assert.equal(session.size, 0);
+});
 test('loads a single checkout script and forwards trusted backend options', async () => {
   const scripts=[];
   let options;

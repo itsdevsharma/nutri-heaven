@@ -216,7 +216,7 @@ export const adminApi = {
   },
 
   orders: {
-    list: () => request('/orders/admin'),
+    list: (params = {}) => request(`/orders/admin/page${toQuery(params)}`),
     get: (id) => request(`/orders/admin/${encodeURIComponent(id)}`),
     overrideAmount: (id, payload) => request(`/orders/admin/${encodeURIComponent(id)}/amount`, { method: 'PATCH', body: payload }),
     updateStatus: (id, status, details = {}) => request(`/orders/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status, ...details } }),
@@ -224,7 +224,7 @@ export const adminApi = {
     cancel: (id, reason) => request(`/orders/admin/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: { reason } }),
   },
   payments: {
-    refunds: () => request('/payments/razorpay/admin/refunds'),
+    refunds: (params = {}) => request(`/payments/razorpay/admin/refunds${toQuery(params)}`),
     webhookFailures: () => request('/payments/razorpay/admin/webhook-failures'),
     reconcile: id => request(`/payments/razorpay/admin/${encodeURIComponent(id)}/reconcile`, { method: 'POST' }),
     retryRefund: id => request(`/payments/razorpay/admin/${encodeURIComponent(id)}/retry-refund`, { method: 'POST' }),
