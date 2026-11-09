@@ -408,13 +408,21 @@ describe('Order workflow safety with actual MongoDB transactions', () => {
     await outbox.updateMany({}, { $set: { nextAttemptAt: new Date(Date.now() + 86400000) } });
     const order = await create();
     const entry = await outbox.findOne({ orderId: order.id }).lean().exec(); expect(entry?.status).toBe('pending');
+    expect(entry).toMatchObject({ emailTemplate: 'order_confirmation', emailText: expect.stringContaining(order.id), emailHtml: expect.stringContaining('Order summary') });
     const add = jest.spyOn(app.get(NotificationService), 'add').mockRejectedValueOnce(new Error('Notification persistence unavailable'));
     await orders.deliverOutbox();
     expect((await outbox.findOne({ eventKey: entry!.eventKey }).lean().exec())?.status).toBe('pending');
     expect((await orders.getOrder(order.id)).status).toBe('confirmed');
     await outbox.updateOne({ eventKey: entry!.eventKey }, { $set: { nextAttemptAt: new Date(0) } });
     await orders.deliverOutbox();
-    expect((await outbox.findOne({ eventKey: entry!.eventKey }).lean().exec())?.status).toBe('delivered'); add.mockRestore();
+    expect((await outbox.findOne({ eventKey: entry!.eventKey }).lean().exec())?.status).toBe('delivered');
+    expect(add).toHaveBeenLastCalledWith(order.customerEmail, entry!.title, entry!.message, entry!.eventKey, true, order.customerId, { text: entry!.emailText, html: entry!.emailHtml });
+    await action(order.id, 'accept');
+    const update = await outbox.findOne({ orderId: order.id, eventKey: { $ne: entry!.eventKey } }).lean().exec();
+    expect(update?.emailTemplate).toBeUndefined();
+    await orders.deliverOutbox();
+    expect(add).toHaveBeenLastCalledWith(order.customerEmail, update!.title, update!.message, update!.eventKey, false, order.customerId, undefined);
+    add.mockRestore();
   });
   it('does not oversell stock under concurrent checkouts', async () => {
     const available = await stock();

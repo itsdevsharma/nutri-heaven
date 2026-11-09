@@ -60,7 +60,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
       const record = await this.outbox.findOneAndUpdate({ status: 'pending', nextAttemptAt: { $lte: new Date() } }, { $set: { nextAttemptAt: new Date(Date.now() + 300000) }, $inc: { attempts: 1 } }, { new: true }).lean().exec();
       if (!record) break;
       try {
-        await this.notifications.add(record.email, record.title, record.message, record.eventKey, true, record.customerId);
+        await this.notifications.add(record.email, record.title, record.message, record.eventKey, record.emailTemplate === 'order_confirmation', record.customerId, record.emailTemplate === 'order_confirmation' ? { text: record.emailText!, html: record.emailHtml! } : undefined);
         await this.outbox.updateOne({ eventKey: record.eventKey, attempts: record.attempts }, { $set: { status: 'delivered' } });
       } catch {
         await this.outbox.updateOne({ eventKey: record.eventKey, attempts: record.attempts }, { $set: { status: record.attempts >= 8 ? 'dead_letter' : 'pending', nextAttemptAt: new Date(Date.now() + Math.min(3600000, 30000 * 2 ** record.attempts)) } });
@@ -224,7 +224,7 @@ export class OrderService implements OnModuleInit, OnModuleDestroy {
           }], { session });
           if (!created) throw new Error('Order transaction produced no record');
           order = created;
-          await enqueueOrderNotification(this.outbox, created, session);
+          await enqueueOrderNotification(this.outbox, created, session, true);
           if (isCod) await this.inventory.commitForOrder(idempotencyKey, lines, 'system', session);
         });
       } finally { await session.endSession(); }

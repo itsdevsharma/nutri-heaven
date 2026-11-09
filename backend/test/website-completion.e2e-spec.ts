@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { ShiprocketShipment } from '../src/shipping/shipping.schema';
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -12,7 +13,7 @@ import { Product } from '../src/products/product.schema';
 import { enqueueOrderNotification } from '../src/orders/order-outbox.schema';
 import { OrderService } from '../src/orders/order.service';
 import { Order } from '../src/orders/order.schema';
-import { CustomerNotification } from '../src/engagement/engagement.schema';
+import { CustomerNotification, Subscriber } from '../src/engagement/engagement.schema';
 import { NotificationService } from '../src/engagement/notification.service';
 import { MailService } from '../src/mail/mail.module';
 
@@ -94,14 +95,13 @@ describe('Website completion audit', () => {
     await request(app.getHttpServer()).patch(`/customer/me/notifications/${item!._id}/read`).set(auth(otherToken)).expect(404);
   });
 
-  it('requires newsletter consent, confirmation and token ownership', async () => {
+  it('disables newsletter signup without sending mail and preserves existing unsubscribe links', async () => {
+    const send = jest.spyOn(app.get(MailService), 'send');
     await request(app.getHttpServer()).post('/newsletter/subscribe').send({ email: 'newsletter@example.com', consent: false }).expect(400);
-    const joined = await request(app.getHttpServer()).post('/newsletter/subscribe').send({ email: 'newsletter@example.com', consent: true }).expect(201);
-    const token = joined.body.confirmationToken, unsubscribe = joined.body.unsubscribeToken;
-    await request(app.getHttpServer()).post('/newsletter/confirm').send({ token: 'bad' }).expect(400);
-    await request(app.getHttpServer()).post('/newsletter/confirm').send({ token }).expect(201);
-    await request(app.getHttpServer()).post('/newsletter/confirm').send({ token }).expect(400);
-    await request(app.getHttpServer()).post('/newsletter/unsubscribe').send({ token: unsubscribe }).expect(201);
+    await request(app.getHttpServer()).post('/newsletter/subscribe').send({ email: 'newsletter@example.com', consent: true }).expect(503);
+    expect(send).not.toHaveBeenCalled(); send.mockRestore();
+    await app.get<Model<Subscriber>>(getModelToken(Subscriber.name)).create({ email: 'newsletter@example.com', status: 'subscribed', unsubscribeHash: createHash('sha256').update('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa').digest('hex') });
+    await request(app.getHttpServer()).post('/newsletter/unsubscribe').send({ token: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }).expect(201);
     await request(app.getHttpServer()).get('/admin/engagement/subscribers').set(auth(customerToken)).expect(401);
     const list = await request(app.getHttpServer()).get('/admin/engagement/subscribers').set(auth(adminToken)).expect(200);
     expect(list.body[0].status).toBe('unsubscribed'); expect(JSON.stringify(list.body)).not.toMatch(/Hash|Token/);
@@ -192,6 +192,7 @@ describe('Website completion audit', () => {
     const mail = app.get(MailService);
     const configured = jest.spyOn(mail, 'configured', 'get').mockReturnValue(true);
     const send = jest.spyOn(mail, 'send').mockRejectedValue(new Error('provider unavailable'));
+    await app.get(NotificationService).add('buyer@example.com', 'Order received', 'Order received', 'test-confirmation', true, undefined, { text: 'Order summary', html: '<p>Order summary</p>' });
     await app.get(NotificationService).deliver();
     const model = app.get<Model<CustomerNotification>>(getModelToken(CustomerNotification.name));
     const pending = await model.findOne({ emailRequested: true, attempts: 1 }); expect(pending?.sentAt).toBeUndefined();

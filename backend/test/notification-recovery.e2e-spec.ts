@@ -18,7 +18,7 @@ describe('Failed notification recovery', () => {
   const mail = { configured: true, url: (path: string) => `https://shop.example.com${path}`, send: jest.fn().mockResolvedValue(true) };
   const base = '/admin/engagement/emails';
   const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
-  const failed = (eventKey: string, extra = {}) => notifications.create({ email: 'guest@example.com', title: 'Order update', message: 'Your order is confirmed.', eventKey, emailRequested: true, attempts: 5, ...extra });
+  const failed = (eventKey: string, extra = {}) => notifications.create({ email: 'guest@example.com', title: 'Order update', message: 'Your order is confirmed.', eventKey, emailRequested: true, emailTemplate: 'order_confirmation', emailText: 'Your order is confirmed.', emailHtml: '<p>Your order is confirmed.</p>', attempts: 5, ...extra });
   beforeAll(async () => {
     mongo = await startMemoryReplica(); process.env.MONGODB_URI = mongo.uri;
     const fixture = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(MailService).useValue(mail).compile();
@@ -48,7 +48,7 @@ describe('Failed notification recovery', () => {
     await request(app.getHttpServer()).post(`${base}/${item.id}/retry`).set(auth(root)).expect(201);
     await request(app.getHttpServer()).post(`${base}/${item.id}/retry`).set(auth(root)).expect(409);
     await app.get(NotificationService).deliver();
-    expect(mail.send).toHaveBeenCalledWith(customer.email, item.title, expect.any(String), `notification-${item.id}-v1`);
+    expect(mail.send).toHaveBeenCalledWith(customer.email, item.title, expect.any(String), `notification-${item.id}-v1`, item.emailHtml);
     const saved = await notifications.findById(item.id).lean();
     expect(saved?.sentAt).toBeInstanceOf(Date); expect(saved?.deliveryError).toBeUndefined(); expect(saved?.attempts).toBe(1);
     await request(app.getHttpServer()).post(`${base}/${item.id}/retry`).set(auth(root)).expect(409);
@@ -63,11 +63,11 @@ describe('Failed notification recovery', () => {
     expect(mail.send).toHaveBeenCalledTimes(1);
     expect(mail.send.mock.calls[0][3]).toBe(`notification-${item.id}`);
   });
-  it('sends future updates for older orders to the current linked account email', async () => {
+  it('sends queued confirmations to the current linked account email', async () => {
     const customer = await customers.create({ name: 'Updated buyer', email: 'current@example.com', passwordHash: 'unused-test-fixture', isActive: true });
     const item = await failed('older-order-new-update', { customerId: customer.id, email: 'old-typo@example.com', attempts: 0 });
     await app.get(NotificationService).deliver();
-    expect(mail.send).toHaveBeenCalledWith(customer.email, item.title, expect.any(String), `notification-${item.id}-v1`);
+    expect(mail.send).toHaveBeenCalledWith(customer.email, item.title, expect.any(String), `notification-${item.id}-v1`, item.emailHtml);
     expect((await notifications.findById(item.id).lean())?.sentAt).toBeInstanceOf(Date);
   });
   it('does not retry an inactive account or steal a live processing lease', async () => {
@@ -77,6 +77,16 @@ describe('Failed notification recovery', () => {
     for (const item of [inactive, leased]) await request(app.getHttpServer()).post(`${base}/${item.id}/retry`).set(auth(root)).expect(409);
     const list = await request(app.getHttpServer()).get(`${base}/failed`).set(auth(root)).expect(200);
     expect(list.body.every((item: { canRetry: boolean }) => !item.canRetry)).toBe(true);
+  });
+  it('never sends or retries legacy welcome and order-update emails', async () => {
+    const item = await notifications.create({ email: 'buyer@example.com', title: 'Order shipped', message: 'Shipped', eventKey: 'legacy-update', emailRequested: true, attempts: 5 });
+    await request(app.getHttpServer()).post(`${base}/${item.id}/retry`).set(auth(root)).expect(404);
+    expect((await request(app.getHttpServer()).get(`${base}/failed`).set(auth(root))).body).toEqual([]);
+    await notifications.updateOne({ _id: item.id }, { $set: { attempts: 0 } });
+    await app.get(NotificationService).deliver();
+    expect(mail.send).not.toHaveBeenCalled();
+    const welcome = await app.get(NotificationService).add('buyer@example.com', 'Welcome', 'Welcome', 'new-welcome', true);
+    expect(welcome?.emailRequested).toBe(false);
   });
   it('blocks recovery without sender configuration', async () => {
     const item = await failed('unconfigured'); mail.configured = false;
