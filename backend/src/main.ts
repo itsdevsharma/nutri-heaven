@@ -46,9 +46,9 @@ async function bootstrap(): Promise<void> {
   if (!existsSync(uploads)) mkdirSync(uploads, { recursive: true });
   // An empty host environment variable must not silently produce an empty
   // allow-list (which causes successful OPTIONS responses with no CORS header).
-  // Vite falls back to 5174 when 5173 is occupied during local development.
+  // Vite can fall back to 5174 or 5175 when earlier local ports are occupied.
   // Production deployments should still set CORS_ORIGINS explicitly.
-  const origins = (process.env.CORS_ORIGINS?.trim() || 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,https://nutri-heaven-mu.vercel.app')
+  const origins = (process.env.CORS_ORIGINS?.trim() || 'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175,https://nutri-heaven-mu.vercel.app')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);

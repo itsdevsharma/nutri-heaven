@@ -223,13 +223,13 @@ body{background:linear-gradient(135deg,#f7f2e8 0%,#fbf8ef 46%,#f0eadc 100%)}.sho
 @media(max-width:760px){.footer-brand .footer-logo{min-height:58px;padding:6px 13px 6px 7px}.footer-brand .footer-logo img{width:44px;height:44px}.footer-brand .footer-logo span{font-size:14px}}
 
 /* Clear storefront branding with a green header and warm cream surfaces. */
-.nav{height:78px;background:var(--paper);color:var(--dark);border-bottom:1px solid var(--nh-border)}
-:is(.nav,.checkout-nav) .brand{display:flex;align-items:center;gap:12px;flex-shrink:0;min-width:0;height:auto!important;padding:0!important;background-image:none!important;background-color:transparent;background-repeat:no-repeat;color:var(--dark)!important}
+.nav{height:78px;background:var(--dark);color:var(--cream);border-bottom:1px solid #52603b}
+:is(.nav,.checkout-nav) .brand{display:flex;align-items:center;gap:12px;flex-shrink:0;min-width:0;height:auto!important;padding:0!important;background-image:none!important;background-color:transparent;background-repeat:no-repeat;color:inherit!important}
 :is(.nav,.checkout-nav) .brand img{display:block;width:58px;height:58px;object-fit:contain;border:1px solid #9c8553;border-radius:6px}
 :is(.nav,.checkout-nav) .brand span{margin-left:0;font:600 16px/1.2 Manrope,Arial,sans-serif;letter-spacing:.08em!important}
-.nav .tools button,.nav .menu{color:var(--dark)}
+.nav .tools button,.nav .menu{color:var(--cream)}
 .nav .bag{border-left-color:#647153!important}
-.nav nav a:hover,.nav nav a:focus-visible{color:var(--green);text-decoration:underline;text-underline-offset:5px}
+.nav nav a:hover,.nav nav a:focus-visible{color:#d3a63f;text-decoration:underline;text-underline-offset:5px}
 footer{background:#d4c19d}
 .product-image-button,.home-product-image,.product-modal-image,.product-modal-media{background:var(--paper)}
 .shop-filters{top:90px}
