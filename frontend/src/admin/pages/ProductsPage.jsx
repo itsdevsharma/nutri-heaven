@@ -135,6 +135,20 @@ export default function ProductsPage() {
     }
   };
 
+  const archive = async (product) => {
+    if (!await confirm({ title: `Archive “${product.title}”?`, message: 'This product will be hidden from the storefront. You can recover it from the Archived tab.', confirmLabel: 'Archive', tone: 'danger' })) return;
+    setBusySlug(product.slug);
+    try {
+      await adminApi.products.archive(product.slug);
+      toast.success(`“${product.title}” was archived.`);
+      await reload();
+    } catch (failure) {
+      toast.error(failure.message);
+    } finally {
+      setBusySlug('');
+    }
+  };
+
   const columns = [
     { key: 'select', header: <input type="checkbox" aria-label="Select page" checked={items.length > 0 && selected.length === items.length} onChange={(event) => selectPage(event.target.checked)} />, render: (product) => <input type="checkbox" aria-label={`Select ${product.title}`} checked={selected.includes(product.slug)} onChange={() => toggleSelected(product.slug)} /> },
     {
@@ -204,7 +218,7 @@ export default function ProductsPage() {
               >
                 Deactivate
               </button>
-              {product.status !== 'archived' ? <button type="button" className="admin-btn admin-btn-small admin-btn-quiet" disabled={busySlug === product.slug} onClick={() => adminApi.products.archive(product.slug).then(reload).catch((failure) => toast.error(failure.message))}>Archive</button> : <><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => adminApi.products.recover(product.slug, 'draft').then(reload).catch((failure) => toast.error(failure.message))}>Recover draft</button><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => adminApi.products.recover(product.slug, 'inactive').then(reload).catch((failure) => toast.error(failure.message))}>Recover inactive</button></>}
+              {product.status !== 'archived' ? <button type="button" className="admin-btn admin-btn-small admin-btn-quiet" disabled={busySlug === product.slug} onClick={() => archive(product)}>Archive</button> : <><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => adminApi.products.recover(product.slug, 'draft').then(reload).catch((failure) => toast.error(failure.message))}>Recover draft</button><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => adminApi.products.recover(product.slug, 'inactive').then(reload).catch((failure) => toast.error(failure.message))}>Recover inactive</button></>}
             </>
           ) : null}
         </div>
@@ -217,7 +231,7 @@ export default function ProductsPage() {
       <PageHeader
         eyebrow="CATALOGUE"
         title="Products"
-        description="Every lifecycle state — draft, active, inactive and archived — with the prices and stock the API holds."
+        description="Manage your catalogue, pricing, availability and product visibility."
         actions={
           canWrite ? (
             <Link className="admin-btn admin-btn-primary" to="/admin/products/new">
@@ -291,8 +305,7 @@ export default function ProductsPage() {
       </Card>
 
       <p className="admin-footnote">
-        Prices are integer paise in the database and are formatted here for display only. The storefront
-        always reads its price from the API, never from this screen.
+        Prices are shown in rupees. Product and stock updates are reflected in the storefront.
       </p>
       <Modal open={Boolean(importPreview)} title="CSV import preview" description="Review validation before any catalogue records are changed." onClose={() => setImportPreview(null)} size="md" footer={<><button type="button" className="admin-btn admin-btn-ghost" onClick={() => setImportPreview(null)}>Cancel</button><button type="button" className="admin-btn admin-btn-primary" disabled={!importPreview || importPreview.errors.length > 0} onClick={async () => { try { const result = await adminApi.products.confirmImport(importPreview.token); toast.success(`Imported ${result.created} new and updated ${result.updated} products.`); setImportPreview(null); reload(); } catch (failure) { toast.error(failure.message); } }}>Confirm import</button></>}><div className="admin-import-summary"><p><b>{importPreview?.created ?? 0}</b> new products · <b>{importPreview?.updated ?? 0}</b> updates · <b>{importPreview?.errors.length ?? 0}</b> invalid rows</p>{importPreview?.errors.length ? <ul className="admin-list">{importPreview.errors.map((item) => <li key={`${item.row}-${item.message}`}>Row {item.row}: {item.message}</li>)}</ul> : <p className="admin-hint">All rows are valid. Confirmation will apply this exact preview once.</p>}</div></Modal>
     </>

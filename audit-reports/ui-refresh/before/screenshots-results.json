@@ -1,0 +1,100 @@
+[
+  {
+    "route": "/",
+    "width": 1440,
+    "overflow": false,
+    "content": 1870,
+    "errors": []
+  },
+  {
+    "route": "/shop",
+    "width": 1440,
+    "overflow": false,
+    "content": 379,
+    "errors": []
+  },
+  {
+    "route": "/account",
+    "width": 1440,
+    "overflow": false,
+    "content": 211,
+    "errors": []
+  },
+  {
+    "route": "/admin/login",
+    "width": 1440,
+    "overflow": false,
+    "content": 317,
+    "errors": []
+  },
+  {
+    "route": "/admin",
+    "width": 1440,
+    "overflow": false,
+    "content": 1271,
+    "errors": []
+  },
+  {
+    "route": "/admin/products",
+    "width": 1440,
+    "overflow": false,
+    "content": 1002,
+    "errors": []
+  },
+  {
+    "route": "/admin/insights",
+    "width": 1440,
+    "overflow": false,
+    "content": 2007,
+    "errors": []
+  },
+  {
+    "route": "/",
+    "width": 390,
+    "overflow": false,
+    "content": 1841,
+    "errors": []
+  },
+  {
+    "route": "/shop",
+    "width": 390,
+    "overflow": false,
+    "content": 267,
+    "errors": []
+  },
+  {
+    "route": "/account",
+    "width": 390,
+    "overflow": false,
+    "content": 211,
+    "errors": []
+  },
+  {
+    "route": "/admin/login",
+    "width": 390,
+    "overflow": false,
+    "content": 317,
+    "errors": []
+  },
+  {
+    "route": "/admin",
+    "width": 390,
+    "overflow": false,
+    "content": 1271,
+    "errors": []
+  },
+  {
+    "route": "/admin/products",
+    "width": 390,
+    "overflow": false,
+    "content": 1002,
+    "errors": []
+  },
+  {
+    "route": "/admin/insights",
+    "width": 390,
+    "overflow": false,
+    "content": 2007,
+    "errors": []
+  }
+]

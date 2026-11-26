@@ -54,7 +54,7 @@ const assert = require('node:assert/strict');
       assert(await page.evaluate(() => Boolean(sessionStorage.getItem('nutri_pending_checkout'))));
       await page.goto('http://127.0.0.1:5173/checkout');
       await page.getByRole('button', { name: 'Return to bag', exact: false }).click();
-      await page.getByRole('complementary', { name: 'Shopping bag' }).waitFor();
+      await page.getByRole('dialog', { name: 'Shopping bag' }).waitFor();
       await page.getByRole('button', { name: 'Proceed to checkout', exact: false }).click();
       await page.getByRole('heading', { name: 'Complete your order' }).waitFor();
       await page.getByRole('button', { name: 'Check payment status', exact: true }).click();

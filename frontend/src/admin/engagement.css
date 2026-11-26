@@ -23,8 +23,8 @@
 .engagement-sales-grid > .admin-card { min-width: 0; }
 .engagement-sales-grid .admin-card-head { flex-wrap: wrap; gap: 12px; }
 .engagement-sales-grid .admin-card-body { padding: 0; }
-.engagement-sales-grid .admin-table { min-width: 0; font-size: 12px; }
-.engagement-sales-grid .admin-table th { font-size: 10px; letter-spacing: .04em; }
+.engagement-sales-grid .admin-table { min-width: 0; font-size: 14px; }
+.engagement-sales-grid .admin-table th { font-size: 12px; letter-spacing: .01em; }
 .engagement-sales-grid .admin-table td, .engagement-sales-grid .admin-table th { padding: 11px 16px; }
 .engagement-sales-grid .admin-table td:first-child { overflow-wrap: anywhere; }
 .engagement-sales-grid .admin-align-right { white-space: nowrap; }

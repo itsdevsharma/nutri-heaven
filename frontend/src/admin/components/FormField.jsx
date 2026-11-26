@@ -1,3 +1,5 @@
+import { Children, cloneElement, isValidElement, useId } from 'react';
+
 /**
  * Form layout primitives. Inputs themselves are plain `<input className="admin-input">`
  * elements in the pages — the wrapper only takes care of the label, the hint and
@@ -5,21 +7,31 @@
  */
 
 export function FormField({ label, hint, error, required, children, span }) {
+  const generatedId = useId();
+  const controls = Children.toArray(children);
+  const field = controls.find(child => isValidElement(child) && ['input', 'select', 'textarea'].includes(child.type));
+  const id = field?.props.id || generatedId;
+  const helpId = `${id}-help`;
+  const content = controls.map(child => child !== field ? child : cloneElement(child, {
+    id,
+    'aria-invalid': error ? true : child.props['aria-invalid'],
+    'aria-describedby': [child.props['aria-describedby'], (error || hint) && helpId].filter(Boolean).join(' ') || undefined,
+  }));
   return (
     <div className={`admin-field${span ? ` admin-field-span-${span}` : ''}`}>
       {label ? (
-        <label className="admin-field-label">
+        <label className="admin-field-label" htmlFor={field ? id : undefined}>
           {label}
           {required ? <span className="admin-required" aria-hidden="true"> *</span> : null}
         </label>
       ) : null}
-      {children}
+      {content}
       {error ? (
-        <p className="admin-field-error" role="alert">
+        <p id={helpId} className="admin-field-error" role="alert">
           {error}
         </p>
       ) : (
-        hint && <p className="admin-field-hint">{hint}</p>
+        hint && <p id={helpId} className="admin-field-hint">{hint}</p>
       )}
     </div>
   );

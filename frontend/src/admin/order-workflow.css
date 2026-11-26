@@ -6,7 +6,7 @@
 .admin-modal-layer .admin-order-section h3{font:600 17px/1.4 Manrope,Arial,sans-serif;margin:0 0 12px}
 .admin-modal-layer .admin-order-section h4{font:600 14px/1.5 Manrope,Arial,sans-serif;margin:0}
 .admin-modal-layer .admin-order-section p{margin:8px 0 14px;overflow-wrap:anywhere}
-.admin-modal-layer .admin-order-section .admin-input{min-height:44px;border:1px solid #c9c5b8;border-radius:4px;background:#fffdf7}
+.admin-modal-layer .admin-order-section .admin-input{min-height:44px;border:1px solid #c9c5b8;border-radius:4px;background:var(--surface)}
 .admin-order-disclosure{margin-top:16px}
 .admin-order-disclosure>summary{min-height:44px;padding:10px 0;cursor:pointer;font:600 13px/1.6 Manrope,Arial,sans-serif;color:var(--green)}
 .admin-order-disclosure>summary:focus-visible{outline:2px solid var(--green);outline-offset:3px}
@@ -25,7 +25,7 @@
 .admin-operation-form{margin:16px 0;padding:16px;border:1px solid var(--line);background:var(--surface-alt);border-radius:4px}
 .admin-modal-layer .admin-order-actions{gap:8px;flex-wrap:wrap}
 .admin-modal-layer .admin-btn{min-height:44px;border-radius:4px;white-space:normal}
-.admin-modal-layer .admin-btn-primary{background:var(--green);color:#fffdf7}
+.admin-modal-layer .admin-btn-primary{background:var(--green);color:var(--surface)}
 .admin-modal-layer .admin-btn-primary:hover:not(:disabled){background:var(--dark)}
 .admin-modal-layer .admin-order-totals{font-size:13px}
 .admin-modal-layer .admin-order-totals>div{gap:16px}

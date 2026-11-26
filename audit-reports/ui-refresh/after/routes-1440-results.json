@@ -1,0 +1,226 @@
+[
+  {
+    "route": "/",
+    "width": 1440,
+    "overflow": false,
+    "content": 1843,
+    "errors": []
+  },
+  {
+    "route": "/shop",
+    "width": 1440,
+    "overflow": false,
+    "content": 379,
+    "errors": []
+  },
+  {
+    "route": "/account",
+    "width": 1440,
+    "overflow": false,
+    "content": 211,
+    "errors": []
+  },
+  {
+    "route": "/checkout",
+    "width": 1440,
+    "overflow": false,
+    "content": 535,
+    "errors": []
+  },
+  {
+    "route": "/privacy-policy",
+    "width": 1440,
+    "overflow": false,
+    "content": 135,
+    "errors": []
+  },
+  {
+    "route": "/shipping-policy",
+    "width": 1440,
+    "overflow": false,
+    "content": 136,
+    "errors": []
+  },
+  {
+    "route": "/return-policy",
+    "width": 1440,
+    "overflow": false,
+    "content": 140,
+    "errors": []
+  },
+  {
+    "route": "/terms",
+    "width": 1440,
+    "overflow": false,
+    "content": 141,
+    "errors": []
+  },
+  {
+    "route": "/products/california-almonds",
+    "width": 1440,
+    "overflow": false,
+    "content": 509,
+    "errors": []
+  },
+  {
+    "route": "/order-confirmation/NH-AUDIT",
+    "width": 1440,
+    "overflow": false,
+    "content": 884,
+    "errors": []
+  },
+  {
+    "route": "/pending-checkout",
+    "width": 1440,
+    "overflow": false,
+    "content": 30,
+    "errors": []
+  },
+  {
+    "route": "/admin/login",
+    "width": 1440,
+    "overflow": false,
+    "content": 317,
+    "errors": []
+  },
+  {
+    "route": "/admin",
+    "width": 1440,
+    "overflow": false,
+    "content": 1179,
+    "errors": []
+  },
+  {
+    "route": "/admin/products",
+    "width": 1440,
+    "overflow": false,
+    "content": 896,
+    "errors": []
+  },
+  {
+    "route": "/admin/products/new",
+    "width": 1440,
+    "overflow": false,
+    "content": 2677,
+    "errors": []
+  },
+  {
+    "route": "/admin/products/california-almonds",
+    "width": 1440,
+    "overflow": false,
+    "content": 2608,
+    "errors": []
+  },
+  {
+    "route": "/admin/categories",
+    "width": 1440,
+    "overflow": false,
+    "content": 506,
+    "errors": []
+  },
+  {
+    "route": "/admin/inventory",
+    "width": 1440,
+    "overflow": false,
+    "content": 868,
+    "errors": []
+  },
+  {
+    "route": "/admin/orders",
+    "width": 1440,
+    "overflow": false,
+    "content": 758,
+    "errors": []
+  },
+  {
+    "route": "/admin/customers",
+    "width": 1440,
+    "overflow": false,
+    "content": 345,
+    "errors": []
+  },
+  {
+    "route": "/admin/shipping",
+    "width": 1440,
+    "overflow": false,
+    "content": 585,
+    "errors": []
+  },
+  {
+    "route": "/admin/insights",
+    "width": 1440,
+    "overflow": false,
+    "content": 2007,
+    "errors": []
+  },
+  {
+    "route": "/admin/reviews",
+    "width": 1440,
+    "overflow": false,
+    "content": 385,
+    "errors": []
+  },
+  {
+    "route": "/admin/offers",
+    "width": 1440,
+    "overflow": false,
+    "content": 405,
+    "errors": []
+  },
+  {
+    "route": "/admin/coupons",
+    "width": 1440,
+    "overflow": false,
+    "content": 324,
+    "errors": []
+  },
+  {
+    "route": "/admin/banners",
+    "width": 1440,
+    "overflow": false,
+    "content": 380,
+    "errors": []
+  },
+  {
+    "route": "/admin/faqs",
+    "width": 1440,
+    "overflow": false,
+    "content": 817,
+    "errors": []
+  },
+  {
+    "route": "/admin/socials",
+    "width": 1440,
+    "overflow": false,
+    "content": 237,
+    "errors": []
+  },
+  {
+    "route": "/admin/users",
+    "width": 1440,
+    "overflow": false,
+    "content": 313,
+    "errors": []
+  },
+  {
+    "route": "/admin/store-content",
+    "width": 1440,
+    "overflow": false,
+    "content": 1307,
+    "errors": []
+  },
+  {
+    "route": "/admin/audit",
+    "width": 1440,
+    "overflow": false,
+    "content": 472,
+    "errors": []
+  },
+  {
+    "route": "/admin/missing",
+    "width": 1440,
+    "overflow": false,
+    "content": 197,
+    "errors": []
+  }
+]
