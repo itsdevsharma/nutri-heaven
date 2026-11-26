@@ -16,7 +16,7 @@ import { API_URL } from '../../api-origin.js';
  *    the API never receives a value the browser computed for display.
  *
  * The access token is kept in `sessionStorage`, not `localStorage`: it dies with
- * the tab. The backend issues a 15-minute access token and has no refresh
+ * the tab. The backend issues an 8-hour access token and has no refresh
  * endpoint yet (step 1 of `backend/ADMIN_COMMERCE_PLAN.md`), which is why a
  * single retry seam is documented on `request()` rather than implemented here.
  */
