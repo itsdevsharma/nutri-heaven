@@ -648,9 +648,9 @@ export default function ProductEditorPage({ params }) {
             </div>
           </FormSection>
 
-                    <FormSection
+          <FormSection
             title="Packs"
-            description="Each pack is a sellable variant with its own price and stock. Storefront quotes are built from these rows."
+            description="Each pack is a sellable variant with its own price and stock. Set pricing, stock alerts and shipping details for each size."
             aside={
               canWrite ? (
                 <button type="button" className="admin-btn admin-btn-ghost" onClick={addVariant}>
@@ -665,89 +665,59 @@ export default function ProductEditorPage({ params }) {
               </p>
             ) : null}
 
-            <div className="admin-variants">
-              <div className="admin-variant-head">
-                <span>Size</span>
-                <span>Price (₹)</span>
-                <span>MRP (₹)</span>
-                <span>SKU</span>
-                <span>Barcode</span>
-                <span>Tax (%)</span>
-                <span>Stock</span>
-                <span>Low-stock at</span>
-                <span>Parcel: g / cm</span>
-                <span>Images</span>
-                <span>Live</span>
-                <span aria-hidden="true" />
-              </div>
-
+            <div className="admin-packs">
               {form.variants.map((variant, index) => (
-                <div className="admin-variant-row" key={`variant-${index}`}>
-                  <input
-                    className="admin-input"
-                    value={variant.size}
-                    placeholder="250g"
-                    onChange={(event) => setVariant(index, 'size', event.target.value)}
-                    disabled={!canWrite}
-                  />
-                  <input
-                    className="admin-input admin-mono"
-                    inputMode="decimal"
-                    value={variant.price}
-                    onChange={(event) => setVariant(index, 'price', event.target.value)}
-                    disabled={!canWrite}
-                  />
-                  <input
-                    className="admin-input admin-mono"
-                    inputMode="decimal"
-                    value={variant.mrp}
-                    onChange={(event) => setVariant(index, 'mrp', event.target.value)}
-                    disabled={!canWrite}
-                  />
-                  <input className="admin-input admin-mono" value={variant.sku} placeholder="Optional" onChange={(event) => setVariant(index, 'sku', event.target.value)} disabled={!canWrite} />
-                  <input className="admin-input admin-mono" value={variant.barcode} placeholder="Optional" onChange={(event) => setVariant(index, 'barcode', event.target.value)} disabled={!canWrite} />
-                  <input className="admin-input admin-mono" inputMode="decimal" value={variant.taxPercent} placeholder="0" onChange={(event) => setVariant(index, 'taxPercent', event.target.value)} disabled={!canWrite} />
-                  <span className="admin-variant-static">
-                    <b>{isNew ? '0' : variant.stock}</b>
-                    <small>inventory only</small>
-                  </span>
-                  <input
-                    className="admin-input admin-mono"
-                    inputMode="numeric"
-                    value={variant.lowStockLimit}
-                    onChange={(event) => setVariant(index, 'lowStockLimit', event.target.value)}
-                    disabled={!canWrite}
-                  />
-                  <div className="admin-pack-dimensions"><input
-                    className="admin-input admin-mono"
-                    aria-label={`${variant.size || 'Pack'} gross weight in grams`}
-                    placeholder="Weight (g)"
-                    inputMode="numeric"
-                    value={variant.weightGrams}
-                    onChange={(event) => setVariant(index, 'weightGrams', event.target.value)}
-                    disabled={!canWrite}
-                  />
-                  <div>{['lengthCm', 'breadthCm', 'heightCm'].map(field => <input key={field} className="admin-input admin-mono" type="number" min="0.51" step="0.01" aria-label={`${variant.size || 'Pack'} ${field}`} placeholder={`${field.replace('Cm', '')} (cm)`} value={variant[field] ?? ''} onChange={event => setVariant(index, field, event.target.value)} disabled={!canWrite} />)}</div></div>
-                  <button type="button" className="admin-btn admin-btn-small admin-btn-ghost" disabled={!canWrite} onClick={() => setVariantImageEditor({ index, selected: variant.images ?? [] })}>Images ({(variant.images ?? []).length})</button>
-                  <label className="admin-check admin-check-compact">
-                    <input
-                      type="checkbox"
-                      checked={variant.isActive}
-                      onChange={(event) => setVariant(index, 'isActive', event.target.checked)}
-                      disabled={!canWrite}
-                    />
-                    <span>Live</span>
-                  </label>
-                  <button
-                    type="button"
-                    className="admin-icon-btn"
-                    onClick={() => removeVariant(index)}
-                    disabled={!canWrite || form.variants.length <= 1}
-                    aria-label={`Remove pack ${index + 1}`}
-                  >
-                    ×
-                  </button>
-                </div>
+                <fieldset className="admin-pack" key={`variant-${index}`}>
+                  <legend>Pack {index + 1}{variant.size ? ` · ${variant.size}` : ''}</legend>
+                  <div className="admin-pack-fields">
+                    <FormField label="Size" required>
+                      <input className="admin-input" value={variant.size} placeholder="250g" onChange={event => setVariant(index, 'size', event.target.value)} disabled={!canWrite} />
+                    </FormField>
+                    <FormField label="Selling price (₹)" required>
+                      <input className="admin-input admin-mono" inputMode="decimal" value={variant.price} onChange={event => setVariant(index, 'price', event.target.value)} disabled={!canWrite} />
+                    </FormField>
+                    <FormField label="MRP (₹)">
+                      <input className="admin-input admin-mono" inputMode="decimal" value={variant.mrp} placeholder="Optional" onChange={event => setVariant(index, 'mrp', event.target.value)} disabled={!canWrite} />
+                    </FormField>
+                    <FormField label="SKU">
+                      <input className="admin-input admin-mono" value={variant.sku} placeholder="Optional" onChange={event => setVariant(index, 'sku', event.target.value)} disabled={!canWrite} />
+                    </FormField>
+                    <FormField label="Barcode">
+                      <input className="admin-input admin-mono" value={variant.barcode} placeholder="Optional" onChange={event => setVariant(index, 'barcode', event.target.value)} disabled={!canWrite} />
+                    </FormField>
+                    <FormField label="Tax (%)">
+                      <input className="admin-input admin-mono" inputMode="decimal" value={variant.taxPercent} placeholder="0" onChange={event => setVariant(index, 'taxPercent', event.target.value)} disabled={!canWrite} />
+                    </FormField>
+                    <FormField label="Stock" hint="Managed in Inventory">
+                      <input className="admin-input admin-mono" value={isNew ? '0' : variant.stock} readOnly />
+                    </FormField>
+                    <FormField label="Low-stock alert at">
+                      <input className="admin-input admin-mono" inputMode="numeric" value={variant.lowStockLimit} onChange={event => setVariant(index, 'lowStockLimit', event.target.value)} disabled={!canWrite} />
+                    </FormField>
+                  </div>
+                  <div className="admin-pack-shipping">
+                    <h3>Parcel measurements</h3>
+                    <p className="admin-field-hint">Use the packed weight and outer dimensions for shipping.</p>
+                    <div className="admin-pack-fields">
+                      <FormField label="Gross weight (g)">
+                        <input className="admin-input admin-mono" inputMode="numeric" value={variant.weightGrams} onChange={event => setVariant(index, 'weightGrams', event.target.value)} disabled={!canWrite} />
+                      </FormField>
+                      {[['lengthCm', 'Length (cm)'], ['breadthCm', 'Breadth (cm)'], ['heightCm', 'Height (cm)']].map(([field, label]) => (
+                        <FormField key={field} label={label}>
+                          <input className="admin-input admin-mono" type="number" min="0.51" step="0.01" value={variant[field] ?? ''} onChange={event => setVariant(index, field, event.target.value)} disabled={!canWrite} />
+                        </FormField>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="admin-pack-actions">
+                    <label className="admin-check admin-check-compact">
+                      <input type="checkbox" checked={variant.isActive} onChange={event => setVariant(index, 'isActive', event.target.checked)} disabled={!canWrite} />
+                      <span>Live</span>
+                    </label>
+                    <button type="button" className="admin-btn admin-btn-small admin-btn-ghost" disabled={!canWrite} onClick={() => setVariantImageEditor({ index, selected: variant.images ?? [] })}>Images ({(variant.images ?? []).length})</button>
+                    <button type="button" className="admin-btn admin-btn-small admin-btn-quiet admin-pack-remove" onClick={() => removeVariant(index)} disabled={!canWrite || form.variants.length <= 1} aria-label={`Remove pack ${index + 1}`}>Remove pack</button>
+                  </div>
+                </fieldset>
               ))}
             </div>
 
