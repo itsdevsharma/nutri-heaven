@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useDraftState } from '../lib/useDraftState.js';
+import { DraftNotice } from '../components/DraftNotice.jsx';
+import { useEffect, useState } from 'react';
 import { PageHeader, Card } from '../components/PageHeader.jsx';
 import { DataTable } from '../components/DataTable.jsx';
 import { Pagination } from '../components/Pagination.jsx';
@@ -20,12 +22,12 @@ function CustomerDetails({ id, onClose, onSaved }) {
   const toast = useToast();
   const confirm = useConfirm();
   const { data, loading, error, reload } = useResource(() => adminApi.customers.get(id), [id]);
-  const [draft, setDraft] = useState(null);
+  const [form, setForm, draft] = useDraftState('customers', { name: '', phone: '' }, { title: 'Customer details', record: id });
+  useEffect(() => { if (data) draft.initialize({ name: data.name ?? '', phone: data.phone ?? '' }); }, [data]);
   const [saving, setSaving] = useState(false);
-  const form = draft ?? { name: data?.name ?? '', phone: data?.phone ?? '' };
   const save = async (event) => {
     event.preventDefault(); setSaving(true);
-    try { await adminApi.customers.update(id, { name: form.name.trim(), phone: form.phone.trim() }); toast.success('Customer details saved.'); setDraft(null); await reload(); await onSaved(); }
+    try { await adminApi.customers.update(id, { name: form.name.trim(), phone: form.phone.trim() }); toast.success('Customer details saved.'); draft.clear(); await reload(); await onSaved(); }
     catch (failure) { toast.error(failure.message); }
     finally { setSaving(false); }
   };
@@ -45,9 +47,9 @@ function CustomerDetails({ id, onClose, onSaved }) {
       </div>
       <section className="admin-customer-section" aria-labelledby="customer-contact-heading">
         <div className="admin-customer-section-head"><h3 id="customer-contact-heading">Contact details</h3><span className="admin-hint">Editable information</span></div>
-        <form id="admin-customer-form" onSubmit={save}><FormGrid>
-          <FormField label="Name" required><input className="admin-input" aria-label="Name" autoComplete="name" value={form.name} required minLength={2} maxLength={100} disabled={saving} onChange={(event) => setDraft({ ...form, name: event.target.value })} /></FormField>
-          <FormField label="Phone" hint="10 digits, or leave blank."><input className="admin-input" aria-label="Phone" aria-describedby="customer-phone-hint" autoComplete="tel-national" inputMode="numeric" type="tel" pattern="[0-9]{10}" maxLength={10} disabled={saving} value={form.phone} onChange={(event) => setDraft({ ...form, phone: event.target.value })} /></FormField>
+        <form id="admin-customer-form" onSubmit={save}><DraftNotice draft={draft} disabled={saving} /><FormGrid>
+          <FormField label="Name" required><input className="admin-input" aria-label="Name" autoComplete="name" value={form.name} required minLength={2} maxLength={100} disabled={saving} onChange={(event) => setForm({ ...form, name: event.target.value })} /></FormField>
+          <FormField label="Phone" hint="10 digits, or leave blank."><input className="admin-input" aria-label="Phone" aria-describedby="customer-phone-hint" autoComplete="tel-national" inputMode="numeric" type="tel" pattern="[0-9]{10}" maxLength={10} disabled={saving} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></FormField>
         </FormGrid><span id="customer-phone-hint" className="admin-visually-hidden">10 digits, or leave blank.</span></form>
       </section>
       <section className="admin-customer-section" aria-labelledby="customer-addresses-heading">
@@ -77,7 +79,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [offset, setOffset] = useState(0);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(() => new URLSearchParams(window.location.search).get('draft'));
   const q = useDebounced(search);
   const limit = 25;
   const { data, loading, error, reload } = useResource(() => adminApi.customers.list({ q, status, offset, limit }), [q, status, offset]);

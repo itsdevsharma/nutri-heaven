@@ -30,19 +30,18 @@ export default function OrdersPage() {
   const orders = data?.items ?? [];
   const total = data?.total ?? 0;
   const summary = data?.summary ?? {};
-  const [selectedId, setSelectedId] = useState(null), [busy, setBusy] = useState(false);
+  const [selectedId, setSelectedId] = useState(() => new URLSearchParams(window.location.search).get('draft')), [busy, setBusy] = useState(false);
   const { data: financialData, loading: financialLoading, error: financialFailure, reload: loadFinancials } = useResource(() => Promise.all([selectedId ? adminApi.payments.refunds({ orderId: selectedId }) : Promise.resolve([]), role === 'super_admin' ? adminApi.payments.webhookFailures() : Promise.resolve([])]), [role, selectedId]);
   const refunds = financialData?.[0] ?? [], webhookFailures = financialData?.[1] ?? [], financialError = financialFailure?.message ?? '';
   const { data: detail, error: detailError, reload: reloadDetail } = useResource(() => selectedId ? adminApi.orders.get(selectedId) : Promise.resolve(null), [selectedId]);
   const refreshOrders = async () => { await reload(); if (selectedId) await reloadDetail(); };
   useEffect(() => { const timer = window.setInterval(() => { void reload(); if (selectedId) void reloadDetail(); void loadFinancials(); }, 30000); return () => window.clearInterval(timer); }, [role, reload, reloadDetail, selectedId, loadFinancials]);
   useEffect(() => { if (!loading && !error && offset > 0 && offset >= total) setOffset(total ? Math.floor((total - 1) / 20) * 20 : 0); }, [loading, error, offset, total]);
-  const [tracking, setTracking] = useState({ trackingNumber: '', trackingUrl: '' });
   const toast = useToast(), confirm = useConfirm();
   const selected = detail?.id === selectedId ? detail : orders.find(order => order.id === selectedId);
   const hasFilters = Boolean(search || status || payment);
   const clear = () => { setSearch(''); setStatus(''); setPayment(''); setOffset(0); };
-  const open = order => { setSelectedId(order.id); setTracking({ trackingNumber: order.trackingNumber ?? '', trackingUrl: order.trackingUrl ?? '' }); };
+  const open = order => { setSelectedId(order.id); };
   const mutate = async (action, message) => {
     setBusy(true);
     try { await action(); toast.success(message); await refreshOrders(); await loadFinancials(); return true; }
@@ -103,7 +102,7 @@ export default function OrdersPage() {
         <section className="admin-order-section"><h3>Items ordered</h3><DataTable rows={selected.lines ?? []} rowKey={line => `${line.productSlug}-${line.packSize}`} columns={[{ key: 'productName', header: 'Product' }, { key: 'packSize', header: 'Pack' }, { key: 'quantity', header: 'Quantity', align: 'right' }, { key: 'lineTotalPaise', header: 'Amount', align: 'right', render: line => formatPaise(line.lineTotalPaise) }]} /><dl className="admin-order-totals"><div><dt>Subtotal</dt><dd>{formatPaise(selected.subtotalPaise)}</dd></div><div><dt>Coupon discount</dt><dd>{formatPaise(selected.couponDiscountPaise ?? 0)}</dd></div><div><dt>Delivery</dt><dd>{formatPaise(selected.shippingPaise)}</dd></div>{Boolean(selected.amountAdjustmentPaise) && <div><dt>Admin adjustment</dt><dd>{formatPaise(selected.amountAdjustmentPaise)}</dd></div>}<div><dt>Total</dt><dd>{formatPaise(selected.totalPaise)}</dd></div></dl></section>
         {role === 'super_admin' && <OrderAmountOverride key={`amount-${selected.id}`} order={selected} busy={busy} save={payload => mutate(() => adminApi.orders.overrideAmount(selected.id, payload), 'Order amount updated.')} />}
         <OrderOperations key={selected.id} order={selected} busy={busy} runAction={(action, payload) => mutate(() => adminApi.orders.action(selected.id, action, payload), 'Order updated.')} />
-        <OrderDelivery key={`delivery-${selected.id}`} order={selected} tracking={tracking} setTracking={setTracking} busy={busy} setBusy={setBusy} reload={refreshOrders} save={() => mutate(() => adminApi.orders.updateStatus(selected.id, selected.status, tracking), 'Tracking details saved.')} />
+        <OrderDelivery key={`delivery-${selected.id}`} order={selected} busy={busy} setBusy={setBusy} reload={refreshOrders} save={tracking => mutate(() => adminApi.orders.updateStatus(selected.id, selected.status, tracking), 'Tracking details saved.')} />
         <details className="admin-order-section admin-order-disclosure"><summary>Payments, refunds & cancellation</summary><p className="admin-hint">Review payments, cancel an order or manage a refund. Open this only when you need to make a payment correction.</p>
           {financialLoading && <p role="status">Loading refund records…</p>}
           {selected.paymentMethod === 'cod' && <p className="admin-hint">For cash-on-delivery orders, record delivery, the cash collected and the money received from the courier separately. If you refund a customer yourself, record the transfer under “More order actions” after sending the money.</p>}

@@ -1,3 +1,5 @@
+import { useDraftState } from '../lib/useDraftState.js';
+import { DraftNotice } from '../components/DraftNotice.jsx';
 import { randomId } from '../../random-id.js';
 import { useState } from 'react';
 import { DataTable } from '../components/DataTable.jsx';
@@ -78,8 +80,8 @@ export default function InventoryPage() {
   const summary = data?.summary;
 
   // ---- adjust dialog --------------------------------------------------------
-  const [adjustRow, setAdjustRow] = useState(null);
-  const [form, setForm] = useState({ balance: '', lowStockLimit: '', reason: '' });
+  const [form, setForm, draft] = useDraftState('inventory', { balance: '', lowStockLimit: '', reason: '' }, { title: 'Stock adjustment' });
+  const [adjustRow, setAdjustRow] = useState(() => draft.context?.row ?? null);
   const [saving, setSaving] = useState(false);
 
   // ---- movement history -----------------------------------------------------
@@ -97,12 +99,12 @@ export default function InventoryPage() {
   );
 
   const openAdjust = (row) => {
-    setAdjustRow(row);
-    setForm({
+    const restored = draft.begin({
       balance: String(row.stockQuantity),
       lowStockLimit: String(row.lowStockLimit),
       reason: '',
-    });
+    }, { row, label: `${row.title || row.productTitle || row.productSlug} · ${row.packSize}` }, `${row.productSlug}:${row.packSize}`);
+    setAdjustRow(restored.context.row);
   };
 
   const submitAdjust = async (event) => {
@@ -138,6 +140,7 @@ export default function InventoryPage() {
           `Stock ${delta > 0 ? 'increased' : 'decreased'} by ${Math.abs(delta)} to ${movement.balance} — movement recorded.`,
         );
       }
+      draft.clear();
       setAdjustRow(null);
       await reload();
     } catch (failure) {
@@ -316,6 +319,7 @@ export default function InventoryPage() {
         }
       >
         <form id="admin-adjust-form" onSubmit={submitAdjust} noValidate>
+          <DraftNotice draft={draft} disabled={saving} onDiscard={() => setAdjustRow(null)} />
           <FormField
             label="Counted stock on hand"
             required

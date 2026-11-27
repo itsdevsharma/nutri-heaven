@@ -16,7 +16,7 @@ export function Sidebar({ ref, open, mobile, collapsed, onCollapse, onClose, onN
 
   const groups = NAV_GROUP_ORDER.map((group) => ({
     group,
-    items: navRoutes.filter((route) => route.group === group && can(role, route.capability)),
+    items: navRoutes.filter((route) => route.group === group && (!route.capability || can(role, route.capability))),
   })).filter((entry) => entry.items.length);
 
   const isActive = (route) =>

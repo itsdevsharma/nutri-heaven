@@ -1,3 +1,5 @@
+import { useDraftState } from '../lib/useDraftState.js';
+import { DraftNotice } from '../components/DraftNotice.jsx';
 import { useMemo, useState } from 'react';
 import { CheckboxField, FormField, FormGrid } from '../components/FormField.jsx';
 import { EmptyState, ErrorState, LoadingBlock } from '../components/Feedback.jsx';
@@ -53,8 +55,8 @@ export default function CategoriesPage() {
   const confirm = useConfirm();
 
   const { data, loading, error, reload } = useResource(() => adminApi.categories.list(), []);
-  const [editor, setEditor] = useState(null);
-  const [form, setForm] = useState(blankCategory);
+  const [form, setForm, draft] = useDraftState('categories', blankCategory, { title: 'Category' });
+  const [editor, setEditor] = useState(() => draft.context);
   const [saving, setSaving] = useState(false);
   const [busySlug, setBusySlug] = useState('');
   const [draggedSlug, setDraggedSlug] = useState('');
@@ -70,13 +72,12 @@ export default function CategoriesPage() {
   const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
   const openCreate = (parent = null) => {
-    setForm({ ...blankCategory(), parentId: parent ? String(parent._id) : '' });
-    setEditor({ mode: 'create', category: null });
+    const restored = draft.begin({ ...blankCategory(), parentId: parent ? String(parent._id) : '' }, { mode: 'create', category: null });
+    setEditor(restored.context);
   };
 
   const openEdit = (category) => {
-    setForm(fromCategory(category));
-    setEditor({ mode: 'edit', category });
+    setEditor(draft.begin(fromCategory(category), { mode: 'edit', category }, category.slug).context);
   };
 
   const closeEditor = () => {
@@ -111,6 +112,7 @@ export default function CategoriesPage() {
         await adminApi.categories.update(editor.category.slug, payload);
         toast.success(`Category “${payload.name}” saved.`);
       }
+      draft.clear();
       closeEditor();
       await reload();
     } catch (failure) {
@@ -301,6 +303,7 @@ export default function CategoriesPage() {
         }
       >
         <form id="admin-category-form" onSubmit={submit} noValidate>
+          <DraftNotice draft={draft} disabled={saving} onDiscard={closeEditor} onNew={() => setEditor(draft.startNew(blankCategory(), { mode: 'create', category: null }).context)} />
           <FormGrid>
             <FormField label="Name" required>
               <input

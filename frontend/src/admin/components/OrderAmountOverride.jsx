@@ -1,19 +1,20 @@
+import { useDraftState } from '../lib/useDraftState.js';
+import { DraftNotice } from './DraftNotice.jsx';
 import { useState } from 'react';
 import { randomId } from '../../random-id.js';
 import { FormField } from './FormField.jsx';
 import { formatPaise, formatDateTime } from '../lib/format.js';
 
 export default function OrderAmountOverride({ order, busy, save }) {
-  const [editing, setEditing] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [reason, setReason] = useState('');
+  const [work, setWork, draft] = useDraftState('order-amount', { amount: '', reason: '', originalTotal: order.totalPaise, requestKey: '' }, { title: `Order ${order.id} · amount adjustment`, record: order.id });
+  const { amount, reason, originalTotal, requestKey } = work;
+  const [editing, setEditing] = useState(Boolean(draft.savedAt));
   const [error, setError] = useState('');
-  const [originalTotal, setOriginalTotal] = useState(order.totalPaise);
-  const [requestKey, setRequestKey] = useState('');
+  const field = key => value => setWork(current => ({ ...current, [key]: value }));
+  const setAmount = field('amount'), setReason = field('reason'), setRequestKey = field('requestKey');
   const history = (order.activity ?? []).filter(event => event.action === 'override_amount');
   const start = () => {
-    setAmount((order.totalPaise / 100).toFixed(2)); setReason(''); setError('');
-    setOriginalTotal(order.totalPaise); setRequestKey(randomId()); setEditing(true);
+    draft.begin({ amount: (order.totalPaise / 100).toFixed(2), reason: '', originalTotal: order.totalPaise, requestKey: randomId() }, null, order.id); setError(''); setEditing(true);
   };
   const change = setter => event => { setter(event.target.value); setError(''); setRequestKey(randomId()); };
   const submit = async event => {
@@ -23,11 +24,12 @@ export default function OrderAmountOverride({ order, busy, save }) {
     if (!/^\d+(\.\d{1,2})?$/.test(amount) || !Number.isSafeInteger(totalPaise) || totalPaise < minimum) { setError(`Enter an amount of at least ${formatPaise(minimum)} with up to two decimal places.`); return; }
     if (totalPaise === originalTotal) { setError('Enter an amount different from the current total.'); return; }
     if (reason.trim().length < 3) { setError('Enter a reason with at least 3 characters.'); return; }
-    if (await save({ totalPaise, expectedTotalPaise: originalTotal, reason: reason.trim(), idempotencyKey: requestKey })) setEditing(false);
+    if (await save({ totalPaise, expectedTotalPaise: originalTotal, reason: reason.trim(), idempotencyKey: requestKey })) { draft.clear(); setEditing(false); }
   };
   return <section className="admin-order-section">
     <h3>Final order total</h3>
     {order.amountOverrideBlockedReason ? <p className="admin-hint">{order.amountOverrideBlockedReason}</p> : !editing ? <><p className="admin-hint">Change the final amount payable for this order. The adjustment and your reason are saved in its history.</p><button type="button" className="admin-btn admin-btn-ghost" disabled={busy} onClick={start}>Override final total</button></> : <form className="admin-stack admin-operation-form" onSubmit={submit}>
+      <DraftNotice draft={draft} disabled={busy} onDiscard={() => setEditing(false)} />
       {order.paymentMethod === 'razorpay' && <p className="admin-hint">Ask the customer to close any open payment window before saving. Their next “Complete payment” action will use the revised total. The old checkout remains tracked for payment review.</p>}
       <p>Current total: <strong>{formatPaise(order.totalPaise)}</strong></p>
       {originalTotal !== order.totalPaise && <p role="alert" className="admin-alert admin-alert-error">The amount changed while you were editing. Go back and reopen the form.</p>}

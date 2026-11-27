@@ -1,3 +1,5 @@
+import { useDraftState } from '../lib/useDraftState.js';
+import { DraftNotice } from './DraftNotice.jsx';
 import { useEffect, useState } from 'react';
 import { adminApi } from '../lib/api.js';
 import { useConfirm } from './ConfirmProvider.jsx';
@@ -7,19 +9,25 @@ export default function ShiprocketShipment({ order, onUpdate, onBusyChange }) {
   const [shipment, setShipment] = useState(null), [config, setConfig] = useState(null), [busy, setBusy] = useState(true), [error, setError] = useState('');
   const [checked, setChecked] = useState(false);
   const [retry, setRetry] = useState(0);
-  const [parcel, setParcel] = useState({}), [courierId, setCourierId] = useState(''), [providerId, setProviderId] = useState('');
-  useEffect(() => { let active = true; setBusy(true); setError(''); Promise.all([adminApi.shipping.get(order.id), adminApi.shipping.configuration()]).then(([record, settings]) => { if (active) { setShipment(record); setConfig(settings); setParcel(record?.parcel ?? (order.shippingQuote?.source !== 'store' ? order.shippingQuote?.parcel : null) ?? settings.defaults ?? {}); } }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setBusy(false); }); return () => { active = false; }; }, [order.id, retry]);
+  const [work, setWork, draft] = useDraftState('order-shipment', { parcel: {}, courierId: '', providerId: '' }, { title: `Order ${order.id} · courier booking`, record: order.id });
+  const lockedParcel = Boolean(order.shippingQuote && order.shippingQuote.source !== 'store');
+  const parcel = shipment?.parcel ?? (lockedParcel ? order.shippingQuote?.parcel ?? {} : work.parcel);
+  const { courierId, providerId } = work;
+  const setParcel = parcel => setWork(current => ({ ...current, parcel }));
+  const setCourierId = courierId => setWork(current => ({ ...current, courierId }));
+  const setProviderId = providerId => setWork(current => ({ ...current, providerId }));
+  useEffect(() => { let active = true; setBusy(true); setError(''); Promise.all([adminApi.shipping.get(order.id), adminApi.shipping.configuration()]).then(([record, settings]) => { if (active) { setShipment(record); setConfig(settings); draft.initialize({ parcel: record?.parcel ?? (order.shippingQuote?.source !== 'store' ? order.shippingQuote?.parcel : null) ?? settings.defaults ?? {}, courierId: '', providerId: '' }); } }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setBusy(false); }); return () => { active = false; }; }, [order.id, retry]);
   const run = async action => {
     if (action === 'cancel' && !await confirm({ title: 'Cancel Shiprocket shipment?', message: 'Request cancellation in Shiprocket. The store order can be cancelled after the provider confirms.', confirmLabel: 'Cancel shipment', tone: 'danger' })) return;
     if (busy) return;
     setBusy(true); onBusyChange?.(true); setError('');
-    try { const payload = ['create', 'verify-and-ship'].includes(action) ? Object.fromEntries(['weight', 'length', 'breadth', 'height'].map(key => [key, Number(parcel[key])])) : action === 'awb' && courierId ? { courierId: Number(courierId) } : action === 'reconcile' && providerId ? { providerOrderId: Number(providerId) } : {}; setShipment(await adminApi.shipping.action(order.id, action, payload)); onUpdate?.(); } catch (e) { setError(e.message); const current = await adminApi.shipping.get(order.id).catch(() => null); if (current) setShipment(current); onUpdate?.(); } finally { setBusy(false); onBusyChange?.(false); }
+    try { const payload = ['create', 'verify-and-ship'].includes(action) ? Object.fromEntries(['weight', 'length', 'breadth', 'height'].map(key => [key, Number(parcel[key])])) : action === 'awb' && courierId ? { courierId: Number(courierId) } : action === 'reconcile' && providerId ? { providerOrderId: Number(providerId) } : {}; setShipment(await adminApi.shipping.action(order.id, action, payload)); draft.clear(); setChecked(false); onUpdate?.(); } catch (e) { setError(e.message); const current = await adminApi.shipping.get(order.id).catch(() => null); if (current) setShipment(current); onUpdate?.(); } finally { setBusy(false); onBusyChange?.(false); }
   };
   const ready = ['unaccepted', 'accepted', 'picking', 'packed', 'ready_to_dispatch'].includes(order.operations?.fulfillment) && ['pending', 'confirmed', 'packed'].includes(order.status) && order.stockReserved && !order.paymentReconciliationRequired && (order.paymentMethod === 'cod' || order.paymentStatus === 'paid');
-  const lockedParcel = Boolean(order.shippingQuote && order.shippingQuote.source !== 'store');
   const blockedReason = !config?.configured ? 'Shiprocket is not connected yet. Use your own courier, or ask the store administrator to connect Shiprocket in Shipping settings.' : !config?.defaults ? 'A pickup address and default parcel measurements need to be saved in Shipping settings before booking.' : lockedParcel && ['weight', 'length', 'breadth', 'height'].some(key => !(Number(parcel[key]) >= (key === 'weight' ? 0.001 : 0.51))) ? 'The parcel measurements saved at checkout are incomplete. Ask the store administrator to review this order before booking.' : !ready ? 'This order is not ready for booking. Check its payment, stock reservation and order stage before continuing.' : '';
   if (busy && !config) return <div className="admin-shipping-panel"><p role="status">Checking courier availability…</p></div>;
   return <div className="admin-shipping-panel"><h4>Book a courier pickup</h4>
+    <DraftNotice draft={draft} disabled={busy} />
     {order.shippingReviewReason && <p className="admin-alert admin-alert-error" role="alert">{order.shippingReviewReason}</p>}
     {error && <p className="admin-alert admin-alert-error" role="alert">{error} <button className="admin-btn admin-btn-ghost" disabled={busy} onClick={() => setRetry(value => value + 1)}>Try again</button></p>}
     {blockedReason && (!shipment || shipment.providerCancelled) && <p className="admin-shipping-help">{blockedReason} <a href="/admin/shipping">Open Shipping settings →</a></p>}

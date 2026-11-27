@@ -1,5 +1,6 @@
 /** A single 20px stroke icon system; route IDs remain the navigation source. */
 const paths = {
+  drafts: 'M4 3h11l5 5v13H4z M14 3v6h6 M8 13h8 M8 17h5',
   dashboard: 'M3 3h6v7H3z M13 3h6v4h-6z M13 11h6v8h-6z M3 14h6v5H3z',
   engagement: 'M3 19h17 M6 15V9 M11 15V4 M16 15v-5',
   products: 'm3 6 8-4 8 4v12l-8 4-8-4z M3 6l8 4 8-4 M11 10v12',

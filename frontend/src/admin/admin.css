@@ -322,7 +322,10 @@
 .admin-pack legend { padding: 0 6px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .admin-pack-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); gap: 14px 12px; }
 .admin-pack-shipping { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-.admin-pack-shipping h3 { font-size: 13px; font-weight: 600; }
+.admin-pack-shipping summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.admin-pack-shipping summary small { display: block; margin: 4px 0 0 16px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.admin-pack-shipping summary:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
+.admin-pack-shipping[open] summary { margin-bottom: 12px; }
 .admin-pack-shipping > p { margin: 4px 0 12px; }
 .admin-pack-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .admin-pack-remove { margin-left: auto; color: var(--danger); }
@@ -821,4 +824,17 @@
 .admin-topbar .admin-install-app + .admin-topbar-meta { margin-left: 0; }
 @media (max-width: 600px) {
   .admin-topbar:has(.admin-install-app) { flex-wrap: wrap; }
+}
+
+/* Unfinished work shares the form's typography and action styles. */
+.admin-draft-notice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 0; border-block: 1px solid var(--line); }
+.admin-draft-notice p { margin: 0; font-size: 13px; }
+.admin-draft-notice small { color: var(--muted); font-size: 12px; }
+.admin-draft-notice a { font-size: 12px; text-decoration: underline; }
+.admin-draft-list { list-style: none; margin: 0; padding: 0; }
+.admin-draft-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.admin-draft-list li:last-child { border-bottom: 0; }
+.admin-draft-list li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .admin-draft-list li { flex-direction: column; align-items: flex-start; gap: 8px; }
 }

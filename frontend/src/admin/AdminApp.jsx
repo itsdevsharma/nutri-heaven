@@ -61,7 +61,7 @@ function Routed() {
   const Page = route.element;
   return (
     <AdminLayout route={route}>
-      <Page params={match.params} route={route} />
+      <Page key={path} params={match.params} route={route} />
     </AdminLayout>
   );
 }
