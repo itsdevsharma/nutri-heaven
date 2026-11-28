@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -140,6 +141,13 @@ export class ProductsController {
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.CATALOGUE_MANAGER)
   adminDuplicate(@Param('slug') slug: string) { return this.products.adminDuplicate(slug); }
+
+  @Delete('admin/:slug')
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.CATALOGUE_MANAGER)
+  adminDelete(@Param('slug') slug: string, @Req() req: AdminRequest) {
+    return this.products.adminDelete(slug, req.admin);
+  }
 
   @Patch('admin/:slug/deactivate')
   @UseGuards(AdminAuthGuard, RolesGuard)

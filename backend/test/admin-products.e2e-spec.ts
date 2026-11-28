@@ -124,6 +124,29 @@ describe('Admin catalogue reads (e2e)', () => {
       .expect(401);
   });
 
+  it('protects deletion and permanently removes an unreferenced product', async () => {
+    const model = app.get<Model<ProductDocument>>(getModelToken(Product.name));
+    await model.create({ slug: 'delete-me', title: 'Delete me', description: 'Test', image: 'nuts.jpg', category: 'Premium Nuts', pricePaise: 10000 });
+    await request(app.getHttpServer()).delete('/products/admin/delete-me').expect(401);
+    await request(app.getHttpServer()).delete('/products/admin/delete-me').set(auth('support')).expect(403);
+    await request(app.getHttpServer()).delete('/products/admin/delete-me').set(auth('catalogue_manager')).expect(200);
+    expect(await model.exists({ slug: 'delete-me' })).toBeNull();
+    await request(app.getHttpServer()).delete('/products/admin/delete-me').set(auth('catalogue_manager')).expect(404);
+    const audit = await model.db.collection('audit_events').findOne({ action: 'product.deleted', 'before.slug': 'delete-me' });
+    expect(audit?.actorEmail).toBe('catalogue@example.com');
+    // Deletion is also checked through the catalogue endpoint.
+    await request(app.getHttpServer()).get('/products/admin/delete-me').set(auth('catalogue_manager')).expect(404);
+  });
+
+  it('preserves products referenced by orders', async () => {
+    const model = app.get<Model<ProductDocument>>(getModelToken(Product.name));
+    const order = await model.db.collection('orders').insertOne({ lines: [{ productSlug: 'almonds' }] });
+    try {
+      await request(app.getHttpServer()).delete('/products/admin/almonds').set(auth('catalogue_manager')).expect(409);
+      expect(await model.exists({ slug: 'almonds' })).not.toBeNull();
+    } finally { await model.db.collection('orders').deleteOne({ _id: order.insertedId }); }
+  });
+
   it('rejects a wrong password', async () => {
     await request(app.getHttpServer())
       .post('/admin/auth/login')

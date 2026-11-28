@@ -169,6 +169,7 @@ export const adminApi = {
     list: (params = {}) => request(`/products/admin${toQuery(params)}`),
     get: (slug) => request(`/products/admin/${encodeURIComponent(slug)}`),
     create: (payload) => request('/products/admin', { method: 'POST', body: payload }),
+    delete: (slug) => request(`/products/admin/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
     update: (slug, payload) =>
       request(`/products/admin/${encodeURIComponent(slug)}`, { method: 'PATCH', body: payload }),
     duplicate: (slug) =>
@@ -239,9 +240,13 @@ export const adminApi = {
     update: (kind, id, payload) => request(`/admin/cms/${kind}/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
     remove: (kind, id) => request(`/admin/cms/${kind}/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     uploadImage: async (file) => {
+      if (file.size > 12 * 1024 * 1024) throw new ApiError('Choose an image no larger than 12 MB.', 413);
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new ApiError('Choose a JPEG, PNG, or WebP image.', 400);
       const token = sessionStore.token(); const form = new FormData(); form.append('image', file);
       const response = await fetch(`${API_URL}/admin/media/images`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form });
-      const payload = await response.json().catch(() => null); if (!response.ok) throw new ApiError(apiMessage(payload,response.status),response.status,payload); return payload;
+      const payload = await response.json().catch(() => null);
+      if (response.status === 413) throw new ApiError('The server rejected the image size. Try a smaller image or ask the administrator to enable uploads up to 12 MB.', 413, payload);
+      if (!response.ok) throw new ApiError(apiMessage(payload,response.status),response.status,payload); return payload;
     },
   },
   offers: { list: async () => {

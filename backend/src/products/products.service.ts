@@ -285,6 +285,18 @@ export class ProductsService {
     });
   }
 
+  async adminDelete(slug: string, actor?: AuditActor) {
+    const product = await this.products.findOne({ slug }).lean().exec();
+    if (!product) throw new NotFoundException(`No product found for slug "${slug}"`);
+    const order = await this.products.db.collection('orders').findOne(
+      { 'lines.productSlug': slug }, { projection: { _id: 1 } },
+    );
+    if (order) throw new ConflictException('This product is linked to an order and cannot be deleted. Archive it instead.');
+    await this.products.deleteOne({ _id: product._id }).exec();
+    await this.audit.record({ action: 'product.deleted', entityType: 'product', entityId: String(product._id), actorId: actor?.sub, actorEmail: actor?.email, correlationId: crypto.randomUUID(), before: product as unknown as Record<string, unknown> });
+    return { deleted: true, slug };
+  }
+
   async adminDeactivate(slug: string, actor?: AuditActor): Promise<Product> {
     const product = await this.products.findOneAndUpdate({ slug }, { $set: { isActive: false, status: 'inactive' } }, { new: true }).lean().exec();
     if (!product) throw new NotFoundException(`No product found for slug "${slug}"`);

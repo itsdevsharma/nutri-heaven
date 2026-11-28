@@ -135,6 +135,27 @@ export default function ProductsPage() {
     }
   };
 
+  const deleteProduct = async (product) => {
+    if (!await confirm({
+      title: `Delete "${product.title}"?`,
+      message: 'This permanently removes the product and cannot be undone. Products linked to orders must be archived instead.',
+      confirmLabel: 'Delete product',
+      tone: 'danger',
+    })) return;
+    setBusySlug(product.slug);
+    try {
+      await adminApi.products.delete(product.slug);
+      setSelected(current => current.filter(slug => slug !== product.slug));
+      toast.success(`"${product.title}" was deleted.`);
+      if (items.length === 1 && offset > 0) setOffset(Math.max(0, offset - PAGE_SIZE));
+      else await reload();
+    } catch (failure) {
+      toast.error(failure.message);
+    } finally {
+      setBusySlug('');
+    }
+  };
+
   const columns = [
     { key: 'select', header: <input type="checkbox" aria-label="Select page" checked={items.length > 0 && selected.length === items.length} onChange={(event) => selectPage(event.target.checked)} />, render: (product) => <input type="checkbox" aria-label={`Select ${product.title}`} checked={selected.includes(product.slug)} onChange={() => toggleSelected(product.slug)} /> },
     {
@@ -203,6 +224,9 @@ export default function ProductsPage() {
                 onClick={() => deactivate(product)}
               >
                 Deactivate
+              </button>
+              <button type="button" className="admin-btn admin-btn-small admin-btn-danger" disabled={Boolean(busySlug)} onClick={() => deleteProduct(product)}>
+                Delete
               </button>
               {product.status !== 'archived' ? <button type="button" className="admin-btn admin-btn-small admin-btn-quiet" disabled={busySlug === product.slug} onClick={() => adminApi.products.archive(product.slug).then(reload).catch((failure) => toast.error(failure.message))}>Archive</button> : <><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => adminApi.products.recover(product.slug, 'draft').then(reload).catch((failure) => toast.error(failure.message))}>Recover draft</button><button type="button" className="admin-btn admin-btn-small admin-btn-ghost" onClick={() => adminApi.products.recover(product.slug, 'inactive').then(reload).catch((failure) => toast.error(failure.message))}>Recover inactive</button></>}
             </>

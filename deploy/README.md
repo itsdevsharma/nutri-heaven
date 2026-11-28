@@ -21,6 +21,13 @@ existing Razorpay webhook route. Run `sudo nginx -t` before reloading Nginx.
 The separate `nginx-checkout.conf` is for legacy checkout API URLs; do not include
 it twice if those locations are already configured.
 
+Image uploads require the `client_max_body_size 13m` setting in `nginx-api.conf`
+(12 MiB file limit plus multipart overhead). When updating an existing deployment,
+copy the updated snippet again, run `sudo nginx -t`, then
+`sudo systemctl reload nginx`. Rebuilding the application alone does not update
+Nginx. If the API uses a separate hostname, apply this limit to that API's proxy
+location as well.
+
 Update the application
 ----------------------
 
