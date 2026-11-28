@@ -27,8 +27,9 @@ export class ShiprocketShipment {
   @Prop({ default: () => new Date() }) nextTrackAt!: Date;
   @Prop() lockToken?: string;
   @Prop() lockedUntil?: Date;
+  @Prop() submissionStartedAt?: Date;
   @Prop({ type: Object }) parcel?: { pickupLocation: string; weight: number; length: number; breadth: number; height: number };
-  @Prop({ type: Object }) tracking?: { status: string; updatedAt: string; activities: Array<{ date: string; activity: string; location: string }> };
+  @Prop({ type: Object }) tracking?: { status: string; updatedAt: string; eventAt?: string; activities: Array<{ date: string; activity: string; location: string }> };
 }
 export const ShiprocketShipmentSchema = SchemaFactory.createForClass(ShiprocketShipment);
 

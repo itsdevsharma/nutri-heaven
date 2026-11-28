@@ -53,6 +53,7 @@ export const storefrontApi = {
   quoteCoupon: (code, lines, email) => request('/coupons/quote', { method: 'POST', body: JSON.stringify({ code, lines, email }) }),
     placeOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload), headers: localStorage.getItem(CUSTOMER_TOKEN_KEY) ? { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_TOKEN_KEY)}` } : {} }),
   getOrder: (id) => request(`/orders/${encodeURIComponent(id)}`),
+  getCheckout: key => request(`/orders/checkout/${encodeURIComponent(key)}`),
   publicSettings: () => cachedPublic('/storefront/settings', 300_000),
   subscribe: payload => request('/newsletter/subscribe', { method: 'POST', body: JSON.stringify(payload) }),
   newsletterAction: (action, token) => request(`/newsletter/${action}`, { method: 'POST', body: JSON.stringify({ token }) }),
@@ -93,10 +94,11 @@ export const customerApi = {
   orderAction: (id, action, reason) => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({ reason }) }),
   downloadReceipt: async id => {
     const response = await fetch(`${API_URL}/customer/me/orders/${encodeURIComponent(id)}/receipt`, { headers: { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_TOKEN_KEY)}` } });
-    if (!response.ok) throw new Error('Could not download this receipt. Please sign in and try again.');
+    if (!response.ok) { const error = await response.json().catch(() => null); throw new Error(error?.message || 'Could not download this receipt. Please sign in and try again.'); }
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement('a'); link.href = url; link.download = `receipt-${id}.html`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
+  order: id => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}`),
   orders: () => customerRequest('/customer/me/orders'),
 };
 
@@ -106,4 +108,12 @@ export const paymentsApi = {
   status: id => request(`/payments/razorpay/orders/${encodeURIComponent(id)}`),
   verify: (id, payment) => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/verify`, { method: 'POST', body: JSON.stringify(payment) }),
   cancel: id => request(`/payments/razorpay/orders/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+};
+
+/** Account payments use customer authentication, including from a different device. */
+export const customerPaymentsApi = {
+  create: id => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/payment`, { method: 'POST' }),
+  status: id => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/payment`),
+  verify: (id, payment) => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/payment/verify`, { method: 'POST', body: JSON.stringify(payment) }),
+  cancel: id => customerRequest(`/customer/me/orders/${encodeURIComponent(id)}/payment/cancel`, { method: 'POST' }),
 };

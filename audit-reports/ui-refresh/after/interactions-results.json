@@ -1,0 +1,30 @@
+[
+  {
+    "route": "/admin/products",
+    "width": 1440,
+    "overflow": false,
+    "content": 648,
+    "errors": []
+  },
+  {
+    "route": "/admin/products",
+    "width": 768,
+    "overflow": false,
+    "content": 896,
+    "errors": []
+  },
+  {
+    "route": "/admin/products",
+    "width": 390,
+    "overflow": false,
+    "content": 896,
+    "errors": []
+  },
+  {
+    "route": "/admin/products",
+    "width": 320,
+    "overflow": false,
+    "content": 896,
+    "errors": []
+  }
+]

@@ -1,0 +1,125 @@
+Frontend build
+$ vite build
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 115 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                      3.79 kB │ gzip:   1.30 kB
+dist/assets/AdminApp-fyO8C7e1.css   11.83 kB │ gzip:   2.53 kB
+dist/assets/index-B0PFcHq0.css     220.84 kB │ gzip:  42.71 kB
+dist/assets/AdminApp-BfyUIuWj.js   235.79 kB │ gzip:  62.92 kB
+dist/assets/index-DIUMavpx.js      354.40 kB │ gzip: 105.11 kB
+
+✓ built in 572ms
+
+Frontend unit and SEO tests
+ok 39 - bounds storage and keeps working when browser storage is blocked
+  ---
+  duration_ms: 1.846479
+  type: 'test'
+  ...
+1..39
+# tests 39
+# suites 0
+# pass 39
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 318.562628
+
+Backend build
+$ nest build
+
+Backend tests
+PASS test/store-delivery.e2e-spec.ts
+PASS test/admin-users.e2e-spec.ts (8.305 s)
+PASS test/payments-contract.e2e-spec.ts
+PASS test/products.e2e-spec.ts
+PASS test/cms.e2e-spec.ts
+PASS test/security-config.e2e-spec.ts
+PASS test/mail.e2e-spec.ts
+PASS test/order-confirmation.e2e-spec.ts
+
+Test Suites: 20 passed, 20 total
+Tests:       203 passed, 203 total
+Snapshots:   0 total
+Time:        96.496 s
+Ran all test suites.
+
+Admin orders
+1440px passed: next step, saved tracking, unavailable courier, parcel inputs, single mocked booking, document links
+768px passed: next step, saved tracking, unavailable courier, parcel inputs, single mocked booking, document links
+390px passed: next step, saved tracking, unavailable courier, parcel inputs, single mocked booking, document links
+320px passed: next step, saved tracking, unavailable courier, parcel inputs, single mocked booking, document links
+
+Admin order amount
+1440px passed: edit, API error, retry, refreshed amount, adjustment and audit history
+768px passed: edit, API error, retry, refreshed amount, adjustment and audit history
+390px passed: edit, API error, retry, refreshed amount, adjustment and audit history
+320px passed: edit, API error, retry, refreshed amount, adjustment and audit history
+
+Admin pagination
+1440px passed: bounded server pages, search across pages, status filter, independent details, error retry, no overflow
+768px passed: bounded server pages, search across pages, status filter, independent details, error retry, no overflow
+390px passed: bounded server pages, search across pages, status filter, independent details, error retry, no overflow
+320px passed: bounded server pages, search across pages, status filter, independent details, error retry, no overflow
+
+Engagement
+1440px: pagination, sales filter, full CSV export, date validation, date reset, error retry and overflow checks passed
+768px: pagination, sales filter, full CSV export, date validation, date reset, error retry and overflow checks passed
+390px: pagination, sales filter, full CSV export, date validation, date reset, error retry and overflow checks passed
+320px: pagination, sales filter, full CSV export, date validation, date reset, error retry and overflow checks passed
+
+Customer payment
+1440px passed: unpaid online payment, COD/cancelled explanation, account authentication, dismissal and refresh recovery, no duplicate orders, existing bag preserved, refreshed confirmation
+768px passed: unpaid online payment, COD/cancelled explanation, account authentication, dismissal and refresh recovery, no duplicate orders, existing bag preserved, refreshed confirmation
+390px passed: unpaid online payment, COD/cancelled explanation, account authentication, dismissal and refresh recovery, no duplicate orders, existing bag preserved, refreshed confirmation
+320px passed: unpaid online payment, COD/cancelled explanation, account authentication, dismissal and refresh recovery, no duplicate orders, existing bag preserved, refreshed confirmation
+
+Customer tracking
+1440px: progress refresh, courier tracking, paid-only receipt, stale-data error, preserved profile and responsive layout passed
+768px: progress refresh, courier tracking, paid-only receipt, stale-data error, preserved profile and responsive layout passed
+390px: progress refresh, courier tracking, paid-only receipt, stale-data error, preserved profile and responsive layout passed
+320px: progress refresh, courier tracking, paid-only receipt, stale-data error, preserved profile and responsive layout passed
+
+Checkout recovery
+1440px passed: closed-tab response recovery, same order payment, no duplicate placement, durable reference cleanup
+768px passed: closed-tab response recovery, same order payment, no duplicate placement, durable reference cleanup
+390px passed: closed-tab response recovery, same order payment, no duplicate placement, durable reference cleanup
+
+Pending checkout
+1440px passed: logo returns home, saved order retained, return to bag, check status, dismiss and resume same payment
+768px passed: logo returns home, saved order retained, return to bag, check status, dismiss and resume same payment
+390px passed: logo returns home, saved order retained, return to bag, check status, dismiss and resume same payment
+
+Install
+1440px passed: login and toolbar install controls, admin manifest, instructions, native prompt handler, installed state, no overflow
+768px passed: login and toolbar install controls, admin manifest, instructions, native prompt handler, installed state, no overflow
+390px passed: login and toolbar install controls, admin manifest, instructions, native prompt handler, installed state, no overflow
+320px passed: login and toolbar install controls, admin manifest, instructions, native prompt handler, installed state, no overflow
+iPhone instructions passed
+
+Focused interactions
+4 route/viewport checks; 0 findings
+[]
+
+Final screenshots
+14 route/viewport checks; 0 findings
+[]
+
+Original screenshots
+14 route/viewport checks; 0 findings
+[]
+
+Final route audit
+128 route/viewport checks passed; zero page errors, empty renders or horizontal page overflows.
+32 route/viewport checks; 0 findings
+[]
+32 route/viewport checks; 0 findings
+[]
+32 route/viewport checks; 0 findings
+[]
+32 route/viewport checks; 0 findings
+[]

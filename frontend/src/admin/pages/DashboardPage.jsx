@@ -201,7 +201,7 @@ export default function DashboardPage() {
 
           <Card
             title="Your access"
-            description="The console mirrors the API's role rules for navigation only — the API is the enforcement boundary."
+            description="Review the modules available to your role and the access each team member needs."
           >
             <DataTable
               columns={[
@@ -232,9 +232,8 @@ export default function DashboardPage() {
           </Card>
 
           <p className="admin-footnote">
-            Figures cover the first {formatNumber(products.length)} catalogue entries returned by the API
-            {data?.[0]?.total > products.length ? ` of ${formatNumber(data[0].total)}` : ''} — enough for the
-            current catalogue size, and the reason pagination exists on the products screen.
+            Figures cover the first {formatNumber(products.length)} catalogue entries
+            {data?.[0]?.total > products.length ? ` of ${formatNumber(data[0].total)}` : ''}. Open Products to browse the full catalogue.
           </p>
         </>
       )}

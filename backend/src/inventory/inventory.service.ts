@@ -349,14 +349,24 @@ export class InventoryService {
         return result;
       } finally { await transaction.endSession(); }
     }
-    const applied = [];
+    // Reserve aggregates repeated packs; release must use the same quantity
+    // before applying its single movement key per pack (including older orders).
+    const grouped = new Map<string, { productSlug: string; packSize: string; quantity: number }>();
     for (const line of lines) {
+      if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) throw new BadRequestException('Quantity must be a positive whole number');
+      const productSlug = line.productSlug.trim().toLowerCase();
+      const key = `${productSlug}:${line.packSize}`;
+      const previous = grouped.get(key);
+      grouped.set(key, { productSlug, packSize: line.packSize, quantity: (previous?.quantity ?? 0) + line.quantity });
+    }
+    const applied = [];
+    for (const line of grouped.values()) {
       const slug = line.productSlug.trim().toLowerCase();
       applied.push(
         await this.apply({
           productSlug: slug,
           packSize: line.packSize,
-          delta: Math.abs(line.quantity),
+          delta: line.quantity,
           type: kind,
           reason:
             kind === 'return'

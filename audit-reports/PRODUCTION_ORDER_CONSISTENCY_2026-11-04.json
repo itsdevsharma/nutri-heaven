@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-11-04T08:36:35.323Z",
+  "mode": "read_only",
+  "crossCollectionSnapshot": false,
+  "counts": {
+    "orders": 12,
+    "variants": 24,
+    "reservations": 12,
+    "refunds": 0,
+    "redemptions": 0,
+    "shipments": 0
+  },
+  "findings": {
+    "reference_backfill_required": {
+      "severity": "review",
+      "count": 8,
+      "sampleRecordIds": [
+        "6ae8690df443a03f8793dae5",
+        "6ae977a44d094e61741d28d0",
+        "6ae979234d094e61741d2b5b",
+        "6ae97b124d094e61741d2ea7",
+        "6ae97bd3bc95937e8324ac1a",
+        "6ae97cffbc95937e8324ad77",
+        "6aeabd8889c24f4c65d4e5aa",
+        "6aeada6dbd4d22e83743f4a7"
+      ]
+    }
+  },
+  "indexes": [
+    {
+      "name": "unique_razorpay_order_reference",
+      "ready": false
+    },
+    {
+      "name": "unique_active_razorpay_order",
+      "ready": false
+    },
+    {
+      "name": "unique_razorpay_payment_reference",
+      "ready": false
+    },
+    {
+      "name": "order_page_created",
+      "ready": false
+    },
+    {
+      "name": "order_page_status",
+      "ready": false
+    },
+    {
+      "name": "order_page_payment",
+      "ready": false
+    }
+  ],
+  "indexPreflightReady": true,
+  "note": "Counts and opaque record IDs only. Concurrent writes can cause transient cross-collection findings; verify each record/provider/physical-stock fact before approved corrections. No provider calls or data writes performed."
+}

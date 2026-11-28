@@ -48,3 +48,16 @@ export function allowedOrderActions(order: Order, role: string): OrderAction[] {
   if (role === 'super_admin' && order.paymentMethod === 'cod' && order.paymentStatus === 'paid' && order.totalPaise > 0 && ['cancelled', 'returned'].includes(order.status) && !order.paymentReconciliationRequired && !order.refundedPaise && !order.refundReservedPaise) actions.push('record_cod_refund');
   return actions;
 }
+
+/** A provider or recorded payment must never retain a different amount. */
+export function amountOverrideBlockedReason(order: Order): string | null {
+  if (!['pending', 'confirmed', 'packed'].includes(order.status) || !order.stockReserved) return 'Amount changes are available only for active orders before dispatch.';
+  if (order.paymentStatus !== 'pending' && order.paymentStatus !== 'failed') return 'The payment has already been recorded. Use the refund workflow for corrections.';
+  if (order.paymentReconciliationRequired || order.refundReservedPaise || order.refundedPaise) return 'Resolve the payment or refund exception before changing the amount.';
+  if (order.razorpayPaymentId) return 'A payment has already been recorded. Check payment status before changing the amount.';
+  if (order.paymentCreationStartedAt && !order.razorpayOrderId) return 'Online checkout is being created. Check payment status and try again shortly.';
+  if ((order.paymentRevision ?? 0) >= 20) return 'This order has reached its amount change limit. Cancel it and place a new order.';
+  const op = operationsFor(order);
+  if (order.shiprocketBookingStarted || order.trackingNumber || op.shipment !== 'not_created' || op.dispatchedAt || op.codCollectedPaise || op.codSettledPaise) return 'Courier booking, dispatch or cash collection has already started.';
+  return null;
+}

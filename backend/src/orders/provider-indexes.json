@@ -1,0 +1,17 @@
+[
+  {
+    "key": { "razorpayOrderReferences": 1 },
+    "options": { "name": "unique_razorpay_order_reference", "unique": true, "partialFilterExpression": { "razorpayOrderReferences": { "$type": "string", "$gt": "" } } }
+  },
+  {
+    "key": { "razorpayOrderId": 1 },
+    "options": { "name": "unique_active_razorpay_order", "unique": true, "partialFilterExpression": { "razorpayOrderId": { "$type": "string", "$gt": "" } } }
+  },
+  {
+    "key": { "razorpayPaymentId": 1 },
+    "options": { "name": "unique_razorpay_payment_reference", "unique": true, "partialFilterExpression": { "razorpayPaymentId": { "$type": "string", "$gt": "" } } }
+  },
+  { "key": { "createdAt": -1, "_id": -1 }, "options": { "name": "order_page_created" } },
+  { "key": { "status": 1, "createdAt": -1, "_id": -1 }, "options": { "name": "order_page_status" } },
+  { "key": { "paymentStatus": 1, "createdAt": -1, "_id": -1 }, "options": { "name": "order_page_payment" } }
+]

@@ -9,9 +9,13 @@ export class CustomerNotification {
   @Prop() readAt?: Date;
   @Prop({ required: true, unique: true }) eventKey!: string;
   @Prop({ default: false }) emailRequested!: boolean;
+  @Prop({ enum: ['order_confirmation'] }) emailTemplate?: string;
+  @Prop() emailText?: string;
+  @Prop() emailHtml?: string;
   @Prop() sentAt?: Date;
   @Prop() retryAt?: Date;
   @Prop({ default: 0 }) attempts!: number;
+  @Prop({ default: 0 }) deliveryVersion!: number;
   @Prop() deliveryError?: string;
 }
 export const CustomerNotificationSchema = SchemaFactory.createForClass(CustomerNotification);

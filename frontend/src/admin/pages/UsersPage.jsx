@@ -1,3 +1,5 @@
+import { useDraftState } from '../lib/useDraftState.js';
+import { DraftNotice } from '../components/DraftNotice.jsx';
 import { useState } from 'react';
 import { PageHeader, Card, StatCard } from '../components/PageHeader.jsx';
 import { DataTable } from '../components/DataTable.jsx';
@@ -19,8 +21,8 @@ export default function UsersPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const { data, loading, error, reload } = useResource(() => adminApi.users.list(), []);
-  const [editor, setEditor] = useState(null);
-  const [form, setForm] = useState(blank);
+  const [form, setForm, draft] = useDraftState('users', blank, { title: 'Staff user' });
+  const [editor, setEditor] = useState(() => draft.context);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
   const [search, setSearch] = useState('');
@@ -31,10 +33,9 @@ export default function UsersPage() {
   const rows = users.filter((user) => `${user.name} ${user.email}`.toLowerCase().includes(search.trim().toLowerCase()) && (!roleFilter || user.role === roleFilter) && (!statusFilter || String(user.isActive) === statusFilter));
   const field = (key, value) => setForm((previous) => ({ ...previous, [key]: value }));
   const open = (user = null) => {
-    setForm(user ? { name: user.name, email: user.email, role: user.role, password: '' } : blank());
-    setEditor({ user });
+    setEditor(draft.begin(user ? { name: user.name, email: user.email, role: user.role, password: '' } : blank(), { user }, user?._id ?? 'new').context);
   };
-  const close = () => { if (!saving) { setEditor(null); setForm(blank()); } };
+  const close = () => { if (!saving) { setEditor(null); } };
   const submit = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -43,7 +44,8 @@ export default function UsersPage() {
       if (editor.user) await adminApi.users.update(editor.user._id, payload);
       else await adminApi.users.create(payload);
       toast.success(editor.user ? 'User updated.' : 'User created. They can now sign in to the admin panel.');
-      setEditor(null); setForm(blank());
+      draft.reset(blank());
+      setEditor(null);
       await reload();
     } catch (failure) { toast.error(failure.message); }
     finally { setSaving(false); }
@@ -79,6 +81,8 @@ export default function UsersPage() {
     </Card>
     <Modal open={Boolean(editor)} title={editor?.user ? 'Edit user' : 'Create user'} description="Assign a role that matches this person's responsibilities." onClose={close} footer={<><button className="admin-btn admin-btn-ghost" disabled={saving} onClick={close}>Cancel</button><button className="admin-btn admin-btn-primary" type="submit" form="admin-user-form" disabled={saving}>{saving ? 'Saving…' : editor?.user ? 'Save user' : 'Create user'}</button></>}>
       <form id="admin-user-form" onSubmit={submit}>
+        <DraftNotice draft={draft} disabled={saving} onDiscard={close} onNew={() => setEditor(draft.startNew(blank(), { user: null }).context)} />
+        <p className="admin-hint">Passwords are not saved in drafts. Re-enter the password when resuming.</p>
         <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0 }}><FormGrid>
           <FormField label="Name" required><input className="admin-input" required maxLength={120} value={form.name} onChange={(event) => field('name', event.target.value)} autoFocus /></FormField>
           <FormField label="Email" required><input className="admin-input" type="email" required maxLength={254} value={form.email} onChange={(event) => field('email', event.target.value)} autoComplete="off" /></FormField>

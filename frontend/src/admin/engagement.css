@@ -1,0 +1,64 @@
+/* Sales reporting uses the console palette with compact operational spacing. */
+.admin-engagement-page { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.admin-engagement-page .admin-card { border-radius: var(--radius-sm); box-shadow: none; }
+.admin-engagement-page .admin-card-head { padding: 16px 18px; align-items: center; }
+.admin-engagement-page .admin-card-body { padding: 16px 18px; }
+.engagement-period .admin-card-head { border-bottom: 0; padding-bottom: 0; }
+.engagement-date-form { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.engagement-date-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 600; }
+.engagement-date-form .admin-input { width: 170px; min-height: 38px; }
+.engagement-date-form .admin-btn { min-height: 38px; }
+.engagement-date-form .admin-btn-primary { background: var(--nav-bg); border-color: var(--nav-bg); color: var(--nav-ink); }
+.engagement-date-form .admin-btn-primary:hover { background: var(--green); }
+.engagement-period-summary { display: flex; gap: 8px 20px; flex-wrap: wrap; padding-top: 14px; margin-top: 16px; border-top: 1px solid var(--line); font-size: 12px; }
+.engagement-period-summary span { color: var(--muted); }
+.admin-engagement-page .engagement-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.engagement-metrics .admin-stat { border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 18px; }
+.engagement-metrics .admin-stat + .admin-stat { border-left: 1px solid var(--line); }
+.engagement-metrics .admin-stat::after { display: none; }
+.engagement-metrics .admin-stat-label { font-family: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; }
+.engagement-metrics .admin-stat-value { font-family: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
+.admin-engagement-page .engagement-revenue-note { margin-top: -10px; }
+.engagement-sales-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.engagement-sales-grid > .admin-card { min-width: 0; }
+.engagement-sales-grid .admin-card-head { flex-wrap: wrap; gap: 12px; }
+.engagement-sales-grid .admin-card-body { padding: 0; }
+.engagement-sales-grid .admin-table { min-width: 0; font-size: 14px; }
+.engagement-sales-grid .admin-table th { font-size: 12px; letter-spacing: .01em; }
+.engagement-sales-grid .admin-table td, .engagement-sales-grid .admin-table th { padding: 11px 16px; }
+.engagement-sales-grid .admin-table td:first-child { overflow-wrap: anywhere; }
+.engagement-sales-grid .admin-align-right { white-space: nowrap; }
+.engagement-table-tools { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.engagement-table-tools label { display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 24px; }
+.engagement-table-tools input { accent-color: var(--nav-bg); width: 16px; height: 16px; }
+.engagement-table-tools > span { color: var(--muted); }
+.engagement-sale-value { font-weight: 600; }
+.engagement-sales-grid .admin-pagination { padding: 12px 16px; margin: 0; gap: 10px; }
+.engagement-sales-grid .admin-pagination .admin-btn { padding: 6px 10px; }
+.engagement-empty { padding: 20px 16px; color: var(--muted); font-size: 13px; }
+@media (max-width: 1100px) { .engagement-sales-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) {
+  .admin-engagement-page .admin-card-head { flex-wrap: wrap; }
+  .admin-engagement-page .engagement-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .engagement-metrics .admin-stat { padding: 14px; }
+  .engagement-metrics .admin-stat:nth-child(3) { border-left: 0; }
+  .engagement-metrics .admin-stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .engagement-date-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 8px; }
+  .engagement-date-form .admin-input { width: 100%; min-width: 0; }
+  .engagement-date-form .admin-btn { padding-inline: 10px; }
+  .engagement-sales-grid .admin-table-wrap { margin: 0; padding: 0; }
+  .engagement-sales-grid .admin-table td, .engagement-sales-grid .admin-table th { padding: 10px; }
+  .engagement-period-summary { flex-direction: column; }
+}
+
+.admin-engagement-page .admin-toolbar { display: grid; grid-template-columns: auto minmax(140px, 1fr) minmax(130px, .6fr) auto; gap: 12px; }
+.admin-engagement-page .admin-toolbar .admin-input { min-width: 0; width: 100%; }
+.admin-engagement-page .admin-empty { padding: 24px 16px; gap: 6px; }
+.admin-engagement-page .admin-empty-icon { display: none; }
+@media (max-width: 800px) {
+  .admin-engagement-page .admin-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-engagement-page .admin-toolbar input[type="search"] { grid-column: 1 / -1; grid-row: 1; }
+}
+@media (max-width: 400px) {
+  .admin-engagement-page .admin-toolbar { grid-template-columns: minmax(0, 1fr); }
+}

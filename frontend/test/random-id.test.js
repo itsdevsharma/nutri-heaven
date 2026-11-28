@@ -25,6 +25,7 @@ test('a first-time HTTP visitor can fetch the catalogue and reuse the cart ID', 
   const storage = new Map();
   const requests = [];
   const context = vm.createContext({
+    API_URL: '/api',
     crypto: httpCrypto,
     URLSearchParams,
     localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
@@ -41,7 +42,7 @@ test('a first-time HTTP visitor can fetch the catalogue and reuse the cart ID', 
   vm.runInContext(`${helper}\n${api}`, context);
   const result = await vm.runInContext('storefrontApi.browse({ limit: 24 })', context);
   assert.equal(result.items[0].slug, 'almonds');
-  assert.equal(requests[0].url, '/products/browse?limit=24');
+  assert.equal(requests[0].url, '/api/products/browse?limit=24');
   const id = requests[0].options.headers['x-cart-id'];
   assert.match(id, /^[0-9a-f]{32}$/);
   assert.equal(storage.get('nutri_guest_cart_id'), id);

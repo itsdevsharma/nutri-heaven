@@ -1,7 +1,7 @@
 import { DEFAULT_SITE_URL, siteOrigin } from './site.js';
 export const getOrigin = () => siteOrigin(process.env.SITE_URL || process.env.VITE_SITE_URL || DEFAULT_SITE_URL);
 export async function apiGet(path) {
-  const origin = process.env.VITE_API_URL || process.env.API_URL;
+  const origin = process.env.API_URL || process.env.VITE_API_URL;
   if (!origin) throw new Error('Set VITE_API_URL to the public backend origin for SEO rendering');
   const response = await fetch(`${origin.replace(/\/$/, '')}${path}`, { signal: AbortSignal.timeout(8000) });
   if (!response.ok) {

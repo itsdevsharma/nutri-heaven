@@ -1,0 +1,10 @@
+[Unit]
+Description=Nutri Heaven HTTP and backup freshness checks
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/node /var/www/apps/nutri-heaven/deploy/monitor.mjs
+TimeoutStartSec=90
+NoNewPrivileges=true
+PrivateTmp=true

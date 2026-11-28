@@ -12,6 +12,7 @@ import { ShippingService } from '../src/shipping/shipping.service';
 import { CheckoutQuote } from '../src/checkout/checkout.schema';
 import { Coupon } from '../src/coupons/coupon.schema';
 import { Order } from '../src/orders/order.schema';
+import { OrderService } from '../src/orders/order.service';
 import { PaymentsService } from '../src/payments/payments.service';
 import { startMemoryReplica } from './helpers/memory-replica';
 
@@ -161,4 +162,27 @@ describe('Authoritative Shiprocket checkout', () => {
     expect(remote.orders.create).toHaveBeenCalledWith(expect.objectContaining({ receipt: order.id, amount: 72525, currency: 'INR' }));
     await products.updateOne({ slug: 'nuts' }, { $pull: { variants: { size: '500g' } } });
   });
+  it('validates the saved quote while charging an admin-adjusted amount', async () => {
+    const body = basket(); const shipping = await quote(body);
+    const order = (await request(app.getHttpServer()).post('/orders').send(payload(body, shipping)).expect(201)).body;
+    await app.get(OrderService).overrideAmount(order.id, { totalPaise: 24000, expectedTotalPaise: order.totalPaise, reason: 'Agreed final total', idempotencyKey: randomUUID() }, 'admin');
+    const started = await request(app.getHttpServer()).post(`/payments/razorpay/orders/${order.id}`).set('x-cart-id', body.cartId).expect(201);
+    expect(started.body.amount).toBe(24000);
+    expect(remote.orders.create).toHaveBeenLastCalledWith(expect.objectContaining({ amount: 24000 }));
+  });
+
+  it('resumes an existing provider order after its delivery quote expires without creating another payment', async () => {
+    const body = basket(); const shipping = await quote(body);
+    const order = (await request(app.getHttpServer()).post('/orders').send(payload(body, shipping)).expect(201)).body;
+    const start = () => request(app.getHttpServer()).post(`/payments/razorpay/orders/${order.id}`).set('x-cart-id', body.cartId);
+    const first = await start().expect(201);
+    const calls = remote.orders.create.mock.calls.length;
+    await app.get<Model<CheckoutQuote>>(getModelToken(CheckoutQuote.name)).updateOne({ id: shipping.id }, { $set: { expiresAt: new Date(0) } });
+    const resumed = await start().expect(201);
+    expect(resumed.body).toEqual(first.body);
+    expect(remote.orders.create).toHaveBeenCalledTimes(calls);
+    await app.get<Model<Order>>(getModelToken(Order.name)).updateOne({ id: order.id }, { $set: { status: 'cancelled', stockReserved: false } });
+    await start().expect(400);
+  });
+
 });

@@ -17,7 +17,9 @@ function positiveInteger(value: string | undefined, fallback: number): number {
 function limitFor(request: Request): { key: string; limit: number; windowMs: number } {
   const path = request.path;
   if (path === '/admin/auth/login') return { key: 'login', limit: positiveInteger(process.env.RATE_LIMIT_LOGIN_PER_15_MIN, 8), windowMs: 15 * 60_000 };
-  if (path.startsWith('/payments/razorpay')) return { key: 'payment', limit: positiveInteger(process.env.RATE_LIMIT_PAYMENT_PER_MIN, 30), windowMs: 60_000 };
+  // The storefront reads static availability on every navigation. It makes no
+  // provider calls and must not consume the payment-operation circuit breaker.
+  if (path.startsWith('/payments/razorpay') && path !== '/payments/razorpay/config') return { key: 'payment', limit: positiveInteger(process.env.RATE_LIMIT_PAYMENT_PER_MIN, 30), windowMs: 60_000 };
   if (!['GET', 'HEAD'].includes(request.method)) return { key: 'write', limit: positiveInteger(process.env.RATE_LIMIT_WRITE_PER_MIN, 90), windowMs: 60_000 };
   return { key: 'read', limit: positiveInteger(process.env.RATE_LIMIT_READ_PER_MIN, 300), windowMs: 60_000 };
 }
@@ -44,9 +46,9 @@ async function bootstrap(): Promise<void> {
   if (!existsSync(uploads)) mkdirSync(uploads, { recursive: true });
   // An empty host environment variable must not silently produce an empty
   // allow-list (which causes successful OPTIONS responses with no CORS header).
-  // Vite falls back to 5174 when 5173 is occupied during local development.
+  // Vite can fall back to 5174 or 5175 when earlier local ports are occupied.
   // Production deployments should still set CORS_ORIGINS explicitly.
-  const origins = (process.env.CORS_ORIGINS?.trim() || 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,https://nutri-heaven-mu.vercel.app')
+  const origins = (process.env.CORS_ORIGINS?.trim() || 'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175,https://nutri-heaven-mu.vercel.app')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -155,7 +157,9 @@ async function bootstrap(): Promise<void> {
   // Render and most managed hosts provide PORT; API_PORT remains useful for
   // local development and existing deployments.
   const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3000);
-  await app.listen(port);
+  // Nginx is the only public ingress on the Ubuntu host. Containers may opt in
+  // to 0.0.0.0 explicitly; never lose loopback isolation during a deployment.
+  await app.listen(port, process.env.API_HOST || (production ? '127.0.0.1' : '0.0.0.0'));
   Logger.log(JSON.stringify({ event: 'api_started', port, production, trustProxy, corsOrigins: origins.length, rateLimitEnabled }), 'Bootstrap');
 }
 

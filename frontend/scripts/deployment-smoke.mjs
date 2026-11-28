@@ -15,19 +15,58 @@ const checks = [
   [site, '/', 'text/html', body => /<title>/.test(body) && /\/assets\/index-/.test(body)],
   [site, '/shop', 'text/html', body => /canonical/.test(body)],
   [site, '/account', 'text/html', body => /noindex/.test(body)],
+  [site, '/checkout', 'text/html', body => /name="robots" content="noindex/.test(body)],
+  [site, '/admin/login', 'text/html', body => /name="robots" content="noindex/.test(body)],
   [site, '/sitemap.xml', 'xml', body => /<urlset/.test(body)],
   [site, '/robots.txt', 'text/plain', body => /Sitemap:/.test(body)],
 ];
 let failed = false;
+const checkedAssets = new Set();
+for (const [path, type, validate] of [
+  ['/manifest.webmanifest', /application\/manifest\+json/, body => { const manifest = JSON.parse(body); return manifest.display === 'standalone' && manifest.scope === '/' && manifest.icons.some(icon => icon.sizes === '512x512'); }],
+  ['/sw.js', /(?:application|text)\/javascript/, body => body.includes('nutri-app-offline-') && !body.includes('__APP_VERSION__')],
+  ['/offline.html', /text\/html/, body => body.includes('You’re offline') && body.includes('noindex')],
+]) {
+  try {
+    const response = await fetch(endpoint(site, path), { signal: AbortSignal.timeout(20000) });
+    if (!response.ok || !type.test(response.headers.get('content-type') || '') || !validate(await response.text())) throw new Error(`Invalid PWA resource: ${response.status}`);
+    if (!/no-cache|no-store|max-age=0/.test(response.headers.get('cache-control') || '')) throw new Error('PWA resource needs revalidation');
+    console.log(`PASS app resource ${path}`);
+  } catch (error) { failed = true; console.error(`FAIL app resource ${path}: ${error.message}`); }
+}
 for (const [origin, path, type, validate] of checks) {
   try {
     const response = await fetch(endpoint(origin, path), { signal: AbortSignal.timeout(20000) });
     const body = await response.text();
     if (new URL(response.url).protocol !== 'https:') throw new Error('Redirect downgraded HTTPS');
     if (!response.ok || !response.headers.get('content-type')?.includes(type) || !validate(body)) throw new Error(`Unexpected status/content: ${response.status}`);
+    if (origin === site && type === 'text/html') {
+      for (const header of ['content-security-policy', 'strict-transport-security', 'x-frame-options', 'x-content-type-options', 'referrer-policy']) {
+        if (!response.headers.get(header)) throw new Error(`Missing ${header}`);
+      }
+      const canonical = body.match(/rel="canonical" href="([^"]+)"/)?.[1];
+      if (canonical !== new URL(path, site).href) throw new Error('Incorrect initial canonical URL');
+      const assets = [...body.matchAll(/(?:src|href)="(\/assets\/[^"?#]+\.(?:js|css))"/g)].map(match => match[1]);
+      if (!assets.some(asset => asset.endsWith('.js')) || !assets.some(asset => asset.endsWith('.css'))) throw new Error('Missing built JS or CSS references');
+      for (const asset of assets) {
+        if (checkedAssets.has(asset)) continue;
+        const assetResponse = await fetch(endpoint(site, asset), { signal: AbortSignal.timeout(20000) });
+        const contentType = assetResponse.headers.get('content-type') || '';
+        const content = await assetResponse.text();
+        const validType = asset.endsWith('.css') ? /^text\/css\b/i.test(contentType) : /^(?:application|text)\/(?:javascript|ecmascript)\b/i.test(contentType);
+        if (!assetResponse.ok || !validType || /^\s*(?:<!doctype|<html)/i.test(content)) throw new Error(`Broken build asset ${asset}: ${assetResponse.status} ${contentType}`);
+        checkedAssets.add(asset);
+        console.log(`PASS asset ${asset}`);
+      }
+    }
     console.log(`PASS ${path}`);
   } catch (error) { failed = true; console.error(`FAIL ${path}: ${error.message}`); }
 }
+try {
+  const response = await fetch(endpoint(site, '/deployment-check-page-does-not-exist'), { signal: AbortSignal.timeout(20000) });
+  if (response.status !== 404 || !response.headers.get('x-robots-tag')?.includes('noindex')) throw new Error('Missing page must return HTTP 404 and noindex');
+  console.log('PASS missing page HTTP 404');
+} catch (error) { failed = true; console.error(`FAIL missing page: ${error.message}`); }
 // A JSON 401 proves the protected route reached NestJS without exposing data.
 for (const path of ['/inventory/admin', '/admin/settings', '/admin/offers', '/admin/coupons', '/admin/audit', '/admin/users', '/admin/engagement/report', '/admin/cms/faqs', '/admin/shipping/configuration']) {
   try {

@@ -9,8 +9,8 @@ export function DataTable({ columns, rows, rowKey, loading, empty, onRowClick, c
   if (!rows?.length) return empty ?? <EmptyState />;
 
   return (
-    <div className="admin-table-wrap">
-      <table className="admin-table">
+    <div className="admin-table-wrap" role="region" aria-label={caption || 'Data table'} tabIndex={0}>
+      <table className={`admin-table${columns.length > 7 ? ' admin-table-wide' : ''}`}>
         {caption ? <caption className="admin-visually-hidden">{caption}</caption> : null}
         <thead>
           <tr>
@@ -31,6 +31,8 @@ export function DataTable({ columns, rows, rowKey, loading, empty, onRowClick, c
             <tr
               key={rowKey ? rowKey(row) : index}
               className={onRowClick ? 'admin-row-clickable' : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={onRowClick ? event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onRowClick(row); } } : undefined}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >
               {columns.map((column) => (

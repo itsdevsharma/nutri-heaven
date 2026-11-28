@@ -1,18 +1,22 @@
+import { useDialog } from './useDialog.js';
 import { randomId } from './random-id.js';
 import { API_URL } from './api-origin.js';
 import { useDeliveryQuote } from './useDeliveryQuote.js';
 import StoreGallery from './store/StoreGallery.jsx';
 import OrderConfirmation from './OrderConfirmation.jsx';
+import PendingCheckout from './PendingCheckout.jsx';
 import { DEFAULT_FAQS } from './defaultFaqs.js';
-import { NewsletterForm, NewsletterAction } from './customer/Newsletter.jsx';
+import { NewsletterAction } from './customer/Newsletter.jsx';
 import Reviews from './customer/Reviews.jsx';
 import WishlistButton from './customer/WishlistButton.jsx';
 import Account from './customer/Account.jsx';
+import InstallApp from './InstallApp.jsx';
 import { openRazorpay, readPendingCheckout, savePendingCheckout } from './razorpay.js';
 import { updateSeo } from './seo.js';
+import { readCheckoutDraft, saveCheckoutDraft, clearCheckoutDraft } from './checkout-storage.js';
 import { initializeMetaPixel, trackMetaEvent, commerceData, trackProductView, trackPurchase } from './meta-pixel.js';
-import { useEffect, useMemo, useState } from 'react';
-import { cartApi, cartId, customerApi, storefrontApi, paymentsApi } from './cart-api.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { cartApi, cartId, customerApi, storefrontApi, paymentsApi, customerPaymentsApi } from './cart-api.js';
 
 const asset = '/assets/';
 const money = (paise = 0) => `₹${(paise / 100).toLocaleString('en-IN')}`;
@@ -65,12 +69,13 @@ function Footer({settings={}}) {
   const phone = settings.supportPhone || "90172-25722";
   const whatsapp = settings.whatsappNumber || phone;
   const address = settings.address || "258, Siwach complex Bishnoi colony near HAU gate no. 4 (sec-15) Hisar";
-  return <footer><div className="footer-top"><div className="footer-brand"><a className="footer-logo" href="/" aria-label="Nutri Heaven home"><img src="/assets/nutri-heaven-logo.jpeg" alt="" /><span>NUTRI HEAVEN</span></a><p>Thoughtfully selected dry fruits, nuts and seeds for better everyday rituals.</p><div className="footer-contact"><a href={"mailto:" + email}>{email}</a><a href={"tel:" + phone.replace(/[^0-9]/g,"")}>{phone}</a><a href={"https://wa.me/91" + whatsapp.replace(/[^0-9]/g,"")} target="_blank" rel="noreferrer">WhatsApp {whatsapp}</a><a href="https://www.instagram.com/_nutri_heaven?utm_source=qr&igsh=dmd6OXcybjdndndu" target="_blank" rel="noopener noreferrer">Instagram · @_nutri_heaven</a><address><a href="https://maps.app.goo.gl/3hVgaoeoAfFxbPyn7" target="_blank" rel="noopener noreferrer">{address}</a></address>{settings.businessHours&&<small>{settings.businessHours}</small>}</div></div><div className="footer-links"><div><b>Shop</b><a href="/shop">All products</a><a href="/shop">Dry fruits</a><a href="/shop">Nuts & seeds</a></div><div><b>Support</b><a href="/#faq">FAQs</a><a href="/shipping-policy">Shipping policy</a><a href="/return-policy">Returns</a><a href="/privacy-policy">Privacy</a><a href="/terms">Terms</a></div></div><div><b>A note from our pantry</b><p>Fresh arrivals, pantry notes, and member-only offers.</p><NewsletterForm /></div></div><div className="footer-trust"><span>✓ FSSAI Registered</span><span>✓ Secure checkout</span><span>✓ Delivery calculated at checkout</span></div><div className="footer-bottom"><span>© 2026 Nutri Heaven</span><a href="/NUTRI-HEAVEN-FSSAI-RC.pdf" target="_blank" rel="noreferrer">FSSAI certificate ↗</a></div></footer>; }
+  return <footer><div className="footer-top"><div className="footer-brand"><a className="footer-logo" href="/" aria-label="Nutri Heaven home"><img src="/assets/nutri-heaven-logo.jpeg" alt="" /><span>NUTRI HEAVEN</span></a><p>Thoughtfully selected dry fruits, nuts and seeds for better everyday rituals.</p><div className="footer-contact"><a href={"mailto:" + email}>{email}</a><a href={"tel:" + phone.replace(/[^0-9]/g,"")}>{phone}</a><a href={"https://wa.me/91" + whatsapp.replace(/[^0-9]/g,"")} target="_blank" rel="noreferrer">WhatsApp {whatsapp}</a><a href="https://www.instagram.com/_nutri_heaven?utm_source=qr&igsh=dmd6OXcybjdndndu" target="_blank" rel="noopener noreferrer">Instagram · @_nutri_heaven</a><address><a href="https://maps.app.goo.gl/3hVgaoeoAfFxbPyn7" target="_blank" rel="noopener noreferrer">{address}</a></address>{settings.businessHours&&<small>{settings.businessHours}</small>}</div></div><div className="footer-links"><div><b>Shop</b><a href="/shop">All products</a><a href="/shop">Dry fruits</a><a href="/shop">Nuts & seeds</a></div><div><b>Support</b><a href="/#faq">FAQs</a><a href="/shipping-policy">Shipping policy</a><a href="/return-policy">Returns</a><a href="/privacy-policy">Privacy</a><a href="/terms">Terms</a></div></div><div className="footer-support"><b>Need help with an order?</b><p>Contact us for help with orders, delivery, or returns. Include your order number if you have one.</p><a className="text-link" href={"mailto:" + email + "?subject=Nutri%20Heaven%20support"}>Email support <span aria-hidden="true">→</span></a><small>Opens your email app.</small><InstallApp /></div></div><div className="footer-trust"><span>✓ FSSAI Registered</span><span>✓ Secure checkout</span><span>✓ Delivery calculated at checkout</span></div><div className="footer-bottom"><span>© 2026 Nutri Heaven</span><a href="/NUTRI-HEAVEN-FSSAI-RC.pdf" target="_blank" rel="noreferrer">FSSAI certificate ↗</a></div></footer>; }
 
 
 function CartDrawer({ data, products = [], busy, add, change, close, checkout, openProduct }) {
+  const dialogRef = useDialog(true, close);
   const items = data?.items ?? [];
-  return <aside className="drawer" aria-label="Shopping bag"><div className="drawer-head"><div><span className="eyebrow">YOUR BAG · {items.reduce((sum,item)=>sum+item.quantity,0)} ITEMS</span><h3>Goodness in Every Bite.</h3></div><button className="icon-button" onClick={close} aria-label="Close bag">×</button></div>{!items.length ? <div className="empty"><h3>Your bag is empty</h3><button className="button dark" onClick={close}>Continue shopping</button></div> : <><div className="cart-lines">{items.map((item, index) => { const variants = products.find(product => product.slug === item.productId)?.variants?.filter(v => v.isActive && v.stockQuantity > 0) ?? []; const otherVariants = variants.filter(variant => !items.some(line => line.productId === item.productId && line.packSize === variant.size)); return <div className="cart-line" key={`${item.productId}:${item.packSize}`}><button className="cart-item-image" onClick={() => openProduct(item.productId)} aria-label={`View ${item.productName}`}><img src={image(item.image)} alt={item.productName} /><span className="cart-image-preview" aria-hidden="true"><img src={image(item.image)} alt="" /></span></button><div className="line-info"><button className="cart-product-name" onClick={() => openProduct(item.productId)}>{item.productName}</button><p className="cart-pack">Pack size: {item.packSize}</p>{otherVariants.length > 0 && <label className="cart-pack">Add another pack<select disabled={busy} value="" onChange={event => { if (event.target.value) add(item.productId, event.target.value); }}><option value="">Choose a size</option>{otherVariants.map(variant=><option key={variant.size} value={variant.size}>{variant.size} · {money(variant.pricePaise)}</option>)}</select></label>}<p>{money(item.unitPricePaise)} each</p><div className="quantity"><button disabled={busy || item.quantity <= 1} onClick={() => change(index, item.quantity - 1, item.packSize)} aria-label="Decrease quantity">−</button><span>{item.quantity}</span><button disabled={busy} onClick={() => change(index, item.quantity + 1, item.packSize)} aria-label="Increase quantity">+</button></div><b className="cart-line-total">{money(item.unitPricePaise * item.quantity)}</b></div><button className="remove" disabled={busy} onClick={() => change(index, 0, item.packSize)} aria-label={`Remove ${item.productName}`}>Remove</button></div>; })}</div><div className="cart-summary"><p><span>Subtotal</span><b>{money(data.subtotalPaise)}</b></p><p><span>Delivery</span><b>{data.shippingPending ? 'Calculated at checkout' : data.shippingPaise ? money(data.shippingPaise) : 'Free'}</b></p><p className="cart-total"><span>{data.shippingPending ? 'Items total' : 'Total'}</span><b>{money(data.shippingPending ? data.subtotalPaise : data.totalPaise)}</b></p><button className="checkout-button" onClick={checkout}>Proceed to checkout →</button><button className="continue-shopping" onClick={close}>Continue shopping</button></div></>}</aside>;
+  return <aside ref={dialogRef} className="drawer" role="dialog" aria-modal="true" tabIndex={-1} aria-label="Shopping bag"><div className="drawer-head"><div><span className="eyebrow">YOUR BAG · {items.reduce((sum,item)=>sum+item.quantity,0)} ITEMS</span><h3>Goodness in Every Bite.</h3></div><button className="icon-button" onClick={close} aria-label="Close bag">×</button></div>{!items.length ? <div className="empty"><h3>Your bag is empty</h3><button className="button dark" onClick={close}>Continue shopping</button></div> : <><div className="cart-lines">{items.map((item, index) => { const variants = products.find(product => product.slug === item.productId)?.variants?.filter(v => v.isActive && v.stockQuantity > 0) ?? []; const otherVariants = variants.filter(variant => !items.some(line => line.productId === item.productId && line.packSize === variant.size)); return <div className="cart-line" key={`${item.productId}:${item.packSize}`}><button className="cart-item-image" onClick={() => openProduct(item.productId)} aria-label={`View ${item.productName}`}><img src={image(item.image)} alt={item.productName} /><span className="cart-image-preview" aria-hidden="true"><img src={image(item.image)} alt="" /></span></button><div className="line-info"><button className="cart-product-name" onClick={() => openProduct(item.productId)}>{item.productName}</button><p className="cart-pack">Pack size: {item.packSize}</p>{otherVariants.length > 0 && <label className="cart-pack">Add another pack<select disabled={busy} value="" onChange={event => { if (event.target.value) add(item.productId, event.target.value); }}><option value="">Choose a size</option>{otherVariants.map(variant=><option key={variant.size} value={variant.size}>{variant.size} · {money(variant.pricePaise)}</option>)}</select></label>}<p>{money(item.unitPricePaise)} each</p><div className="quantity"><button disabled={busy || item.quantity <= 1} onClick={() => change(index, item.quantity - 1, item.packSize)} aria-label="Decrease quantity">−</button><span>{item.quantity}</span><button disabled={busy} onClick={() => change(index, item.quantity + 1, item.packSize)} aria-label="Increase quantity">+</button></div><b className="cart-line-total">{money(item.unitPricePaise * item.quantity)}</b></div><button className="remove" disabled={busy} onClick={() => change(index, 0, item.packSize)} aria-label={`Remove ${item.productName}`}>Remove</button></div>; })}</div><div className="cart-summary"><p><span>Subtotal</span><b>{money(data.subtotalPaise)}</b></p><p><span>Delivery</span><b>{data.shippingPending ? 'Calculated at checkout' : data.shippingPaise ? money(data.shippingPaise) : 'Free'}</b></p><p className="cart-total"><span>{data.shippingPending ? 'Items total' : 'Total'}</span><b>{money(data.shippingPending ? data.subtotalPaise : data.totalPaise)}</b></p><button className="checkout-button" onClick={checkout}>Proceed to checkout →</button><button className="continue-shopping" onClick={close}>Continue shopping</button></div></>}</aside>;
 }
 
 function ProductDescription({ children }) {
@@ -85,6 +90,7 @@ function ProductDescription({ children }) {
 }
 
 function ProductModal({ product, close, add, whatsappNumber = '90172-25722' }) {
+  const dialogRef = useDialog(Boolean(product), close);
   const [size,setSize] = useState(product?.variants?.find(v=>v.isActive)?.size ?? '');
   const [selectedImage, setSelectedImage] = useState(product?.image ?? '');
   useEffect(() => { setSize(product?.variants?.find(v=>v.isActive)?.size ?? ''); setSelectedImage(product?.image ?? ''); }, [product]);
@@ -96,7 +102,7 @@ function ProductModal({ product, close, add, whatsappNumber = '90172-25722' }) {
   const rawWhatsAppPhone = String(whatsappNumber).replace(/\D/g, '');
   const whatsAppPhone = rawWhatsAppPhone.length === 10 ? `91${rawWhatsAppPhone}` : rawWhatsAppPhone.replace(/^0/, '91');
   const whatsAppMessage = `Hello Nutri Heaven, I would like to order ${product.title}${selected ? ` (${selected.size})` : ''}, quantity 1, for ${money(selected?.pricePaise ?? product.pricePaise)}.`;
-  return <div className="product-modal-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget) close();}}><section className="product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title"><button className="product-modal-close" onClick={close} aria-label="Close product details">×</button><div className="product-modal-media"><img className="product-modal-image" src={image(selectedImage)} alt={product.title}/>{gallery.length>1&&<div className="product-gallery" aria-label="Product images">{gallery.map(photo=><button className={photo===selectedImage?'active':''} key={photo} onClick={()=>setSelectedImage(photo)} aria-label={`Show product image ${gallery.indexOf(photo)+1}`}><img src={image(photo)} alt="" /></button>)}</div>}</div><div className="product-modal-info"><WishlistButton slug={product.slug} /><p className="product-category">{product.category}{product.brand ? ` · ${product.brand}` : ''}</p><h2 id="product-modal-title">{product.title}</h2><ProductDescription>{product.fullDescription || product.description}</ProductDescription>{product.sku && <p className="product-meta"><b>SKU</b> {product.sku}</p>}{product.tags?.length>0&&<p className="product-meta"><b>Details</b> {product.tags.join(' · ')}</p>}<div className="product-purchase"><label className="pack-select">Pack size<select value={size} onChange={e=>setSize(e.target.value)}>{variants.map(v=><option key={v.size} value={v.size}>{v.size} · {money(v.pricePaise)} · {v.stockQuantity>0?`${v.stockQuantity} available`:'Out of stock'}</option>)}</select></label><div className="product-price-row"><div className="product-modal-price"><b>{money(selected?.pricePaise ?? product.pricePaise)}</b>{selected?.mrpPaise>selected?.pricePaise&&<s>{money(selected.mrpPaise)}</s>}</div><span className={selected?.stockQuantity > 0 ? 'product-stock' : 'product-stock sold-out'}>{selected?.stockQuantity > 0 ? `${selected.stockQuantity} in stock` : 'Out of stock'}</span></div><div className="product-modal-actions"><button className="checkout-button" disabled={!selected || selected.stockQuantity<1} onClick={()=>{add(product.slug,size);close();}}>Add to bag <span aria-hidden="true">→</span></button><a className="whatsapp-order" href={`https://wa.me/${whatsAppPhone}?text=${encodeURIComponent(whatsAppMessage)}`} target="_blank" rel="noreferrer">WhatsApp</a></div></div><div className="product-policy-links"><a href="/shipping-policy" onClick={close}>Shipping policy</a><a href="/return-policy" onClick={close}>Returns & refunds</a></div><Reviews slug={product.slug} /></div></section></div>;
+  return <div className="product-modal-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget) close();}}><section ref={dialogRef} tabIndex={-1} className="product-modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title"><button className="product-modal-close" onClick={close} aria-label="Close product details">×</button><div className="product-modal-media"><img className="product-modal-image" src={image(selectedImage)} alt={product.title}/>{gallery.length>1&&<div className="product-gallery" aria-label="Product images">{gallery.map(photo=><button className={photo===selectedImage?'active':''} key={photo} onClick={()=>setSelectedImage(photo)} aria-label={`Show product image ${gallery.indexOf(photo)+1}`}><img src={image(photo)} alt="" /></button>)}</div>}</div><div className="product-modal-info"><WishlistButton slug={product.slug} /><p className="product-category">{product.category}{product.brand ? ` · ${product.brand}` : ''}</p><h2 id="product-modal-title">{product.title}</h2><ProductDescription>{product.fullDescription || product.description}</ProductDescription>{product.sku && <p className="product-meta"><b>SKU</b> {product.sku}</p>}{product.tags?.length>0&&<p className="product-meta"><b>Details</b> {product.tags.join(' · ')}</p>}<div className="product-purchase"><label className="pack-select">Pack size<select value={size} onChange={e=>setSize(e.target.value)}>{variants.map(v=><option key={v.size} value={v.size}>{v.size} · {money(v.pricePaise)} · {v.stockQuantity>0?`${v.stockQuantity} available`:'Out of stock'}</option>)}</select></label><div className="product-price-row"><div className="product-modal-price"><b>{money(selected?.pricePaise ?? product.pricePaise)}</b>{selected?.mrpPaise>selected?.pricePaise&&<s>{money(selected.mrpPaise)}</s>}</div><span className={selected?.stockQuantity > 0 ? 'product-stock' : 'product-stock sold-out'}>{selected?.stockQuantity > 0 ? `${selected.stockQuantity} in stock` : 'Out of stock'}</span></div><div className="product-modal-actions"><button className="checkout-button" disabled={!selected || selected.stockQuantity<1} onClick={()=>{add(product.slug,size);close();}}>Add to bag <span aria-hidden="true">→</span></button><a className="whatsapp-order" href={`https://wa.me/${whatsAppPhone}?text=${encodeURIComponent(whatsAppMessage)}`} target="_blank" rel="noreferrer">WhatsApp</a></div></div><div className="product-policy-links"><a href="/shipping-policy" onClick={close}>Shipping policy</a><a href="/return-policy" onClick={close}>Returns & refunds</a></div><Reviews slug={product.slug} /></div></section></div>;
 }
 
 function RelatedProducts({ category, products, add }) {
@@ -291,7 +297,8 @@ function Home({ products, loading, add, open, settings, cms, categories }) {
 }
 
 function Checkout({ cart, busy, error, back, submit, paymentConfig }) {
-  const [form, setForm] = useState({ name:'', email:'', phone:'', address:'', landmark:'', city:'', state:'', pin:'', couponCode:'', acceptedTerms:false, paymentMethod:'cod' });
+  const [form, setForm] = useState(() => readCheckoutDraft(cartId()));
+  useEffect(() => { saveCheckoutDraft(cartId(), form); }, [form]);
   const [deliveryConfig, setDeliveryConfig] = useState(null), [courierId, setCourierId] = useState(''), [configError, setConfigError] = useState('');
   useEffect(() => { let active = true; storefrontApi.checkoutConfig().then(config => { if (active) setDeliveryConfig(config); }).catch(() => { if (active) setConfigError('Delivery settings could not be loaded. Please refresh checkout.'); }); return () => { active = false; }; }, []);
   const [couponQuote, setCouponQuote] = useState(null), [couponError, setCouponError] = useState(''), [couponBusy, setCouponBusy] = useState(false);
@@ -307,7 +314,16 @@ function Checkout({ cart, busy, error, back, submit, paymentConfig }) {
   useEffect(() => {
     if (!customerApi.token()) return;
     let active = true;
-    customerApi.me().then(me => { if (!active) return; setSavedCustomer(me); setForm(current => ({ ...current, email: me.email, name: me.name, phone: me.phone ?? '' })); useAddress(me.addresses.find(address => address.isDefault)); }).catch(() => {});
+    customerApi.me().then(me => {
+      if (!active) return;
+      setSavedCustomer(me);
+      setForm(current => {
+        // A delayed account fetch must not overwrite restored or newly typed details.
+        if (current.name || current.email || current.address) return current;
+        const address = me.addresses.find(item => item.isDefault);
+        return { ...current, email: me.email, name: address?.name || me.name, phone: address?.phone || me.phone || '', ...(address ? { address: address.street, landmark: address.landmark || '', city: address.city, state: address.state, pin: address.pin } : {}) };
+      });
+    }).catch(() => {});
     return () => { active = false; };
   }, []);
   const [validationError, setValidationError] = useState('');
@@ -346,8 +362,9 @@ function Checkout({ cart, busy, error, back, submit, paymentConfig }) {
 
 
 export default function App() {
-  const [products,setProducts] = useState([]), [cart,setCart] = useState(null), [drawer,setDrawer] = useState(false), [screen,setScreen] = useState(() => location.pathname === '/checkout' || readPendingCheckout() ? 'checkout' : 'shop'), [order,setOrder] = useState(null), [detail,setDetail] = useState(null), [loading,setLoading] = useState(true), [busy,setBusy] = useState(false), [error,setError] = useState(''), [selectedProduct,setSelectedProduct] = useState(null), [productLoading,setProductLoading] = useState(() => /^\/products\//.test(location.pathname)), [storeSettings,setStoreSettings] = useState({}), [cms,setCms] = useState({}), [categories,setCategories] = useState([]);
+  const [products,setProducts] = useState([]), [cart,setCart] = useState(null), [drawer,setDrawer] = useState(false), [screen,setScreen] = useState(() => location.pathname === '/checkout' ? 'checkout' : 'shop'), [order,setOrder] = useState(null), [detail,setDetail] = useState(null), [loading,setLoading] = useState(true), [busy,setBusy] = useState(false), [error,setError] = useState(''), [selectedProduct,setSelectedProduct] = useState(null), [productLoading,setProductLoading] = useState(() => /^\/products\//.test(location.pathname)), [storeSettings,setStoreSettings] = useState({}), [cms,setCms] = useState({}), [categories,setCategories] = useState([]);
   const [pendingPayment,setPendingPayment] = useState(readPendingCheckout), [paymentConfig,setPaymentConfig] = useState({enabled:false,loading:true});
+  const checkoutSubmitting = useRef(false);
   const persistPayment = value => { savePendingCheckout(value); setPendingPayment(value); };
   const enterCheckout = () => {
     if (location.pathname !== '/checkout') history.pushState(null, '', '/checkout');
@@ -369,6 +386,18 @@ export default function App() {
     return () => window.removeEventListener('popstate', navigate);
   }, []);
   useEffect(() => { paymentsApi.config().then(config=>setPaymentConfig({...config,loading:false})).catch(()=>setPaymentConfig({enabled:false,loading:false})); }, []);
+  useEffect(() => {
+    const match = location.pathname.match(/^\/order-confirmation\/([^/]+)$/);
+    if (!match) return;
+    let active = true;
+    const getOrder = new URLSearchParams(location.search).get('source') === 'account' ? customerApi.order : storefrontApi.getOrder;
+    getOrder(decodeURIComponent(match[1])).then(result => {
+      if (!active) return;
+      if (result.status === 'cancelled' || (result.paymentMethod !== 'cod' && (result.paymentStatus !== 'paid' || result.paymentReconciliationRequired))) throw new Error('This order is not confirmed. Check its status in your account or contact support.');
+      setOrder(result); setScreen('confirmed');
+    }).catch(error => { if (active) setError(error.message); });
+    return () => { active = false; };
+  }, []);
   const loadCart = async () => { const next = await cartApi.get(); setCart(next); return next; };
   useEffect(() => {
     const loadCatalogue = () => storefrontApi.listProducts().then(setProducts).catch(e => setError(e.message)).finally(() => setLoading(false));
@@ -399,71 +428,96 @@ export default function App() {
     const line = next.items.find(item => item.productId === slug && item.packSize === size);
     if (line) trackMetaEvent('AddToCart', commerceData([{ ...line, quantity: 1 }], line.unitPricePaise)); } catch(e) { setError(e.message); } finally { setBusy(false); } };
   const change = async (index,quantity,packSize) => { setBusy(true); try { setCart(quantity ? await cartApi.update(index,{quantity, ...(packSize ? {packSize} : {})}) : await cartApi.remove(index)); } catch(e) { setError(e.message); } finally { setBusy(false); } };
-  const completeCheckout = async result => {
-    history.replaceState(null, '', '/shop');
+  const completeCheckout = async (result, clearCart = true) => {
+    history.replaceState(null, '', '/order-confirmation/' + encodeURIComponent(result.id) + (clearCart ? '' : '?source=account'));
+    if (clearCart) clearCheckoutDraft();
     setOrder(result); setScreen('confirmed'); persistPayment(null);
+    if (!clearCart) return;
     // A cart cleanup failure must never turn a paid order into a failed checkout.
     try { await cartApi.clear(); await loadCart(); } catch { setError('Your order is confirmed. Refresh your shopping bag before starting another order.'); }
   };
-  const confirmedPayment = result => result.paymentStatus==='paid' && result.status==='confirmed' && !result.paymentReconciliationRequired;
+  const confirmedPayment = result => result.paymentStatus==='paid' && ['confirmed', 'packed', 'shipped', 'out_for_delivery', 'delivered'].includes(result.status) && !result.paymentReconciliationRequired;
   const resumePayment = async (checkOnly = false, attempt = pendingPayment) => {
     setBusy(true); setError('');
     try {
-      if (!attempt || attempt.cartId !== cartId()) throw new Error('This checkout belongs to another shopping session.');
+      if (!attempt || (attempt.source !== 'account' && attempt.cartId !== cartId())) throw new Error('This checkout belongs to another shopping session.');
+      const paymentApi = attempt.source === 'account' ? customerPaymentsApi : paymentsApi;
       let currentOrder;
       if (!attempt.orderId) {
-        currentOrder = await storefrontApi.placeOrder(attempt.payload);
+        currentOrder = attempt.payload ? await storefrontApi.placeOrder(attempt.payload) : await storefrontApi.getCheckout(attempt.checkoutKey);
         attempt = {cartId:attempt.cartId, orderId:currentOrder.id, paymentMethod:currentOrder.paymentMethod};
         persistPayment(attempt);
       }
-      if (attempt.paymentMethod==='cod') { await completeCheckout(currentOrder || await storefrontApi.getOrder(attempt.orderId)); return; }
+      if (attempt.paymentMethod==='cod') {
+        const saved = currentOrder || await storefrontApi.getOrder(attempt.orderId);
+        if (saved.status === 'cancelled') { persistPayment(null); setError('This order was cancelled. You can start a new checkout.'); return; }
+        if (saved.paymentReconciliationRequired || ['return_requested', 'returned', 'refunded'].includes(saved.status)) throw new Error('This order needs support review. Please contact us with order #' + saved.id + '.');
+        await completeCheckout(saved); return;
+      }
       currentOrder = attempt.paymentResponse
-        ? await paymentsApi.verify(attempt.orderId, attempt.paymentResponse)
-        : await paymentsApi.status(attempt.orderId);
+        ? await paymentApi.verify(attempt.orderId, attempt.paymentResponse)
+        : await paymentApi.status(attempt.orderId);
       setOrder(currentOrder);
-      if (confirmedPayment(currentOrder)) { await completeCheckout(currentOrder); return; }
+      if (confirmedPayment(currentOrder)) { await completeCheckout(currentOrder, attempt.source !== 'account'); return; }
       if (currentOrder.paymentStatus==='paid' || currentOrder.paymentStatus==='refunded') throw new Error('This payment needs support review. Please contact us with order #'+currentOrder.id+' before paying again.');
       if (currentOrder.status==='cancelled') { persistPayment(null); setError('This order was cancelled. You can start a new checkout.'); return; }
       if (checkOnly) { setError('Payment is not confirmed yet. If you already paid, check again shortly before retrying.'); return; }
-      const payment = await paymentsApi.create(currentOrder.id);
+      const payment = await paymentApi.create(currentOrder.id);
       const paymentResponse = await openRazorpay(payment,currentOrder,setError);
       // Save the signed response before verification so refresh/network failures are recoverable.
       attempt = {...attempt,paymentResponse}; persistPayment(attempt);
-      const verified = await paymentsApi.verify(currentOrder.id,paymentResponse);
+      const verified = await paymentApi.verify(currentOrder.id,paymentResponse);
       if (!confirmedPayment(verified)) throw new Error('Payment received but your order needs support review. Please contact us with order #'+currentOrder.id+'.');
-      await completeCheckout(verified);
-    } catch(e) { if (!attempt?.orderId && [400,403,404,409,422].includes(e.status)) persistPayment(null); setError(e.message); } finally { setBusy(false); }
+      await completeCheckout(verified, attempt.source !== 'account');
+    } catch(e) { if (!attempt?.orderId && attempt?.payload && [400,403,404,409,422].includes(e.status)) persistPayment(null); setError(e.message); } finally { setBusy(false); }
   };
   const cancelPayment = async () => {
     setBusy(true);setError('');
     try {
       let attempt = pendingPayment;
+      const paymentApi = attempt.source === 'account' ? customerPaymentsApi : paymentsApi;
       if (!attempt.orderId) {
-        const created = await storefrontApi.placeOrder(attempt.payload);
+        const created = attempt.payload ? await storefrontApi.placeOrder(attempt.payload) : await storefrontApi.getCheckout(attempt.checkoutKey);
         attempt = {...attempt,orderId:created.id};persistPayment(attempt);
       }
       if (attempt.paymentMethod==='cod' || attempt.payload?.paymentMethod==='cod') throw new Error('A COD order was already submitted. Resume to view its confirmation.');
       if (attempt.paymentResponse) {
-        const verified = await paymentsApi.verify(attempt.orderId,attempt.paymentResponse);
-        if (confirmedPayment(verified)) { await completeCheckout(verified);return; }
+        const verified = await paymentApi.verify(attempt.orderId,attempt.paymentResponse);
+        if (confirmedPayment(verified)) { await completeCheckout(verified, attempt.source !== 'account');return; }
       }
-      await paymentsApi.cancel(attempt.orderId);
+      await paymentApi.cancel(attempt.orderId);
       persistPayment(null);setOrder(null);await loadCart();
     } catch(e) {setError(e.message);} finally {setBusy(false);}
   };
   const submit = async form => {
+    if (checkoutSubmitting.current) return;
+    checkoutSubmitting.current = true;
     setBusy(true);setError('');
     try {
-      if (form.paymentMethod==='razorpay' && !paymentConfig.enabled) throw new Error('Online payments are currently unavailable.');
-      const current = await loadCart();
-      const attempt = {cartId:cartId(),paymentMethod:form.paymentMethod,payload:{cartId:cartId(),idempotencyKey:randomId(),customerName:form.name,customerEmail:form.email,customerPhone:form.phone.replace(/\D/g,''),deliveryAddress:{street:form.address,landmark:form.landmark,city:form.city,state:form.state,pin:form.pin},lines:current.items.map(i=>({productSlug:i.productId,packSize:i.packSize,quantity:i.quantity})),couponCode:form.couponCode||undefined,shippingQuoteId:form.shippingQuoteId,courierId:form.courierId,paymentMethod:form.paymentMethod}};
-      persistPayment(attempt);
-      await resumePayment(false,attempt);
-    } catch(e) {setError(e.message);setBusy(false);}
+      const place = async () => {
+        const saved = readPendingCheckout();
+        if (saved) { persistPayment(saved); await resumePayment(false, saved); return; }
+        if (form.paymentMethod==='razorpay' && !paymentConfig.enabled) throw new Error('Online payments are currently unavailable.');
+        const current = await loadCart();
+        const attempt = {cartId:cartId(),paymentMethod:form.paymentMethod,payload:{cartId:cartId(),idempotencyKey:randomId(),customerName:form.name,customerEmail:form.email,customerPhone:form.phone.replace(/\D/g,''),deliveryAddress:{street:form.address,landmark:form.landmark,city:form.city,state:form.state,pin:form.pin},lines:current.items.map(i=>({productSlug:i.productId,packSize:i.packSize,quantity:i.quantity})),couponCode:form.couponCode||undefined,shippingQuoteId:form.shippingQuoteId,courierId:form.courierId,paymentMethod:form.paymentMethod}};
+        persistPayment(attempt);
+        await resumePayment(false,attempt);
+      };
+      // Serialize cooperating tabs as well as same-frame double submissions.
+      if (globalThis.navigator?.locks) await navigator.locks.request('nutri-checkout-' + cartId(), place);
+      else await place();
+    } catch(e) {setError(e.message);setBusy(false);} finally { checkoutSubmitting.current = false; }
   };
-  if (screen === 'checkout') return <>{pendingPayment ? <main className="checkout-page"><section className="account-card"><h1>Complete your order</h1><p>{pendingPayment.orderId?'Order #'+pendingPayment.orderId:'Your checkout has been saved.'}</p>{order&&<p>Order total: {money(order.totalPaise)}</p>}<p>Resume this order to avoid creating a second order. If you already paid, check payment status first. Unpaid stock reservations expire after 30 minutes.</p>{error&&<p role="alert">{error}</p>}<button className="checkout-button" disabled={busy} onClick={()=>resumePayment(false)}>{busy?'Processing…':'Resume checkout'}</button><button className="back-button" disabled={busy} onClick={()=>resumePayment(true)}>Check payment status</button><button className="back-button" disabled={busy} onClick={cancelPayment}>Cancel unpaid order</button></section></main> : <Checkout cart={cart} busy={busy} error={error} back={returnToBag} submit={submit} paymentConfig={paymentConfig} />}<Footer settings={storeSettings} /></>;
+  const payAccountOrder = async selectedOrder => {
+    const attempt = pendingPayment?.source === 'account' && pendingPayment.orderId === selectedOrder.id
+      ? pendingPayment : { source: 'account', orderId: selectedOrder.id, paymentMethod: 'razorpay' };
+    persistPayment(attempt); setOrder(selectedOrder); enterCheckout();
+    await resumePayment(false, attempt);
+  };
+  if (screen === 'checkout') return <>{pendingPayment ? <PendingCheckout pendingPayment={pendingPayment} order={order} busy={busy} error={error} resume={resumePayment} cancel={cancelPayment} back={returnToBag} /> : <Checkout cart={cart} busy={busy} error={error} back={returnToBag} submit={submit} paymentConfig={paymentConfig} />}<Footer settings={storeSettings} /></>;
   if (screen === 'confirmed' && order) return <><OrderConfirmation order={order} products={products} settings={storeSettings} />{error&&<p role="status">{error}</p>}<Footer settings={storeSettings} /></>;
-  if (location.pathname === '/account') return <><Header count={count} cart={() => setDrawer(true)} />{new URLSearchParams(location.search).has('newsletter') ? <NewsletterAction /> : <Account />}<Footer settings={storeSettings} />{drawer && <><button className="scrim" onClick={() => setDrawer(false)} aria-label="Close cart" /><CartDrawer data={cart} products={products} busy={busy} add={add} change={change} close={() => setDrawer(false)} checkout={enterCheckout} openProduct={slug=>{setSelectedProduct(products.find(p=>p.slug===slug));setDrawer(false);}} /></>}</>;
+  if (location.pathname.startsWith('/order-confirmation/')) return <><Header count={count} cart={() => setDrawer(true)} /><main className="policy-page"><h1>Order confirmation</h1>{error ? <><p role="alert">{error}</p><a href="/account">View your orders</a></> : <p role="status">Loading your order…</p>}</main><Footer settings={storeSettings} /></>;
+  if (location.pathname === '/account') return <><Header count={count} cart={() => setDrawer(true)} />{new URLSearchParams(location.search).has('newsletter') ? <NewsletterAction /> : <Account onPayOrder={payAccountOrder} />}<Footer settings={storeSettings} />{drawer && <><button className="scrim" onClick={() => setDrawer(false)} aria-label="Close cart" /><CartDrawer data={cart} products={products} busy={busy} add={add} change={change} close={() => setDrawer(false)} checkout={enterCheckout} openProduct={slug=>{setSelectedProduct(products.find(p=>p.slug===slug));setDrawer(false);}} /></>}</>;
   const policyRoutes = { '/shipping-policy':['Shipping policy','shippingPolicy'], '/return-policy':['Returns and refunds','returnPolicy'], '/privacy-policy':['Privacy policy','privacyPolicy'], '/terms':['Terms and conditions','terms'] };
   if (policyRoutes[location.pathname]) { const [title,key]=policyRoutes[location.pathname]; return <><Header count={count} cart={() => setDrawer(true)} /><main className="policy-page"><p className="eyebrow">NUTRI HEAVEN · CUSTOMER CARE</p><h1>{title}</h1><div>{storeSettings.content?.[key] || 'This information is being updated. Please contact nutriheavenhsr@gmail.com for assistance.'}</div></main><Footer settings={storeSettings} /></>; }
   const productPath = /^\/products\//.test(location.pathname);

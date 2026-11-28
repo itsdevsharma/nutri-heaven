@@ -1,13 +1,14 @@
 import { OptionalCustomerAuthGuard } from '../customers/optional-customer-auth.guard';
-import { Body, Controller, Get, Headers, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CancelOrderDto, OrderCreateDto, UpdateOrderStatusDto, OrderActionDto } from './order.dto';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminRole } from '../admin/admin.schema';
-import { allowedOrderActions, operationsFor, type OrderAction } from './order-workflow';
+import { allowedOrderActions, amountOverrideBlockedReason, operationsFor, type OrderAction } from './order-workflow';
 import type { AdminRequest } from '../auth/admin-auth.guard';
+import { OrderListQuery } from './order-list.dto';
 
 @Controller('orders')
 export class OrderController {
@@ -26,7 +27,15 @@ export class OrderController {
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
   async adminList(@Request() request: AdminRequest) {
     const orders = await this.service.listAdmin();
-    return orders.map(order => ({ ...order, operations: operationsFor(order), allowedActions: allowedOrderActions(order, request.admin?.role ?? '') }));
+    return orders.map(order => ({ ...order, amountOverrideBlockedReason: amountOverrideBlockedReason(order), operations: operationsFor(order), allowedActions: allowedOrderActions(order, request.admin?.role ?? '') }));
+  }
+
+  @Get('admin/page')
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
+  async adminPage(@Query() query: OrderListQuery, @Request() request: AdminRequest) {
+    const page = await this.service.listAdminPage(query);
+    return { ...page, items: page.items.map(order => ({ ...order, amountOverrideBlockedReason: amountOverrideBlockedReason(order), operations: operationsFor(order), allowedActions: allowedOrderActions(order, request.admin?.role ?? '') })) };
   }
 
   /** Admin read of an order. Protected by RBAC. */
@@ -35,7 +44,7 @@ export class OrderController {
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.SUPPORT)
   async adminGet(@Param('id') id: string, @Request() request: AdminRequest) {
     const order = await this.service.getOrder(id);
-    return { ...order, operations: operationsFor(order), allowedActions: allowedOrderActions(order, request.admin?.role ?? '') };
+    return { ...order, amountOverrideBlockedReason: amountOverrideBlockedReason(order), operations: operationsFor(order), allowedActions: allowedOrderActions(order, request.admin?.role ?? '') };
   }
 
   /** Admin update of fulfilment state. Protected by RBAC. */
@@ -62,4 +71,7 @@ export class OrderController {
 
   @Get(':id')
   get(@Param('id') id: string, @Headers('x-cart-id') cartId?: string) { return this.service.getCustomerOrder(id, cartId); }
+
+  @Get('checkout/:key')
+  checkout(@Param('key') key: string, @Headers('x-cart-id') cartId?: string) { return this.service.getCheckout(key, cartId); }
 }

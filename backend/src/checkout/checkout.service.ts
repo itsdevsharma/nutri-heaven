@@ -55,7 +55,10 @@ export class CheckoutService {
     // Existing catalogue prices include tax. Do not add GST a second time.
     const discountPaise = discount?.discountPaise ?? 0;
     const store = this.mode === 'store' ? storeDeliveryRate(dto.deliveryAddress, grams) : undefined;
-    return { prices, discountPaise, parcel, store, pricingFingerprint: hash({ lines: prices.lines, discountPaise, parcel, ...(store ? { store } : {}) }) };
+    // Images are historical display snapshots, not a pricing input. Excluding
+    // the new field also preserves quotes issued before image snapshots existed.
+    const pricingLines = prices.lines.map(({ image: _snapshotImage, ...line }) => line);
+    return { prices, discountPaise, parcel, store, pricingFingerprint: hash({ lines: pricingLines, discountPaise, parcel, ...(store ? { store } : {}) }) };
   }
   async rates(parcel: Parcel, pin: string, cod: boolean, valuePaise: number): Promise<DeliveryOption[]> {
     const params = new URLSearchParams({ pickup_postcode: parcel.pickupPostcode, delivery_postcode: pin, weight: String(parcel.weight), length: String(parcel.length), breadth: String(parcel.breadth), height: String(parcel.height), cod: cod ? '1' : '0', declared_value: String(valuePaise / 100) });

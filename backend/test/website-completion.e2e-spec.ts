@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+import { ShiprocketShipment } from '../src/shipping/shipping.schema';
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
@@ -11,7 +13,7 @@ import { Product } from '../src/products/product.schema';
 import { enqueueOrderNotification } from '../src/orders/order-outbox.schema';
 import { OrderService } from '../src/orders/order.service';
 import { Order } from '../src/orders/order.schema';
-import { CustomerNotification } from '../src/engagement/engagement.schema';
+import { CustomerNotification, Subscriber } from '../src/engagement/engagement.schema';
 import { NotificationService } from '../src/engagement/notification.service';
 import { MailService } from '../src/mail/mail.module';
 
@@ -93,14 +95,13 @@ describe('Website completion audit', () => {
     await request(app.getHttpServer()).patch(`/customer/me/notifications/${item!._id}/read`).set(auth(otherToken)).expect(404);
   });
 
-  it('requires newsletter consent, confirmation and token ownership', async () => {
+  it('disables newsletter signup without sending mail and preserves existing unsubscribe links', async () => {
+    const send = jest.spyOn(app.get(MailService), 'send');
     await request(app.getHttpServer()).post('/newsletter/subscribe').send({ email: 'newsletter@example.com', consent: false }).expect(400);
-    const joined = await request(app.getHttpServer()).post('/newsletter/subscribe').send({ email: 'newsletter@example.com', consent: true }).expect(201);
-    const token = joined.body.confirmationToken, unsubscribe = joined.body.unsubscribeToken;
-    await request(app.getHttpServer()).post('/newsletter/confirm').send({ token: 'bad' }).expect(400);
-    await request(app.getHttpServer()).post('/newsletter/confirm').send({ token }).expect(201);
-    await request(app.getHttpServer()).post('/newsletter/confirm').send({ token }).expect(400);
-    await request(app.getHttpServer()).post('/newsletter/unsubscribe').send({ token: unsubscribe }).expect(201);
+    await request(app.getHttpServer()).post('/newsletter/subscribe').send({ email: 'newsletter@example.com', consent: true }).expect(503);
+    expect(send).not.toHaveBeenCalled(); send.mockRestore();
+    await app.get<Model<Subscriber>>(getModelToken(Subscriber.name)).create({ email: 'newsletter@example.com', status: 'subscribed', unsubscribeHash: createHash('sha256').update('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa').digest('hex') });
+    await request(app.getHttpServer()).post('/newsletter/unsubscribe').send({ token: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }).expect(201);
     await request(app.getHttpServer()).get('/admin/engagement/subscribers').set(auth(customerToken)).expect(401);
     const list = await request(app.getHttpServer()).get('/admin/engagement/subscribers').set(auth(adminToken)).expect(200);
     expect(list.body[0].status).toBe('unsubscribed'); expect(JSON.stringify(list.body)).not.toMatch(/Hash|Token/);
@@ -139,6 +140,35 @@ describe('Website completion audit', () => {
     // Leave an approved review for the pagination coverage below.
     await request(app.getHttpServer()).patch(`/admin/engagement/reviews/${review.body._id}`).set(auth(adminToken)).send({ status: 'approved' }).expect(200);
   });
+  it('issues private receipts only after verified payment, including historical refunds', async () => {
+    const unpaid = '/customer/me/orders/AUDIT-CONFIRMED/receipt';
+    await request(app.getHttpServer()).get(unpaid).expect(401);
+    await request(app.getHttpServer()).get(unpaid).set(auth(otherToken)).expect(404);
+    const denied = await request(app.getHttpServer()).get(unpaid).set(auth(customerToken)).expect(400);
+    expect(denied.body.message).toContain('only after payment');
+    expect(denied.headers['content-disposition']).toBeUndefined();
+    const orders = app.get<Model<Order>>(getModelToken(Order.name));
+    await orders.updateOne({ id: 'AUDIT-DELIVERED' }, { $set: { paymentReconciliationRequired: true } });
+    await request(app.getHttpServer()).get('/customer/me/orders/AUDIT-DELIVERED/receipt').set(auth(customerToken)).expect(400);
+    await orders.updateOne({ id: 'AUDIT-DELIVERED' }, { $set: { paymentReconciliationRequired: false, paymentStatus: 'refunded', refundedPaise: 10000 } });
+    const refunded = await request(app.getHttpServer()).get('/customer/me/orders/AUDIT-DELIVERED/receipt').set(auth(customerToken)).expect(200);
+    expect(refunded.headers['cache-control']).toBe('no-store');
+    expect(refunded.text).toContain('Amount refunded: INR 100.00');
+    await orders.updateOne({ id: 'AUDIT-DELIVERED' }, { $set: { paymentStatus: 'paid', refundedPaise: 0 } });
+  });
+  it('shows only the owned order courier updates without shipping operation secrets', async () => {
+    const shipments = app.get<Model<ShiprocketShipment>>(getModelToken(ShiprocketShipment.name));
+    await shipments.create({ orderId: 'AUDIT-CONFIRMED', awb: 'TRACK-123', courier: 'Test courier', lockToken: 'private-lock', error: 'private-provider-error', tracking: { status: 'IN TRANSIT', updatedAt: '2026-11-04T05:00:00Z', activities: [{ date: '2026-11-04T04:00:00Z', activity: 'Parcel picked up', location: 'Hisar' }] } });
+    const endpoint = '/customer/me/orders/AUDIT-CONFIRMED';
+    await request(app.getHttpServer()).get(endpoint).set(auth(otherToken)).expect(404);
+    const detail = await request(app.getHttpServer()).get(endpoint).set(auth(customerToken)).expect(200);
+    expect(detail.body.deliveryTracking).toMatchObject({ number: 'TRACK-123', courier: 'Test courier', url: 'https://shiprocket.co/tracking/TRACK-123', status: 'IN TRANSIT', activities: [{ activity: 'Parcel picked up', location: 'Hisar' }] });
+    expect(JSON.stringify(detail.body)).not.toMatch(/private-lock|private-provider-error/);
+    const list = await request(app.getHttpServer()).get('/customer/me/orders').set(auth(customerToken)).expect(200);
+    expect(list.body.find((item: any) => item.id === 'AUDIT-CONFIRMED').deliveryTracking.status).toBe('IN TRANSIT');
+    await shipments.updateOne({ orderId: 'AUDIT-CONFIRMED' }, { $set: { providerCancelled: true } });
+    expect((await request(app.getHttpServer()).get(endpoint).set(auth(customerToken))).body.deliveryTracking).toBeUndefined();
+  });
   it('enforces ownership on addresses, orders, cancellation and receipts', async () => {
     const address = { label: 'Home', name: 'Customer', phone: '9876543210', street: '12 Main Street', city: 'Hisar', state: 'Haryana', pin: '125001' };
     const added = await request(app.getHttpServer()).post('/customer/me/addresses').set(auth(customerToken)).send(address).expect(201);
@@ -162,6 +192,7 @@ describe('Website completion audit', () => {
     const mail = app.get(MailService);
     const configured = jest.spyOn(mail, 'configured', 'get').mockReturnValue(true);
     const send = jest.spyOn(mail, 'send').mockRejectedValue(new Error('provider unavailable'));
+    await app.get(NotificationService).add('buyer@example.com', 'Order received', 'Order received', 'test-confirmation', true, undefined, { text: 'Order summary', html: '<p>Order summary</p>' });
     await app.get(NotificationService).deliver();
     const model = app.get<Model<CustomerNotification>>(getModelToken(CustomerNotification.name));
     const pending = await model.findOne({ emailRequested: true, attempts: 1 }); expect(pending?.sentAt).toBeUndefined();

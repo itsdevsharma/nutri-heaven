@@ -16,7 +16,7 @@ import { API_URL } from '../../api-origin.js';
  *    the API never receives a value the browser computed for display.
  *
  * The access token is kept in `sessionStorage`, not `localStorage`: it dies with
- * the tab. The backend issues a 15-minute access token and has no refresh
+ * the tab. The backend issues an 8-hour access token and has no refresh
  * endpoint yet (step 1 of `backend/ADMIN_COMMERCE_PLAN.md`), which is why a
  * single retry seam is documented on `request()` rather than implemented here.
  */
@@ -143,6 +143,8 @@ export const adminApi = {
     action: (id, action, payload = {}) => request(`/admin/shipping/orders/${encodeURIComponent(id)}/${encodeURIComponent(action)}`, { method: 'POST', body: payload }),
   },
   engagement: {
+    failedEmails: () => request('/admin/engagement/emails/failed'),
+    retryEmail: id => request(`/admin/engagement/emails/${encodeURIComponent(id)}/retry`, { method: 'POST' }),
     report: (params = {}) => request(`/admin/engagement/report${toQuery(params)}`),
     subscribers: (params = {}) => request(`/admin/engagement/subscribers/page${toQuery(params)}`),
     reviews: (params = {}) => request(`/admin/engagement/reviews/page${toQuery(params)}`),
@@ -215,14 +217,15 @@ export const adminApi = {
   },
 
   orders: {
-    list: () => request('/orders/admin'),
+    list: (params = {}) => request(`/orders/admin/page${toQuery(params)}`),
     get: (id) => request(`/orders/admin/${encodeURIComponent(id)}`),
+    overrideAmount: (id, payload) => request(`/orders/admin/${encodeURIComponent(id)}/amount`, { method: 'PATCH', body: payload }),
     updateStatus: (id, status, details = {}) => request(`/orders/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status, ...details } }),
     action: (id, action, payload) => request(`/orders/admin/${encodeURIComponent(id)}/actions/${encodeURIComponent(action)}`, { method: 'POST', body: payload }),
     cancel: (id, reason) => request(`/orders/admin/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: { reason } }),
   },
   payments: {
-    refunds: () => request('/payments/razorpay/admin/refunds'),
+    refunds: (params = {}) => request(`/payments/razorpay/admin/refunds${toQuery(params)}`),
     webhookFailures: () => request('/payments/razorpay/admin/webhook-failures'),
     reconcile: id => request(`/payments/razorpay/admin/${encodeURIComponent(id)}/reconcile`, { method: 'POST' }),
     retryRefund: id => request(`/payments/razorpay/admin/${encodeURIComponent(id)}/retry-refund`, { method: 'POST' }),

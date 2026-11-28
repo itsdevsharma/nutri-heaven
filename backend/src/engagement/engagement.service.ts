@@ -1,7 +1,7 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException, HttpException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
-import { createHash, randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 import { Subscriber, Review, CustomerNotification } from './engagement.schema';
 import { MailService } from '../mail/mail.module';
 import { Customer } from '../customers/customer.schema';
@@ -12,20 +12,9 @@ import { AuditService } from '../audit/audit.service';
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 @Injectable()
 export class EngagementService {
-  private readonly attempts = new Map<string, number>();
   constructor(@InjectModel(Subscriber.name) private readonly subscribers: Model<Subscriber>, @InjectModel(Review.name) private readonly reviews: Model<Review>, @InjectModel(Customer.name) private readonly customers: Model<Customer>, @InjectModel(Order.name) private readonly orders: Model<Order>, @InjectModel(Product.name) private readonly products: Model<Product>, @InjectModel(CustomerNotification.name) private readonly notifications: Model<CustomerNotification>, private readonly mail: MailService, private readonly audit: AuditService) {}
-  async subscribe(email: string) {
-    const now = Date.now(); for (const [key, until] of this.attempts) if (until < now) this.attempts.delete(key);
-    if (this.attempts.has(email)) throw new HttpException('Please wait before requesting another confirmation.', 429);
-    this.attempts.set(email, now + 60000);
-    if (process.env.NODE_ENV === 'production' && !this.mail.configured) throw new ServiceUnavailableException('Newsletter signup is temporarily unavailable.');
-    const existing = await this.subscribers.findOne({ email });
-    const message = 'Check your email to confirm your subscription. If already subscribed, no action is needed.';
-    if (existing?.status === 'subscribed') return { message };
-    const token = randomBytes(32).toString('hex'), unsubscribe = randomBytes(32).toString('hex');
-    await this.subscribers.findOneAndUpdate({ email }, { $set: { status: 'pending', consentAt: new Date(), confirmHash: digest(token), expiresAt: new Date(now + 86400000), unsubscribeHash: digest(unsubscribe) } }, { upsert: true });
-    await this.mail.send(email, 'Confirm your Nutri Heaven newsletter subscription', `Confirm within 24 hours: ${this.mail.url('/account?newsletter=confirm&token=' + token)}\nUnsubscribe at any time: ${this.mail.url('/account?newsletter=unsubscribe&token=' + unsubscribe)}`, 'newsletter-' + digest(token));
-    return { message, ...(process.env.NODE_ENV !== 'production' ? { confirmationToken: token, unsubscribeToken: unsubscribe } : {}) };
+  async subscribe(_email: string) {
+    throw new ServiceUnavailableException('Newsletter signup is currently disabled. We only send order confirmations and requested password reset emails.');
   }
   async newsletterAction(token: string, unsubscribe: boolean) {
     const query = unsubscribe ? { unsubscribeHash: digest(token) } : { confirmHash: digest(token), expiresAt: { $gt: new Date() }, status: 'pending' };
@@ -94,7 +83,7 @@ export class EngagementService {
       this.orders.aggregate([{ $match: paid }, { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'Asia/Kolkata' } }, revenuePaise: { $sum: '$totalPaise' }, orders: { $sum: 1 } } }, { $sort: { _id: 1 } }]),
       this.orders.aggregate([{ $match: paid }, { $unwind: '$lines' }, { $group: { _id: '$lines.productSlug', units: { $sum: '$lines.quantity' }, grossPaise: { $sum: '$lines.lineTotalPaise' } } }, { $sort: { units: -1 } }, { $limit: 10 }]),
       this.customers.countDocuments({ createdAt: dates }), this.orders.countDocuments({ createdAt: dates }), this.catalogueAudit(),
-      this.notifications.countDocuments({ emailRequested: true, sentAt: { $exists: false } }),
+      this.notifications.countDocuments({ emailRequested: true, emailTemplate: 'order_confirmation', sentAt: { $exists: false } }),
     ]);
     const daily = [];
     for (let day = +start; day < +until; day += 86400000) {

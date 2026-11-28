@@ -1,13 +1,14 @@
-import { API_URL } from '../lib/api.js';
+import InstallApp from '../../InstallApp.jsx';
+import { Icon } from './Icon.jsx';
 import { Link } from '../router.jsx';
 import { ModuleGuide } from './ModuleGuide.jsx';
 
 /** Breadcrumb + mobile navigation toggle. Deliberately thin: no global search. */
-export function Topbar({ route, onToggleNav }) {
+export function Topbar({ route, navOpen, toggleRef, onToggleNav }) {
   return (
     <header className="admin-topbar">
-      <button type="button" className="admin-icon-btn admin-nav-toggle" onClick={onToggleNav} aria-label="Toggle navigation">
-        ☰
+      <button type="button" className="admin-icon-btn admin-nav-toggle" ref={toggleRef} onClick={onToggleNav} aria-label={navOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navOpen} aria-controls="admin-navigation">
+        <Icon name="menu" />
       </button>
       <nav className="admin-crumbs" aria-label="Breadcrumb">
         <Link to="/admin">Admin</Link>
@@ -18,14 +19,11 @@ export function Topbar({ route, onToggleNav }) {
           </>
         ) : null}
         <span aria-hidden="true">/</span>
-        <b>{route?.title ?? 'Not found'}</b>
+        <b aria-current="page">{route?.title ?? 'Not found'}</b>
       </nav>
       {route?.id && <ModuleGuide key={route.id} route={route} />}
-      <div className="admin-topbar-meta">
-        <span className="admin-api-chip admin-mono" title={`API base URL: ${API_URL}`}>
-          {API_URL.replace(/^https?:\/\//, '')}
-        </span>
-      </div>
+      <InstallApp admin className="admin-install-app" />
+
     </header>
   );
 }

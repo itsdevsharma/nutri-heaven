@@ -1,0 +1,42 @@
+{
+  "id": "/admin",
+  "name": "Nutri Heaven Admin",
+  "short_name": "Nutri Admin",
+  "description": "Manage Nutri Heaven orders, products, inventory and deliveries.",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#fffdf7",
+  "theme_color": "#153f2f",
+  "lang": "en-IN",
+  "icons": [
+    {
+      "src": "/assets/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Orders",
+      "url": "/admin/orders"
+    },
+    {
+      "name": "Products",
+      "url": "/admin/products"
+    }
+  ]
+}

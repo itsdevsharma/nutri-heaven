@@ -36,9 +36,12 @@ export class RefundsService {
       if (!order) throw new NotFoundException('Order not found');
       if (order.paymentMethod !== 'razorpay' || order.paymentStatus !== 'paid' || !['returned', 'cancelled'].includes(order.status) || !order.razorpayPaymentId) throw new BadRequestException('Only cancelled or inspected returned, captured Razorpay orders can be refunded');
       if (order.status === 'returned' && order.operations?.returnStatus !== 'inspected') throw new BadRequestException('Inspect the return before authorizing a refund');
-      if (order.paymentReconciliationRequired && !(retry && existing?.status === 'failed') && !/Paid order cancelled|reservation was released/.test(order.paymentReconciliationNote || '')) throw new BadRequestException('Investigate the payment exception before refunding');
-      const available = order.totalPaise - (order.refundedPaise || 0) - (order.refundReservedPaise || 0);
-      if (available !== order.totalPaise || available < 1) throw new BadRequestException('Refund balance is already reserved or refunded');
+      const refundableException = /Paid order cancelled|reservation was released/.test(order.paymentReconciliationNote || '')
+        || Boolean(order.capturedAmountPaise && order.paymentReconciliationNote?.startsWith('Payment captured on a replaced checkout;'));
+      if (order.paymentReconciliationRequired && !(retry && existing?.status === 'failed') && !refundableException) throw new BadRequestException('Investigate the payment exception before refunding');
+      const capturedPaise = order.capturedAmountPaise ?? order.totalPaise;
+      const available = capturedPaise - (order.refundedPaise || 0) - (order.refundReservedPaise || 0);
+      if (available !== capturedPaise || available < 1) throw new BadRequestException('Refund balance is already reserved or refunded');
       const requestId = randomUUID();
       const values = { orderId, requestId, paymentId: order.razorpayPaymentId, amountPaise: available, status: 'processing', actor, reason, attempts: 1, nextCheckAt: new Date(Date.now() + 60000), history: [{ at: new Date(), status: 'submission_started', actor, note: reason }] };
       if (retry && existing) {
@@ -89,6 +92,7 @@ export class RefundsService {
       if (refund.status === 'failed' && remote.status !== 'processed') { result = refund.toObject(); return; }
       const order = await this.orders.findOne({ id: refund.orderId }).session(session).exec();
       if (!order) throw new NotFoundException('Order not found');
+      const extraCapture = order.activity.some(item => ['duplicate_payment', 'payment_after_refund'].includes(item.action));
       const status = remote.status === 'processed' ? 'completed' : remote.status === 'failed' ? 'failed' : 'processing';
       refund.providerRefundId = remote.id; refund.status = status; refund.error = '';
       refund.nextCheckAt = new Date(Date.now() + 60000);
@@ -96,11 +100,20 @@ export class RefundsService {
       if (status === 'completed') {
         order.refundReservedPaise = 0; order.refundedPaise = refund.amountPaise;
         order.status = 'refunded'; order.paymentStatus = 'refunded'; order.refundReference = remote.id;
-        order.paymentReconciliationRequired = false; order.paymentReconciliationNote = '';
+        // This refund resolves its own cancellation/return exception only.
+        // A second capture can arrive while the provider refund is pending.
+        const note = order.paymentReconciliationNote || '';
+        const resolvedByRefund = /Paid order cancelled|reservation was released/.test(note)
+          || note.startsWith('Payment captured on a replaced checkout;')
+          || /^Refund .+ failed; finance review required$/.test(note);
+        if (!extraCapture && (!order.paymentReconciliationRequired || resolvedByRefund)) {
+          order.paymentReconciliationRequired = false; order.paymentReconciliationNote = '';
+        }
         order.statusHistory.push({ status: 'refunded', at: new Date(), actor, note: `Refund ${remote.id} processed` });
       } else if (status === 'failed') {
         order.refundReservedPaise = 0;
-        order.paymentReconciliationRequired = true; order.paymentReconciliationNote = `Refund ${remote.id} failed; finance review required`;
+        order.paymentReconciliationRequired = true;
+        if (!extraCapture) order.paymentReconciliationNote = `Refund ${remote.id} failed; finance review required`;
       }
       order.activity.push({ action: `refund_${status}`, actor, at: new Date(), reason: `Provider refund ${remote.id}`, after: { amountPaise: refund.amountPaise, status } });
       await order.save({ session }); await enqueueOrderNotification(this.outbox, order, session); await refund.save({ session }); result = refund.toObject();

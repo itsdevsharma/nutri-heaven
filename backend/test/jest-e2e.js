@@ -2,6 +2,7 @@ module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/helpers/test-env.cjs'],
   testRegex: '.e2e-spec.ts$',
   /**
    * `@nestjs/jwt` 12 ships ESM only (`"type": "module"`) and Jest's CommonJS

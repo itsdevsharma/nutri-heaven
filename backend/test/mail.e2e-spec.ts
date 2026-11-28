@@ -10,16 +10,25 @@ describe('Transactional email adapter', () => {
     process.env.RESEND_API_KEY = 'test-provider-key'; process.env.MAIL_FROM = 'Nutri <hello@example.com>'; process.env.STOREFRONT_URL = 'https://shop.example.com';
     const fetchMock = jest.fn().mockResolvedValue({ ok: true }); global.fetch = fetchMock;
     const mail = new MailService();
-    expect(await mail.send('buyer@example.com', 'Reset password', 'Example link', 'reset-key')).toBe(true);
+    expect(await mail.send('buyer@example.com', 'Reset password', 'Example link', 'reset-key', '<p>Example link</p>')).toBe(true);
     const [url, options] = fetchMock.mock.calls[0]!;
     expect(url).toBe('https://api.resend.com/emails');
     expect(options.headers['Idempotency-Key']).toBe('reset-key');
-    expect(JSON.parse(options.body)).toMatchObject({ to: ['buyer@example.com'], subject: 'Reset password', text: 'Example link' });
+    expect(JSON.parse(options.body)).toMatchObject({ to: ['buyer@example.com'], subject: 'Reset password', text: 'Example link', html: '<p>Example link</p>' });
     expect(mail.url('/account?reset=example')).toBe('https://shop.example.com/account?reset=example');
   });
   it('does not pretend to deliver when production email is unconfigured', async () => {
     process.env.NODE_ENV = 'production'; delete process.env.RESEND_API_KEY;
     await expect(new MailService().send('buyer@example.com', 'Test', 'Text', 'key')).rejects.toThrow('not configured');
+  });
+  it('rejects the onboarding sender and insecure recovery URLs in production', () => {
+    process.env.NODE_ENV = 'production'; process.env.RESEND_API_KEY = 'test-provider-key';
+    process.env.MAIL_FROM = 'Nutri <onboarding@resend.dev>'; process.env.STOREFRONT_URL = 'https://shop.example.com';
+    expect(new MailService().configured).toBe(false);
+    process.env.MAIL_FROM = 'Nutri <orders@example.com>';
+    expect(new MailService().configured).toBe(true);
+    process.env.STOREFRONT_URL = 'http://shop.example.com';
+    expect(new MailService().configured).toBe(false);
   });
   it('hides provider errors and exposes a retryable service failure', async () => {
     process.env.RESEND_API_KEY = 'test-provider-key'; process.env.MAIL_FROM = 'hello@example.com'; process.env.STOREFRONT_URL = 'https://shop.example.com';
